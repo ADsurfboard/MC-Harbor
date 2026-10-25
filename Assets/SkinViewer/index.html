@@ -1,0 +1,12 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; img-src data: blob:; style-src 'unsafe-inline'; connect-src 'none'"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent}canvas{display:block;width:100%;height:100%;outline:none;touch-action:none}</style></head><body><canvas id="player" aria-label="Minecraft 3D skin preview"></canvas><script src="skinview3d.bundle.js"></script><script>
+'use strict';
+let viewer=null,motion='none',active=true,redraw=0;
+function drawOnce(){if(redraw||!viewer)return;redraw=requestAnimationFrame(()=>{redraw=0;if(viewer?.renderPaused)viewer.render();});}
+function report(error){window.webkit?.messageHandlers.harborSkin.postMessage({error:String(error?.message||error)});}
+try{viewer=new skinview3d.SkinViewer({canvas:document.getElementById('player'),width:innerWidth,height:innerHeight,pixelRatio:Math.min(devicePixelRatio,2),renderPaused:true,fov:45,zoom:0.82});viewer.cameraLight.intensity=1.7;viewer.globalLight.intensity=2.4;viewer.controls.enablePan=false;viewer.controls.enableDamping=false;viewer.controls.addEventListener('change',drawOnce);viewer.playerObject.rotation.y=0.35;}catch(error){report(error);}
+window.harborSetSkin=async payload=>{if(!viewer)return;try{await viewer.loadSkin(payload.skin,{model:payload.model||'auto-detect'});if(payload.cape)await viewer.loadCape(payload.cape);else viewer.loadCape(null);viewer.render();}catch(error){report(error);}};
+window.harborSetMotion=payload=>{if(!viewer)return;active=!!payload.active;if(motion!==payload.motion){motion=payload.motion;viewer.autoRotate=motion==='rotate';viewer.autoRotateSpeed=0.55;viewer.animation=motion==='walk'?new skinview3d.WalkingAnimation():null;}viewer.renderPaused=!active||motion==='none';viewer.render();};
+new ResizeObserver(()=>{if(viewer){viewer.setSize(innerWidth,innerHeight);viewer.render();}}).observe(document.documentElement);
+document.addEventListener('visibilitychange',()=>{if(viewer)viewer.renderPaused=document.hidden||!active||motion==='none';});
+window.harborDispose=()=>{cancelAnimationFrame(redraw);redraw=0;viewer?.dispose();viewer=null;};
+</script></body></html>

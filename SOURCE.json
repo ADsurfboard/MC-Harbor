@@ -1,0 +1,7 @@
+{
+  "version": "1.4.0",
+  "hmclRevision": "fbcc17472f08e877d60d6b715734e8054e9e61ee",
+  "hmclCoreSHA256": "98f0123f38e86a606aa583f74d21ae74128679e921ea7ec0c43ab26303767e9e",
+  "skinRenderer": "skinview3d 3.4.2 (MIT); Three.js and skinview-utils licenses included",
+  "audio": "JDSherbert sound files and soundbank intentionally excluded; see README.md."
+}

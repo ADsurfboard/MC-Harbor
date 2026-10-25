@@ -1,0 +1,10 @@
+build/
+evidence/
+outputs/
+MCHarborData/
+ShengganData/
+*.soundbank
+*.wav
+.DS_Store
+__pycache__/
+*.pyc
