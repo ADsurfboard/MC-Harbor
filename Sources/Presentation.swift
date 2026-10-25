@@ -11,6 +11,8 @@ struct HarborModalHost:View {
         case .offline:OfflineAccountPanel(model:model).frame(width:min(410,available.width-70))
         case .addons(let game,let kind):AddonBrowser(model:model,game:game,kind:kind).frame(width:min(1040,available.width-70),height:min(690,available.height-96))
         case .worldEditor(let game,let world):WorldEditorPanel(model:model,game:game,world:world).frame(width:min(760,available.width-70),height:min(770,available.height-96))
+        case .wallpapers:WallpaperLibraryPanel(model:model).frame(width:min(1080,available.width-70),height:min(710,available.height-96))
+        case .skinLibrary:LittleSkinLibraryPanel(model:model).frame(width:min(1080,available.width-70),height:min(730,available.height-96))
         }}
         .harborGlass(appearance:model.appearance,radius:28)
         .overlay(OpticalRim(radius:28,strength:0.35,color:model.themeColor,clarity:model.surfaceClarity).allowsHitTesting(false))

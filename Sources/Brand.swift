@@ -3,17 +3,23 @@ import SwiftUI
 enum HarborBrand {
     static let name = "MC Harbor"
     static let shortName = "MC Harbor"
-    static let version = "1.4.0"
+    static let version = "1.5.0"
+    static let authorURL=URL(string:"https://github.com/ADsurfboard")!
+    static let issuesURL=URL(string:"https://github.com/ADsurfboard/MC-Harbor/issues/new/choose")!
+    static let bilibiliURL=URL(string:"https://space.bilibili.com/1628767816")!
 }
 
 /// Native vector counterpart of the standard icon's folded h. No tile or raster matte.
 struct HarborMonogram: View {
+    @Environment(\.colorScheme) private var scheme
+    var darkInk:Bool? = nil
     var body: some View {
+        let dark = darkInk ?? (scheme == .light)
         ZStack {
-            FoldedHBody().fill(LinearGradient(colors:[Color(white:0.98),Color(white:0.91)],startPoint:.top,endPoint:.bottomTrailing))
-            FoldedHTop().fill(Color(white:0.995))
-            FoldedHUnderfold().fill(LinearGradient(colors:[Color(white:0.70),Color(white:0.93)],startPoint:.topLeading,endPoint:.bottomTrailing))
-            FoldedHLeft().fill(LinearGradient(colors:[Color(white:1),Color(white:0.96)],startPoint:.topLeading,endPoint:.bottomTrailing))
+            FoldedHBody().fill(LinearGradient(colors:[Color(white:dark ? 0.06:0.98),Color(white:dark ? 0.12:0.91)],startPoint:.top,endPoint:.bottomTrailing))
+            FoldedHTop().fill(Color(white:dark ? 0.20:0.995))
+            FoldedHUnderfold().fill(LinearGradient(colors:[Color(white:dark ? 0.02:0.70),Color(white:dark ? 0.16:0.93)],startPoint:.topLeading,endPoint:.bottomTrailing))
+            FoldedHLeft().fill(LinearGradient(colors:[Color(white:dark ? 0.10:1),Color(white:dark ? 0.04:0.96)],startPoint:.topLeading,endPoint:.bottomTrailing))
         }.aspectRatio(0.87,contentMode:.fit).accessibilityHidden(true)
     }
 }

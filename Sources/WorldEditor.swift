@@ -35,7 +35,7 @@ struct WorldEditorPanel:View {
     private var changes:[String:String]{draft.filter{key,value in snapshot?.values[key]?.string != value}}
     var body:some View {
         VStack(spacing:0){
-            HStack(spacing:14){Image(systemName:"square.and.pencil").font(.system(size:23,weight:.light)).foregroundStyle(model.themeColor);VStack(alignment:.leading,spacing:4){Text("编辑存档").font(.system(size:24,weight:.semibold));Text(world.name+" · "+(snapshot?.version ?? game.version)).font(.system(size:11)).foregroundStyle(.secondary).lineLimit(1)};Spacer();Button{close()}label:{Image(systemName:"xmark").frame(width:16,height:18)}.buttonStyle(HarborButtonStyle()).disabled(busy).help("关闭存档编辑")}.padding(26)
+            HStack(spacing:14){Image(systemName:"square.and.pencil").font(.system(size:23,weight:.light)).foregroundStyle(model.controlTint);VStack(alignment:.leading,spacing:4){Text("编辑存档").font(.system(size:24,weight:.semibold));Text(world.name+" · "+(snapshot?.version ?? game.version)).font(.system(size:11)).foregroundStyle(.secondary).lineLimit(1)};Spacer();Button{close()}label:{Image(systemName:"xmark").frame(width:16,height:18)}.buttonStyle(HarborButtonStyle()).disabled(busy).help("关闭存档编辑")}.padding(26)
             Divider().opacity(0.25)
             if let snapshot {
                 ScrollView{VStack(alignment:.leading,spacing:20){

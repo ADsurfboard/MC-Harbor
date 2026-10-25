@@ -6,8 +6,9 @@ import QuartzCore
 struct FrostedSurface:NSViewRepresentable {
     let blur:CGFloat
     let radius:CGFloat
+    var dark=false
     func makeNSView(context:Context)->FrostedSurfaceView{FrostedSurfaceView()}
-    func updateNSView(_ view:FrostedSurfaceView,context:Context){view.configure(blur:blur,radius:radius)}
+    func updateNSView(_ view:FrostedSurfaceView,context:Context){view.configure(blur:blur,radius:radius,dark:dark)}
 }
 final class FrostedSurfaceView:NSVisualEffectView {
     override var isOpaque:Bool{false}
@@ -19,10 +20,12 @@ final class FrostedSurfaceView:NSVisualEffectView {
         wantsLayer=true;layer?.masksToBounds=true;layer?.cornerCurve = .continuous
     }
     required init?(coder:NSCoder){nil}
-    func configure(blur:CGFloat,radius:CGFloat){
+    func configure(blur:CGFloat,radius:CGFloat,dark:Bool){
         // Do not inherit a SwiftUI modal/appearance animation or window emphasis.
         // Only the explicit clarity setting changes this material's diffusion.
         state = .active
+        let name:NSAppearance.Name=dark ? .darkAqua:.aqua
+        if appearance?.name != name{appearance=NSAppearance(named:name)}
         CATransaction.begin();CATransaction.setDisableActions(true)
         layer?.cornerRadius=radius;alphaValue=min(1,max(0,blur/36))
         CATransaction.commit()

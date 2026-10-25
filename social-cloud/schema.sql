@@ -1,0 +1,26 @@
+PRAGMA foreign_keys=ON;
+CREATE TABLE IF NOT EXISTS users(
+ id TEXT PRIMARY KEY, code TEXT UNIQUE NOT NULL, name TEXT NOT NULL,
+ token_hash TEXT UNIQUE NOT NULL, sharing INTEGER NOT NULL DEFAULT 0,
+ skin BLOB, skin_hash TEXT NOT NULL DEFAULT '', skin_model TEXT NOT NULL DEFAULT 'default', created REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS friendships(
+ a TEXT REFERENCES users(id) ON DELETE CASCADE, b TEXT REFERENCES users(id) ON DELETE CASCADE,
+ sender TEXT REFERENCES users(id) ON DELETE CASCADE, accepted INTEGER NOT NULL DEFAULT 0,
+ PRIMARY KEY(a,b), CHECK(a<b)
+);
+CREATE INDEX IF NOT EXISTS friends_a ON friendships(a,accepted);
+CREATE INDEX IF NOT EXISTS friends_b ON friendships(b,accepted);
+CREATE TABLE IF NOT EXISTS history(
+ owner TEXT REFERENCES users(id) ON DELETE CASCADE, id TEXT NOT NULL,
+ instance TEXT NOT NULL, version TEXT NOT NULL, loader TEXT NOT NULL, world TEXT NOT NULL,
+ started REAL NOT NULL, seconds INTEGER NOT NULL, friends TEXT NOT NULL, PRIMARY KEY(owner,id)
+);
+CREATE INDEX IF NOT EXISTS history_time ON history(owner,started DESC);
+CREATE TABLE IF NOT EXISTS messages(
+ a TEXT NOT NULL, b TEXT NOT NULL, id TEXT NOT NULL, sender TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ kind TEXT NOT NULL, text TEXT NOT NULL, invite TEXT NOT NULL DEFAULT '', created REAL NOT NULL, expires REAL NOT NULL,
+ PRIMARY KEY(a,b,id), FOREIGN KEY(a,b) REFERENCES friendships(a,b) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS messages_time ON messages(a,b,created DESC);
+CREATE INDEX IF NOT EXISTS messages_expiry ON messages(expires);

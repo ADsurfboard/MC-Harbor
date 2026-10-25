@@ -1,0 +1,35 @@
+{
+  "tool": "built-in imagegen",
+  "date": "2026-10-25",
+  "promptSet": "MC Harbor default loader icons, sharp isometric 3D Minecraft-inspired subjects, transparent background, clean studio lighting, no tile or text",
+  "files": {
+    "forge": {
+      "generated": "exec-f96cebf3-b171-48ec-8009-1fb9cc4ee90e.png",
+      "path": "Assets/Loaders/forge.png"
+    },
+    "grass": {
+      "generated": "exec-8fbf74bb-12f6-449b-bad1-ad62bbcbebd2.png",
+      "path": "Assets/Loaders/grass.png"
+    },
+    "fabric": {
+      "generated": "exec-383e1600-0f15-4852-85b0-2292855c27ce.png",
+      "path": "Assets/Loaders/fabric.png"
+    },
+    "quilt": {
+      "generated": "exec-00488809-45c3-4725-beb2-5277e23716f2.png",
+      "path": "Assets/Loaders/quilt.png"
+    },
+    "neoforge": {
+      "generated": "exec-8a53d35d-8100-457e-b7fa-0c6b7cea1b12.png",
+      "path": "Assets/Loaders/neoforge.png"
+    },
+    "legacyfabric": {
+      "generated": "exec-a620c648-6733-44c0-9106-e1b45c6f4b98.png",
+      "path": "Assets/Loaders/legacyfabric.png"
+    },
+    "cleanroom": {
+      "generated": "exec-c6b90d98-df96-416d-a510-428b9a6b4f4b.png",
+      "path": "Assets/Loaders/cleanroom.png"
+    }
+  }
+}

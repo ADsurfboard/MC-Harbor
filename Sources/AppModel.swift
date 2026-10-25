@@ -6,6 +6,10 @@ import UniformTypeIdentifiers
 
 @MainActor final class LauncherModel: ObservableObject {
     @Published var preferences: NativePreferences { didSet { persist() } }
+    let sakura=SakuraConnection()
+    let terracotta=TerracottaConnection()
+    @Published var invitedServer=""
+    let social=HarborSocial()
     @Published var section: NativeSection = .library
     @Published var games: [GameInstance] = []
     @Published var remote: [RemoteGame] = []
@@ -44,15 +48,18 @@ import UniformTypeIdentifiers
     var selected: GameInstance? { games.first{$0.id==preferences.selectedGame} ?? games.first }
     var selectedAccount: LauncherAccount? { accounts.first{$0.id==preferences.selectedAccount} ?? accounts.first }
     var appearance: HarborAppearance { preferences.appearance }
-    var themeColor: Color { Color(hexString:preferences.themeHex) }
-    var surfaceClarity:Double{max(0,min(1,(preferences.glassClarity+1)/2))}
+    var themeColor: Color { let color=Color(hexString:preferences.themeHex);return appearance == .theme ? color.paleThemeColor:color }
+    var controlTint:Color{appearance.isLight ? themeColor.mix(with:HarborPalette.night,by:0.38):themeColor}
+    var surfaceClarity:Double{HarborSurfacePolicy(clarity:preferences.glassClarity,frosted:preferences.frostedGlass).clarity}
     func displayName(_ game:GameInstance)->String { let alias=(preferences.nickname[game.id] ?? "").trimmingCharacters(in:.whitespacesAndNewlines);return alias.isEmpty ? game.id:alias }
     var filteredGames: [GameInstance] { games.filter{search.isEmpty || ($0.id+" "+$0.version+" "+$0.loader).localizedCaseInsensitiveContains(search)}.sorted { a,b in let af=preferences.favorites.contains(a.id),bf=preferences.favorites.contains(b.id);if af != bf{return af};return a.modified > b.modified } }
     init() {
         NativePaths.prepare()
         let defaults = (try? JSONSerialization.jsonObject(with:JSONEncoder().encode(NativePreferences()))) as? [String:Any] ?? [:]
         let stored = (try? JSONSerialization.jsonObject(with:Data(contentsOf:NativePaths.root.appendingPathComponent("preferences.json")))) as? [String:Any] ?? [:]
-        let merged = defaults.merging(stored){ _,saved in saved }
+        var merged = defaults.merging(stored){ _,saved in saved }
+        if let old=stored["glassClarity"] as? Double,old<0{merged["glassClarity"]=0.0;merged["frostedGlass"]=true}
+        if let old=merged["glassClarity"] as? Double{merged["glassClarity"]=max(0,min(1,old.isFinite ? old:0.82))}
         preferences = (try? JSONDecoder().decode(NativePreferences.self,from:JSONSerialization.data(withJSONObject:merged))) ?? NativePreferences()
         accounts=(try? JSONDecoder().decode([LauncherAccount].self,from:Data(contentsOf:NativePaths.root.appendingPathComponent("accounts.json")))) ?? []
         for account in accounts{if let profile=SkinStorage.cached(account.id){skinProfiles[account.id]=profile}}
@@ -75,7 +82,7 @@ import UniformTypeIdentifiers
     func open(_ path:String) { guard FileManager.default.fileExists(atPath:path) else{errorMessage="目录尚不存在。";return};NSWorkspace.shared.open(URL(fileURLWithPath:path)) }
     func selectRoot() { let panel=NSOpenPanel();panel.canChooseDirectories=true;panel.canChooseFiles=false;panel.prompt="选择游戏库";if panel.runModal() == .OK,let url=panel.url{preferences.gameRoot=url.path;scan()} }
     func favorite(_ game:GameInstance) { if preferences.favorites.contains(game.id){preferences.favorites.remove(game.id)}else{preferences.favorites.insert(game.id)} }
-    func selectWallpaper() { let p=NSOpenPanel();p.allowedContentTypes=[.png,.jpeg,.heic,.movie];if p.runModal() == .OK,let url=p.url {preferences.wallpaper.filePath=url.path;preferences.wallpaper.kind=["mp4","mov","m4v"].contains(url.pathExtension.lowercased()) ? .video:.image} }
+    func selectWallpaper() { modal = .wallpapers }
     func fetchCatalog() async {
         guard !loadingCatalog else{return};loadingCatalog=true;defer{loadingCatalog=false}
         let official="https://piston-meta.mojang.com/mc/game/version_manifest_v2.json",mirror="https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json"
@@ -94,10 +101,11 @@ import UniformTypeIdentifiers
         if games.contains(where:{$0.id==name}){errorMessage="该版本名称已存在。";return}
         backend("install",title:"安装 "+name,arguments:["version":version.id,"name":name,"loader":loader,"loaderVersion":loaderVersion]){_ in self.scan();self.preferences.selectedGame=name;self.toast("安装完成")}
     }
-    func launch(_ game:GameInstance) {
+    func launch(_ game:GameInstance,server:String?=nil) {
         guard !running.contains(game.id) else{return}
         guard let account=selectedAccount else{inspectedGame=nil;section = .accounts;return}
-        var args:[String:Any]=["id":game.id,"runDirectory":game.runDirectory,"memory":preferences.memory,"gameJava":preferences.javaPath,"accountType":account.kind,"username":account.name,"uuid":account.uuid,"accountID":account.id,"javaExplicit":false,"completeDependencies":preferences.completeDependencies,"loader":game.loader,"version":game.version]
+        var args:[String:Any]=["historySessionID":UUID().uuidString,"id":game.id,"runDirectory":game.runDirectory,"memory":preferences.memory,"gameJava":preferences.javaPath,"accountType":account.kind,"username":account.name,"uuid":account.uuid,"accountID":account.id,"javaExplicit":false,"completeDependencies":preferences.completeDependencies,"loader":game.loader,"version":game.version]
+        if let server{args["serverAddress"]=server}
         let options=preferences.instanceOptions[game.id]
         let original=NativeScanner.readJSON(URL(fileURLWithPath:game.directory).appendingPathComponent(".hmcl/config/instance-game-settings.json"))
         if let originalMemory=original["maxMemory"] as? Int,(original["overrideProperties"] as? [String] ?? []).contains("maxMemory"){args["memory"]=originalMemory}
@@ -136,8 +144,8 @@ import UniformTypeIdentifiers
                 if !silent,let message=event["message"] as? String{if self.logLines.count>400{self.logLines.removeFirst(100)};self.logLines.append(message);if let i=self.works.firstIndex(where:{$0.id==job.id}){self.works[i].detail=message}}
                 if let value=event["progress"] as? Double,let i=self.works.firstIndex(where:{$0.id==job.id}){self.works[i].progress=value}
                 if let code=event["deviceCode"] as? String{self.deviceCode=code;self.verificationURL=event["url"] as? String}
-                if event["event"] as? String == "launched",let id=arguments["id"] as? String{self.running.insert(id);if let i=self.works.firstIndex(where:{$0.id==job.id}){self.works[i].active=false};self.toast("游戏已启动")}
-            }},completion:{[weak self] result in Task{@MainActor in guard let self else{return};self.processes.removeValue(forKey:job.id);if command=="migrate"{self.migrating=false};if let i=self.works.firstIndex(where:{$0.id==job.id}){self.works[i].active=false;switch result{case .success:self.works[i].progress=1;case .failure:self.works[i].error=true}}
+                if event["event"] as? String == "launched",let id=arguments["id"] as? String{self.running.insert(id);if let game=self.games.first(where:{$0.id==id}){self.social.begin(game,name:self.displayName(game),id:arguments["historySessionID"] as? String ?? UUID().uuidString)};if let i=self.works.firstIndex(where:{$0.id==job.id}){self.works[i].active=false};self.toast("游戏已启动")}
+            }},completion:{[weak self] result in Task{@MainActor in guard let self else{return};self.processes.removeValue(forKey:job.id);if command=="launch",let id=arguments["id"] as? String{self.social.finish(id)};if command=="migrate"{self.migrating=false};if let i=self.works.firstIndex(where:{$0.id==job.id}){self.works[i].active=false;switch result{case .success:self.works[i].progress=1;case .failure:self.works[i].error=true}}
                 switch result{case .success(let object):done(object);case .failure(let error):self.errorMessage=error.localizedDescription;if let id=arguments["id"] as? String{self.running.remove(id)}}
             }})
             processes[job.id]=process

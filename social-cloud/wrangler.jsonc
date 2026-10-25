@@ -1,0 +1,38 @@
+{
+  "name": "mc-harbor-friends",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-10-25",
+  "workers_dev": true,
+ "preview_urls": false,
+  "observability": {
+    "enabled": false
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "mc-harbor-friends",
+      "database_id": "b00782f8-fec6-4aa2-ad1e-7a1ac4dbf95f"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CHAT_HUB",
+        "class_name": "ChatHub"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "chat-v1",
+      "new_sqlite_classes": [
+        "ChatHub"
+      ]
+    }
+  ],
+  "triggers": {
+    "crons": [
+      "17 3 * * *"
+    ]
+  }
+}

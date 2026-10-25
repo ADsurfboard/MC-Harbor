@@ -31,6 +31,12 @@ import java.util.zip.*;
 
 /** JSON-line adapter for the unmodified, stable HMCL game engine; no JavaFX window is created. */
 public final class NativeBridge {
+    static String validServer(String value){
+        if(value.length()>260 || value.isBlank() || value.chars().anyMatch(c->Character.isWhitespace(c)||Character.isISOControl(c)) || value.matches(".*[/@?#].*")) throw new IllegalArgumentException("Invalid Minecraft server address");
+        org.jackhuang.hmcl.util.ServerAddress address=org.jackhuang.hmcl.util.ServerAddress.parse(value);
+        if(address.host().isBlank() || address.port()==0 || !address.host().matches(address.host().contains(":")?"[0-9a-fA-F:.]+":"[A-Za-z0-9][A-Za-z0-9.-]*"))throw new IllegalArgumentException("Invalid Minecraft server address");
+        return value;
+    }
     private static final PrintWriter protocol=new PrintWriter(new OutputStreamWriter(new FileOutputStream(FileDescriptor.out),StandardCharsets.UTF_8),true);
     private static JsonObject request;
     private static Path data;
@@ -65,7 +71,7 @@ public final class NativeBridge {
             Map<String,Object> output=switch(command){
                 case "mods"->mods();case "resources"->resources();case "loaders"->loaders();case "install"->install();case "repair"->repair();
                 case "langScan"->languageScan();case "langRead"->new NativeLocalization(request,data).read();case "langSave"->new NativeLocalization(request,data).save();
-                case "langTranslate"->new NativeLocalization(request,data).translate();case "langImport"->new NativeLocalization(request,data).importTranslations();case "langExport"->new NativeLocalization(request,data).export();case "langApply"->new NativeLocalization(request,data).applyTextAssets();
+                case "langPending"->new NativeLocalization(request,data).pending();case "langTranslate"->new NativeLocalization(request,data).translate();case "langImport"->new NativeLocalization(request,data).importTranslations();case "langExport"->new NativeLocalization(request,data).export();case "langApply"->new NativeLocalization(request,data).applyTextAssets();
                 case "launch"->launch();case "import"->importPack();case "backup"->backup(false);case "export"->exportPack();
                 case "dependencyScan"->new NativeDependencies(request,data,provider,NativeBridge::stage).scan();
                 case "dependencyComplete"->new NativeDependencies(request,data,provider,NativeBridge::stage).complete();
@@ -151,10 +157,10 @@ public final class NativeBridge {
         AuthInfo authentication;
         if(request.has("account")){JsonObject stored=request.getAsJsonObject("account");Account account=restore(text("accountType","offline"),stored.getAsJsonObject("hmclMetadata"),stored.getAsJsonObject("privateData"));authentication=account.logIn();emit(Map.of("event","accountUpdated","data",serialize(account,text("accountType","offline"))));}
         else{String name=text("username","");if(!name.matches("[A-Za-z0-9_]{3,16}"))throw new IOException("离线用户名无效");UUID uuid;try{uuid=UUID.fromString(text("uuid",""));}catch(IllegalArgumentException e){uuid=UUID.nameUUIDFromBytes(("OfflinePlayer:"+name).getBytes(StandardCharsets.UTF_8));}authentication=new AuthInfo(name,uuid,"0",AuthInfo.USER_TYPE_LEGACY,"{}");}
-        JavaRuntime java=gameJava(version);LaunchOptions options=new LaunchOptions.Builder().setGameDir(repository.getRunDirectory(id)).setJava(java).setVersionName(id).setVersionType("MC Harbor").setProfileName(id).setMaxMemory(Math.max(1024,Math.min(6144,integer("memory",3072)))).setWidth(Math.max(640,Math.min(7680,integer("width",1280)))).setHeight(Math.max(480,Math.min(4320,integer("height",800)))).setFullscreen(request.has("fullscreen")&&request.get("fullscreen").getAsBoolean()).setJavaArguments(StringUtils.tokenize(text("jvmArguments",""))).setDaemon(true).setAllowAutoAgent(true).create();
+        JavaRuntime java=gameJava(version);LaunchOptions options=new LaunchOptions.Builder().setGameDir(repository.getRunDirectory(id)).setJava(java).setVersionName(id).setVersionType("MC Harbor").setProfileName(id).setMaxMemory(Math.max(1024,Math.min(6144,integer("memory",3072)))).setWidth(Math.max(640,Math.min(7680,integer("width",1280)))).setHeight(Math.max(480,Math.min(4320,integer("height",800)))).setFullscreen(request.has("fullscreen")&&request.get("fullscreen").getAsBoolean()).setJavaArguments(StringUtils.tokenize(text("jvmArguments",""))).setDaemon(true).setAllowAutoAgent(true).setQuickPlayOption(text("serverAddress","").isBlank()?null:new org.jackhuang.hmcl.game.QuickPlayOption.MultiPlayer(validServer(text("serverAddress","")))).create();
         Files.createDirectories(data.resolve("logs"));PrintWriter gameLog=new PrintWriter(Files.newBufferedWriter(data.resolve("logs").resolve("game-"+System.currentTimeMillis()+".log"),StandardCharsets.UTF_8));
         ProcessListener listener=new ProcessListener(){@Override public synchronized void onLog(String line,boolean error){gameLog.println(line);gameLog.flush();}@Override public void onExit(int code,ExitType type){gameLog.close();}};
-        stage("启动游戏");ManagedProcess process=new DefaultLauncher(repository,version,authentication,options,listener,true).launch();emit(Map.of("event","launched","pid",process.getProcess().pid()));int exit=process.getProcess().waitFor();return Map.of("id",id,"exitCode",exit);
+        stage("启动游戏");ManagedProcess process=new DefaultLauncher(repository,version,authentication,options,listener,true).launch();emit(Map.of("event","launched","pid",process.getProcess().pid()));NativePlayHistory history=null;try{if(request.has("historySessionID"))history=new NativePlayHistory(data,text("historySessionID",""),repository.getRunDirectory(id),process.getProcess().pid());}catch(Exception error){System.err.println("Playtime receipt unavailable");}int exit;try{exit=process.getProcess().waitFor();}finally{if(history!=null)history.close();}return Map.of("id",id,"exitCode",exit);
     }
     private static Map<String,Object> importPack()throws Exception{
         String name=validName(text("name",""));if(Files.exists(repository.getVersionRoot(name)))throw new IOException("实例目录已存在，未覆盖");Path file=Path.of(text("file",""));

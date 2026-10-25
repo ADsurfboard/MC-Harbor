@@ -1,27 +1,37 @@
 import AppKit
 import MetalKit
 import SwiftUI
+import ImageIO
 
 private struct AccentKey:EnvironmentKey{static let defaultValue=Color(hex:0x29825B)}
 private struct ClarityKey:EnvironmentKey{static let defaultValue=0.82}
 private struct RainbowKey:EnvironmentKey{static let defaultValue=true}
+private struct FrostedKey:EnvironmentKey{static let defaultValue=false}
+private struct AppearanceKey:EnvironmentKey{static let defaultValue=HarborAppearance.ultraClear}
 extension EnvironmentValues{
     var harborAccent:Color{get{self[AccentKey.self]}set{self[AccentKey.self]=newValue}}
     var harborClarity:Double{get{self[ClarityKey.self]}set{self[ClarityKey.self]=newValue}}
     var harborRainbow:Bool{get{self[RainbowKey.self]}set{self[RainbowKey.self]=newValue}}
+    var harborFrosted:Bool{get{self[FrostedKey.self]}set{self[FrostedKey.self]=newValue}}
+    var harborAppearance:HarborAppearance{get{self[AppearanceKey.self]}set{self[AppearanceKey.self]=newValue}}
 }
 extension Color{
     init(hexString:String){let clean=hexString.trimmingCharacters(in:CharacterSet(charactersIn:"#"));self.init(hex:UInt32(clean,radix:16) ?? 0x29825B)}
     var hexString:String{let rgb=NSColor(self).usingColorSpace(.deviceRGB) ?? .systemGreen;return String(format:"#%02X%02X%02X",Int(rgb.redComponent*255),Int(rgb.greenComponent*255),Int(rgb.blueComponent*255))}
     var readableInk:Color{let rgb=NSColor(self).usingColorSpace(.deviceRGB) ?? .systemGreen;return rgb.redComponent*0.2126+rgb.greenComponent*0.7152+rgb.blueComponent*0.0722 > 0.65 ? .black:.white}
+    var paleThemeColor:Color{let rgb=NSColor(self).usingColorSpace(.deviceRGB) ?? .systemGreen;let minimum=min(rgb.redComponent,min(rgb.greenComponent,rgb.blueComponent));let mix=max(0,(0.72-minimum)/max(0.001,1-minimum));return self.mix(with:.white,by:mix)}
 }
 enum InstanceArt{
-    private static var cache:[String:NSImage]=[:]
+    private static let cache:NSCache<NSString,NSImage>={let cache=NSCache<NSString,NSImage>();cache.countLimit=64;cache.totalCostLimit=32*1024*1024;return cache}()
     static func image(_ game:GameInstance)->NSImage?{
         let resource:String
         switch game.loader{case "Forge":resource="forge";case "NeoForge":resource="neoforge";case "Fabric":resource="fabric";case "Legacy Fabric":resource="legacyfabric";case "Quilt":resource="quilt";case "Cleanroom":resource="cleanroom";default:resource="grass"}
         let path=game.iconPath ?? NativePaths.resources.appendingPathComponent("Loaders/"+resource+".png").path
-        if let image=cache[path]{return image};let image=NSImage(contentsOfFile:path);if let image{cache[path]=image};return image
+        let revision=(try? URL(fileURLWithPath:path).resourceValues(forKeys:[.contentModificationDateKey]).contentModificationDate)?.timeIntervalSince1970 ?? 0
+        let key=(path+String(revision)) as NSString
+        if let image=cache.object(forKey:key){return image}
+        guard let source=CGImageSourceCreateWithURL(URL(fileURLWithPath:path) as CFURL,nil),let bitmap=CGImageSourceCreateThumbnailAtIndex(source,0,[kCGImageSourceCreateThumbnailFromImageAlways:true,kCGImageSourceThumbnailMaxPixelSize:1024,kCGImageSourceCreateThumbnailWithTransform:true] as CFDictionary) else{return nil}
+        let image=NSImage(cgImage:bitmap,size:NSSize(width:bitmap.width,height:bitmap.height));cache.setObject(image,forKey:key,cost:bitmap.bytesPerRow*bitmap.height);return image
     }
 }
 enum BrandArtwork{static let icon=NSImage(contentsOf:NativePaths.resources.appendingPathComponent("Brand/Icon.png"))}

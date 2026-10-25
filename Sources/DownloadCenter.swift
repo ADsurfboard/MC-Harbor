@@ -57,7 +57,7 @@ struct NativeDownloadsView:View {
                     .padding(.horizontal,14).frame(height:34)
                     .background {
                         if model.downloadCategory==id {
-                            Capsule().fill(model.themeColor.opacity(0.13)).glassEffect(.clear.interactive(),in:.capsule)
+                            HarborMaterial(shape:Capsule(),appearance:model.appearance,interactive:true)
                         }
                     }
                 }.buttonStyle(HarborBareButtonStyle())

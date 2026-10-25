@@ -39,6 +39,8 @@ struct HarborButtonStyle:ButtonStyle {
     var prominent=false
     @Environment(\.harborAccent) private var accent
     @Environment(\.harborClarity) private var clarity
+    @Environment(\.harborAppearance) private var appearance
+    @Environment(\.harborFrosted) private var frosted
     @Environment(\.harborReduceMotion) private var reduceMotion
     @Environment(\.isEnabled) private var enabled
     func makeBody(configuration:Configuration)->some View {
@@ -46,8 +48,7 @@ struct HarborButtonStyle:ButtonStyle {
             .font(.system(size:12,weight:.medium))
             .foregroundStyle(prominent ? accent.readableInk:Color.primary)
             .padding(.horizontal,16).padding(.vertical,9)
-            .background(prominent ? accent:Color.primary.opacity((1-clarity)*0.07),in:Capsule())
-            .glassEffect((clarity>0.55 ? Glass.clear:Glass.regular).interactive(),in:.capsule)
+            .background{ZStack{HarborMaterial(shape:Capsule(),appearance:appearance,interactive:true);if prominent{Capsule().fill(accent.opacity(frosted ? 0.8:1))}}}
             .contentShape(.interaction,Capsule())
             .overlay(Capsule().stroke(.white.opacity(prominent ? 0.25:0.12),lineWidth:0.6))
             .harborPrism(radius:16)

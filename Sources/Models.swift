@@ -3,11 +3,12 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 public enum HarborAppearance: String, Codable, CaseIterable, Identifiable {
-    case dark, light, ultraClear
+    case dark, light, ultraClear, theme
     public var id: String { rawValue }
-    var title: String { switch self { case .dark: return "深色"; case .light: return "浅色"; case .ultraClear: return "通透" } }
+    var title: String { switch self { case .dark: return "深色"; case .light: return "浅色"; case .ultraClear: return "通透";case .theme:return "主题" } }
+    var isLight:Bool{self == .light || self == .theme}
 }
-public enum WallpaperKind: String, Codable, CaseIterable, Identifiable {
+public enum WallpaperKind: String, Codable, CaseIterable, Identifiable, Sendable {
     case harbor, image, video
     public var id: String { rawValue }
 }
@@ -22,24 +23,28 @@ public struct WallpaperSettings: Codable, Equatable {
 struct NativePreferences: Codable {
     var themeHex = "#29825B"
     var glassClarity: Double = 0.82
+    var frostedGlass = false
+    var localizationEditorHeight: Double = 180
+    var localizationEditorHidden = false
     var rainbowCorners = true
     var knownLibraries:[String] = []
     var appearance: HarborAppearance = .ultraClear
     var wallpaper = WallpaperSettings()
     var fluidBackground = false
     var reduceMotion = false
-    var gameRoot = "/Applications/.minecraft"
-    var selectedGame = "冻土"
+    var gameRoot = FileManager.default.fileExists(atPath:"/Applications/.minecraft") ? "/Applications/.minecraft":NativePaths.root.appendingPathComponent("game").path
+    var selectedGame = ""
     var favorites: Set<String> = []
     var memory = 3072
-    var javaPath = "/Library/Java/JavaVirtualMachines/liberica-jdk-21.jdk/Contents/Home/bin/java"
+    var javaPath = NativePaths.resources.appendingPathComponent("Runtime/bin/java").path
     var downloadSource = "auto"
     var downloadThreads = 8
     var completeDependencies = false
     var introEnabled = true
     var voiceEnabled = true
+    var welcomeVoice:WelcomeVoice = .female
     var introVolume: Double = 0.65
-    var username = "张少"
+    var username = "Player"
     var introDuration: Double = 4.8
     var soundsEnabled = true
     var soundVolume: Double = 0.48
@@ -66,8 +71,8 @@ enum ContentKind: String, CaseIterable, Identifiable {
     var symbol:String { switch self {case .mods:return "puzzlepiece.extension";case .resourcepacks:return "square.stack.3d.up";case .shaderpacks:return "sun.max";case .worlds:return "globe.europe.africa";case .modpacks:return "shippingbox"} }
 }
 enum HarborModal: Identifiable {
-    case install(RemoteGame), offline, addons(GameInstance,ContentKind),worldEditor(GameInstance,LocalContent)
-    var id:String {switch self {case .install(let v):return "install-"+v.id;case .offline:return "offline";case .addons(let g,let k):return "addons-"+g.id+k.rawValue;case .worldEditor(let g,let w):return "world-"+g.id+w.id}}
+    case install(RemoteGame), offline, addons(GameInstance,ContentKind),worldEditor(GameInstance,LocalContent),wallpapers,skinLibrary
+    var id:String {switch self {case .install(let v):return "install-"+v.id;case .offline:return "offline";case .addons(let g,let k):return "addons-"+g.id+k.rawValue;case .worldEditor(let g,let w):return "world-"+g.id+w.id;case .wallpapers:return "wallpapers";case .skinLibrary:return "skinLibrary"}}
 }
 struct GameInstance: Identifiable, Hashable, Sendable {
     let id: String
@@ -95,10 +100,10 @@ struct LauncherAccount: Codable, Identifiable {
 struct ModFile: Identifiable { let id: String; let name: String; let path: URL; let enabled: Bool; let size: Int64; var version = ""; var authors = ""; var modID = "";var iconPath:String? = nil }
 struct WorkItem: Identifiable { let id=UUID(); var title: String; var detail=""; var progress: Double? = nil; var active=true; var error=false }
 enum NativeSection: String, CaseIterable, Identifiable {
-    case library, downloads, accounts, settings
+    case library, downloads, accounts, multiplayer, friends, settings
     var id: String { rawValue }
-    var title: String { switch self { case .library:return "游戏";case .downloads:return "下载";case .accounts:return "账号";case .settings:return "设置" } }
-    var icon: String { switch self { case .library:return "square.stack.3d.up";case .downloads:return "arrow.down.circle";case .accounts:return "person.crop.circle";case .settings:return "slider.horizontal.3" } }
+    var title: String { switch self { case .library:return "游戏";case .downloads:return "下载";case .accounts:return "账号";case .multiplayer:return "联机";case .friends:return "好友";case .settings:return "设置" } }
+    var icon: String { switch self { case .library:return "square.stack.3d.up";case .downloads:return "arrow.down.circle";case .accounts:return "person.crop.circle";case .multiplayer:return "network";case .friends:return "person.2";case .settings:return "slider.horizontal.3" } }
 }
 enum NativePaths {
     static var root: URL {

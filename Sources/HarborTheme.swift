@@ -14,7 +14,7 @@ struct HarborTheme {
     let appearance: HarborAppearance
 
     var primaryText: Color {
-        appearance == .light ? HarborPalette.night : HarborPalette.fog
+        appearance.isLight ? HarborPalette.night : HarborPalette.fog
     }
 
     var secondaryText: Color {
@@ -25,7 +25,7 @@ struct HarborTheme {
         switch appearance {
         case .dark:
             return HarborPalette.night.opacity(0.4)
-        case .light:
+        case .light, .theme:
             return Color.white.opacity(0.38)
         case .ultraClear:
             return HarborPalette.night.opacity(0.08)
@@ -36,7 +36,7 @@ struct HarborTheme {
         switch appearance {
         case .dark:
             return HarborPalette.nightRaised.opacity(0.2)
-        case .light:
+        case .light, .theme:
             return Color.white.opacity(0.18)
         case .ultraClear:
             return nil
@@ -44,7 +44,7 @@ struct HarborTheme {
     }
 
     var border: Color {
-        appearance == .light
+        appearance.isLight
             ? Color.white.opacity(0.5)
             : HarborPalette.fog.opacity(appearance == .ultraClear ? 0.24 : 0.16)
     }
@@ -67,69 +67,41 @@ extension Color {
     }
 }
 
-struct HarborGlassModifier: ViewModifier {
-    let appearance: HarborAppearance
-    let radius: CGFloat
-    let interactive: Bool
+/// A single monotonic scale: 0 is diffuse, 1 is clear. Frost is a separate material.
+struct HarborSurfacePolicy {
+    let clarity:Double
+    let frosted:Bool
+    init(clarity:Double,frosted:Bool){self.clarity=max(0,min(1,clarity.isFinite ? clarity:0.82));self.frosted=frosted}
+    var diffusion:Double{frosted ? 1:1-clarity}
+    var liquid:Double{frosted ? 0:clarity}
+}
+struct HarborMaterial<S:Shape>:View {
+    let shape:S
+    let appearance:HarborAppearance
+    var interactive=false
     @Environment(\.harborClarity) private var clarity
+    @Environment(\.harborFrosted) private var frosted
     @Environment(\.harborAccent) private var accent
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-
-    // Negative clarity increases native backdrop diffusion, never the dark fill.
-    // The existing nonnegative Liquid Glass range is unchanged.
-    private var minimumFrost: Double {
-        guard !reduceTransparency, clarity < 0.50 else { return 0 }
-        let value = max(0, min(1, 1 - clarity / 0.50))
-        return value * value * (3 - 2 * value)
-    }
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
-        let theme = HarborTheme(appearance: appearance)
-        if minimumFrost > 0 || appearance == .light {
-            // Keep the AppKit diffuser outside the SwiftUI glass subtree. Wrapping an
-            // NSVisualEffectView in glassEffect lets the compositor flatten/rebuild
-            // its backdrop when a scroll view or modal animates over it.
-            let frost = max(minimumFrost, appearance == .light ? pow(1-clarity,2)*0.65:0)
-            content
-                .foregroundStyle(theme.primaryText.mix(with:HarborPalette.night,by:minimumFrost*0.92))
-                .environment(\.colorScheme,minimumFrost>0.65 ? .light:(appearance == .light ? .light:.dark))
-                .background {
-                    ZStack {
-                        FrostedSurface(blur:36*frost,radius:radius)
-                        shape.fill((appearance == .light ? Color(hex:0xF0F3F1):HarborPalette.nightRaised).opacity(0.25*(1-minimumFrost)))
-                            .glassEffect(Glass.clear.tint(accent.opacity(0.035*(1-minimumFrost))).interactive(interactive),in:shape)
-                    }.allowsHitTesting(false).accessibilityHidden(true)
-                }
-                .overlay(shape.stroke(theme.border,lineWidth:0.7))
-                .shadow(color:theme.shadow,radius:20,y:10)
-        } else if #available(macOS 26.0, *) {
-            switch appearance {
-            case .ultraClear:
-                content
-                    .background(HarborPalette.nightRaised.opacity(pow(1-clarity,2)),in:shape)
-                    .glassEffect((reduceTransparency ? Glass.regular : Glass.clear).tint(accent.opacity((1-clarity)*0.10)).interactive(interactive), in: shape)
-                    .overlay(shape.stroke(theme.border, lineWidth: 0.7))
-                    .shadow(color: theme.shadow, radius: 22, y: 12)
-            case .dark, .light:
-                content
-                    .background((appearance == .dark ? HarborPalette.nightRaised:Color(hex:0xF0F3F1)).opacity(pow(1-clarity,2)),in:shape)
-                    .glassEffect(
-                        (clarity>0.55 && !reduceTransparency ? Glass.clear:Glass.regular)
-                            .tint(accent.opacity((1-clarity)*0.07))
-                            .interactive(interactive),
-                        in: shape
-                    )
-                    .overlay(shape.stroke(theme.border, lineWidth: 0.7))
-                    .shadow(color: theme.shadow, radius: 20, y: 10)
+    var body:some View{let policy=HarborSurfacePolicy(clarity:clarity,frosted:frosted);let light=appearance.isLight;let base=light ? Color(hex:0xF0F3F1):HarborPalette.nightRaised
+        ZStack{
+            if reduceTransparency{shape.fill(appearance == .theme ? accent.paleThemeColor:base)}else{
+                if policy.diffusion>0.001{FrostedSurface(blur:36,radius:0,dark:!light).clipShape(shape).opacity(policy.diffusion)}
+                if policy.liquid>0.001{shape.fill(base.opacity(0.035)).glassEffect(Glass.clear.tint(accent.opacity(appearance == .theme ? 0.12:0.025)).interactive(interactive),in:shape).opacity(policy.liquid)}
+                // A constant neutral veil avoids changing hue as clarity moves.
+                shape.fill((appearance == .theme ? accent:base).opacity(frosted ? (light ? 0.12:0.10):(appearance == .theme ? 0.10:0.015)))
             }
-        } else {
-            content
-                .background(.regularMaterial, in: shape)
-                .overlay(shape.stroke(theme.border, lineWidth: 0.7))
-                .shadow(color: theme.shadow, radius: 18, y: 9)
-        }
+        }.allowsHitTesting(false).accessibilityHidden(true)
+    }
+}
+struct HarborGlassModifier:ViewModifier {
+    let appearance:HarborAppearance
+    let radius:CGFloat
+    let interactive:Bool
+    func body(content:Content)->some View{let shape=RoundedRectangle(cornerRadius:radius,style:.continuous);let theme=HarborTheme(appearance:appearance)
+        content.background{HarborMaterial(shape:shape,appearance:appearance,interactive:interactive)}
+            .overlay(shape.stroke(theme.border,lineWidth:0.7).allowsHitTesting(false))
+            .shadow(color:theme.shadow,radius:20,y:10)
     }
 }
 
@@ -163,7 +135,7 @@ struct HarborActionButtonStyle: ButtonStyle {
         let theme = HarborTheme(appearance: appearance)
         configuration.label
             .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(prominent ? Color.white : theme.primaryText)
+            .foregroundStyle(prominent ? accent.readableInk : theme.primaryText)
             .padding(.horizontal, 16)
             .padding(.vertical, 9)
             .background {

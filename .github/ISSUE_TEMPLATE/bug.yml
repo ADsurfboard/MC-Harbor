@@ -1,0 +1,38 @@
+name: 问题反馈
+description: 提交可复现的问题、错误日志或界面缺陷。
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "请说明问题出现在哪一步。不要上传恢复密钥、登录令牌或包含私人内容的完整存档。"
+  - type: input
+    id: version
+    attributes:
+      label: MC Harbor / macOS 版本
+      placeholder: "例如 MC Harbor 1.5.0，macOS 27，Apple M3 / 8GB"
+    validations:
+      required: true
+  - type: input
+    id: instance
+    attributes:
+      label: Minecraft、加载器与整合包
+      placeholder: "例如 1.20.1 / Forge；界面问题可填无关"
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤与实际结果
+      description: 说明从哪个页面开始、点了什么，以及发生了什么。
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期行为
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 截图或已去除敏感内容的日志
+      description: 汉化问题请附具体资源名称、语言键、原文和输出；联机问题请说明陶瓦 / Sakura / 普通地址。

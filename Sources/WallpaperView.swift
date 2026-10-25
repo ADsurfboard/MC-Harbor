@@ -92,7 +92,7 @@ struct HarborWallpaperView: View {
         switch appearance {
         case .dark:
             return HarborPalette.night
-        case .light:
+        case .light, .theme:
             return Color.white
         case .ultraClear:
             return HarborPalette.night
@@ -106,7 +106,7 @@ struct HarborWallpaperView: View {
             return userOpacity
         case (_, .dark):
             return 0.85 * userOpacity
-        case (_, .light):
+        case (_, .light), (_, .theme):
             return 0.75 * userOpacity
         case (_, .ultraClear):
             return 0.6 * userOpacity
@@ -123,7 +123,7 @@ struct HarborWallpaperView: View {
                 switch appearance {
                 case .dark:
                     return [Color(hex: 0x111613), Color(hex: 0x29352E)]
-                case .light:
+                case .light, .theme:
                     return [Color(hex: 0xEEF3F2), Color(hex: 0xC9D6D5)]
                 case .ultraClear:
                     return [Color(hex: 0x18221C), Color(hex: 0x3B4840)]
