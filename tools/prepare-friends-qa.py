@@ -3,7 +3,7 @@ from pathlib import Path
 import hashlib,importlib.util,json,os,secrets,threading,time,uuid
 
 root=Path(__file__).resolve().parent.parent
-folder=root/'evidence/friends-multi-qa';folder.mkdir(parents=True,exist_ok=True)
+folder=Path(os.environ.get('HARBOR_QA_FIXTURE_DIR',str(root/'evidence/friends-multi-qa')));folder.mkdir(parents=True,exist_ok=True)
 os.environ['HARBOR_SOCIAL_DATA']=str(folder/'server')
 spec=importlib.util.spec_from_file_location('social_qa',root/'social-server/server.py')
 module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module);module.initialize()

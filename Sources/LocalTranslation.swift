@@ -31,6 +31,7 @@ enum TranslationText {
     }
 }
 
+@available(macOS 15.0, *)
 enum LocalLanguageTranslation {
     static let source=Locale.Language(identifier:"en")
     static let target=Locale.Language(identifier:"zh-Hans")
@@ -44,5 +45,79 @@ enum LocalLanguageTranslation {
             for response in responses{guard let key=response.clientIdentifier,let index=Int(key),batch.indices.contains(index) else{continue};values[batch[index]]=response.targetText}
         }
         return try zip(entries,parsed).map{entry,parts in ["resource":entry.resource,"entry":entry.id,"source":entry.source,"translation":try TranslationText.restore(parts,values:values)]}
+    }
+}
+
+/// Optional online fallback for macOS 13 and 14, used only after the player consents.
+enum LegacyLanguageTranslation {
+    enum Failure: LocalizedError {
+        case unavailable(String)
+        case unchanged
+        var errorDescription: String? {
+            switch self {
+            case .unavailable(let message): return message
+            case .unchanged: return "翻译服务没有返回可用译文。"
+            }
+        }
+    }
+
+    // MyMemory accepts at most 500 UTF-8 bytes per segment. Preserve whitespace
+    // between segments instead of asking the remote service to recreate it.
+    static func chunks(_ input: String, limit: Int = 400) throws -> [TranslationText.Part] {
+        var rest = input
+        var result: [TranslationText.Part] = []
+        while !rest.isEmpty {
+            var end = rest.startIndex
+            var bytes = 0
+            while end < rest.endIndex {
+                let next = rest.index(after: end)
+                let count = rest[end..<next].utf8.count
+                if bytes + count > limit { break }
+                bytes += count
+                end = next
+            }
+            guard end > rest.startIndex else { throw Failure.unavailable("原文中有无法分段的字符。") }
+            if end < rest.endIndex, let space = rest[..<end].lastIndex(where: { $0.isWhitespace }), space > rest.startIndex { end = space }
+            let part = String(rest[..<end])
+            if !part.isEmpty { result.append(.init(text: part, translate: true)) }
+            rest = String(rest[end...])
+            let whitespace = String(rest.prefix(while: { $0.isWhitespace }))
+            if !whitespace.isEmpty { result.append(.init(text: whitespace, translate: false)); rest.removeFirst(whitespace.count) }
+        }
+        return result
+    }
+
+    static func query(_ text: String) async throws -> String {
+        var url = URLComponents(string: "https://api.mymemory.translated.net/get")!
+        url.queryItems = [URLQueryItem(name: "q", value: text), URLQueryItem(name: "langpair", value: "en|zh-CN")]
+        let data = try await HarborHTTP.data(url.url!, limit: 100_000)
+        return try parseResponse(data,source:text)
+    }
+
+    static func parseResponse(_ data:Data,source:String)throws->String {
+        guard let response = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let status = response["responseStatus"] as? Int, status == 200,
+              let body = response["responseData"] as? [String: Any],
+              let result = body["translatedText"] as? String else {
+            throw Failure.unavailable("在线翻译暂不可用或已达到服务额度；已完成的译文会保留。")
+        }
+        if result.uppercased().contains("MYMEMORY WARNING") { throw Failure.unavailable("在线翻译服务额度已用完，请稍后重试；已完成的译文会保留。") }
+        guard !result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              result.caseInsensitiveCompare(source) != .orderedSame else { throw Failure.unchanged }
+        return result
+    }
+
+    static func translate(_ entry: PendingLanguageEntry, lookup: (String) async throws -> String = query) async throws -> [String: String] {
+        let parsed = try TranslationText.parts(entry.source).flatMap { part in
+            part.translate ? try chunks(part.text) : [part]
+        }
+        guard parsed.contains(where: \.translate) else { throw Failure.unchanged }
+        var values: [String: String] = [:]
+        for part in parsed where part.translate && values[part.text] == nil {
+            try Task.checkCancellation()
+            values[part.text] = try await lookup(part.text)
+        }
+        return ["resource": entry.resource, "entry": entry.id, "source": entry.source,
+                "translation": try TranslationText.restore(parsed, values: values)]
     }
 }

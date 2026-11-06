@@ -1,5 +1,6 @@
 """Create the Chinese product and technical introduction, with embedded CJK fonts."""
 from pathlib import Path
+import os
 from xml.sax.saxutils import escape
 from reportlab.pdfgen import canvas
 from reportlab.lib.colors import HexColor, Color
@@ -10,13 +11,13 @@ from reportlab.platypus import Paragraph
 from reportlab.lib.styles import ParagraphStyle
 
 ROOT=Path(__file__).resolve().parent.parent
-OUT=ROOT.parents[1]/'outputs/MC-Harbor-启动器介绍.pdf';OUT.parent.mkdir(exist_ok=True)
+OUT=Path(os.environ.get('HARBOR_DOC_OUTPUT',str(ROOT/'outputs/MC-Harbor-Intel-Introduction.pdf')));OUT.parent.mkdir(parents=True,exist_ok=True)
 pdfmetrics.registerFont(TTFont('CJK','/System/Library/Fonts/Supplemental/Arial Unicode.ttf'))
 W,H=595.276,841.89
 INK=HexColor('#10271E');GREEN=HexColor('#29825B');MUTED=HexColor('#5C6E65');PALE=HexColor('#EDF4EE');LINE=HexColor('#D9E5DD')
 DOC=canvas.Canvas(str(OUT),pagesize=(W,H),pageCompression=1)
-DOC.setTitle('MC Harbor | 启动器介绍');DOC.setAuthor('morben 墨尔本');DOC.setSubject('1.5.0：原生 macOS Minecraft 启动器，架构、功能与实例资源汉化')
-README=['# MC Harbor','1.5.0 · Apple Silicon · macOS 26 及以上','[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/latest) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.5.0/MC-Harbor-Introduction.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)','以下正文与随包 PDF 同版。']
+DOC.setTitle('MC Harbor | 启动器介绍');DOC.setAuthor('morben 墨尔本');DOC.setSubject('1.5.1 Intel 兼容版：原生 macOS Minecraft 启动器、功能与汉化')
+README=['# MC Harbor','1.5.1 Intel 兼容版 · macOS 12 及以上','[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/tag/v1.5.1-intel-preview.1) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.5.1-intel-preview.1/MC-Harbor-Intel-Introduction.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)','以下正文与随包 PDF 同版。']
 STYLE=ParagraphStyle('body',fontName='CJK',fontSize=10.4,leading=17.4,textColor=INK,wordWrap='CJK',spaceAfter=0)
 
 def txt(text,x,y,size=11,color=INK,font='CJK'):
@@ -38,7 +39,7 @@ def page(number,tag,title,description):
     y=para(description,46,H-132,W-92,11,MUTED)
     rule(y-21);return y-52
 def finish(number):
-    rule(52);txt('MC Harbor  ·  1.5.0  ·  2026.10.26',46,33,8,MUTED)
+    rule(52);txt('MC Harbor Intel  ·  1.5.1  ·  2026.11.07',46,33,8,MUTED)
     txt(f'{number:02d} / 10',W-86,33,8,MUTED);DOC.showPage()
 def section(title,text,y):
     README.append('### '+title)
@@ -64,10 +65,10 @@ txt('MC Harbor',46,490,43,HexColor('#F4F8F4'))
 txt('原生，清晰，随手可用。',48,440,23,HexColor('#D6EADC'))
 para('为 macOS 重新设计的 Minecraft 启动器。\n保留 HMCL 的游戏能力，采用真实 WinHarbor 原生界面，\n把账号、下载、实例资源与汉化工作集中在一个窗口。',48,395,W-96,12,HexColor('#C0D0C6'),21)
 DOC.setStrokeColor(HexColor('#375448'));DOC.line(48,269,W-48,269)
-for x,big,small in [(48,'SwiftUI','原生界面'),(218,'HMCL','稳定内核'),(388,'Liquid Glass','系统材质')]:
+for x,big,small in [(48,'SwiftUI','原生界面'),(218,'HMCL','稳定内核'),(388,'Frosted','原生磨砂')]:
     txt(big,x,231,17,HexColor('#F4F8F4'));txt(small,x,207,10,HexColor('#A9C7B4'))
-para('1.5.0 · Apple Silicon · macOS 26 及以上\n本机验证：Apple M3 / 8GB / macOS 27',48,132,W-96,10,HexColor('#ADC4B5'),17)
-txt('产品与技术介绍 / 2026.10.26',48,51,9,HexColor('#A9C7B4'));txt('01 / 10',W-91,51,9,HexColor('#A9C7B4'));DOC.showPage()
+para('1.5.1 Intel 兼容版 · macOS 12 及以上\n本地验证：Apple Silicon 上以 Rosetta 运行 Intel 程序',48,132,W-96,10,HexColor('#ADC4B5'),17)
+txt('Intel 兼容版 / 2026.11.07',48,51,9,HexColor('#A9C7B4'));txt('01 / 10',W-91,51,9,HexColor('#A9C7B4'));DOC.showPage()
 
 # 02 - Features
 y=page(2,'DAILY USE','日常操作，一处完成。','以实例为中心。默认加载器图标高清重绘，保留实例资源原图标、可视化资源管理与明确的下载目标。')
@@ -86,7 +87,7 @@ finish(2)
 
 # 03 - Localization
 y=page(3,'INSTANCE RESOURCES','让汉化成为原生工作流。','读取原文、筛选范围、对照编辑、导出资源包。整个流程保留原实例资源。')
-steps=[('01','读取全部 lang','扫描本体、已下载原版语言资产、模组 / 资源包与 KubeJS、resources 语言目录。保留所有语言原文件，原文与中文按命名空间和语言键对应。'),('02','选择全部或部分资源','左侧列表显示语言数量与翻译进度。可全选、清空或逐项勾选，也能搜索语言键、原文和译文，单独查看待翻译项。'),('03','社区补全与逐条编辑','一键按版本 / 加载器读取 CFPA 社区译库，校验 MD5 后补齐可用译文。已有中文和手动译文保留；未覆盖的英语原文继续由本机引擎补齐；无法安全处理的条目标记待翻译。'),('04','命名并导出汉化资源包','自定义名称，格式号优先读取实际游戏 JAR，兼容 JSON 与旧 LANG。保存 / 导入时检查 %s、%1$s、{0} 等占位符，导出附元数据与社区署名。'),('05','提取给 AI，再导回','未汉化包包含英文 zh_cn 模板、全部原始 lang、语言键目录与说明。让 AI 翻译模板值，保留键与占位符，再将同结构 ZIP 导入。')]
+steps=[('01','读取全部 lang','扫描本体、已下载原版语言资产、模组 / 资源包与 KubeJS、resources 语言目录。保留所有语言原文件，原文与中文按命名空间和语言键对应。'),('02','选择全部或部分资源','左侧列表显示语言数量与翻译进度。可全选、清空或逐项勾选，也能搜索语言键、原文和译文，单独查看待翻译项。'),('03','社区补全与逐条编辑','一键按版本 / 加载器读取 CFPA 社区译库，校验 MD5 后补齐可用译文。已有中文和手动译文保留；未覆盖的英语原文可由系统或经确认的在线引擎补齐；无法安全处理的条目标记待翻译。'),('04','命名并导出汉化资源包','自定义名称，格式号优先读取实际游戏 JAR，兼容 JSON 与旧 LANG。保存 / 导入时检查 %s、%1$s、{0} 等占位符，导出附元数据与社区署名。'),('05','提取给 AI，再导回','未汉化包包含英文 zh_cn 模板、全部原始 lang、语言键目录与说明。让 AI 翻译模板值，保留键与占位符，再将同结构 ZIP 导入。')]
 for n,title,body in steps:
     README.append('### '+title)
     DOC.setFillColor(PALE);DOC.roundRect(46,y-31,33,33,10,fill=1,stroke=0);txt(n,53,y-19,10,GREEN)
@@ -100,7 +101,7 @@ y=section('FTB Quests 的核心文本','读取章节与章节组标题、任务�
 y=section('存档数据包与书页','自动发现 saves/<世界>/datapacks 中的 ZIP 和文件夹，以及实例 datapacks。提取进度的标题 / 说明、Patchouli 书页，以及 tellraw 和 title 指令的文字组件，覆盖聊天、标题与动作栏显示。只处理识别出的文本，任务 ID、物品 ID、触发条件与指令结构保留。',y)
 y=section('一套编辑与 AI 导回流程','任务和数据包同样支持全部 / 部分选择、原文对照、逐条编辑和草稿重读。提取给 AI 会保留原始 SNBT / JSON5 / 数据文件，并提供带映射键的未汉化模板；翻译后用导入译文接回。颜色代码、格式占位符与物品链接等标记会校验。',y)
 y=section('资源包与任务补丁分开应用','普通 lang 导出为资源包；任务配置与数据包译文使用“应用任务 / 数据包”。先检查文件修订和存档占用，再保存原字节备份、校验 ZIP 并原子写回，失败回滚。导出的 ZIP 也包含 overrides 目录，可按实例根目录合并；原 JAR 不改写。',y)
-para('自写 FTB 任务通常没有现成社区译文，1.5 可使用系统翻译补齐英语文本，仍支持逐条人工校对或提取给 AI。新增流程已完成 39 项隔离协议检查并完整复跑，包含中途写入失败的回滚；未替用户修改真实存档，也未冒称完成 FTB 游戏内全流程试玩。',46,y,W-92,9.5,MUTED)
+para('自写 FTB 任务通常没有现成社区译文。macOS 15 及以上可用系统翻译；12—14 可选择在线补全，也可逐条校对或提取给 AI。旧版的 39 项隔离检查包含写入失败回滚；未替用户修改真实存档。',46,y,W-92,9.5,MUTED)
 finish(4)
 
 # 04 - World editor and dependency completion
@@ -114,7 +115,7 @@ finish(5)
 
 # 05 - Foundation and data
 y=page(6,'FOUNDATION','熟悉的内核，原生的外壳。','基于 HMCL 3.16.4 稳定内核与真实 WinHarbor SwiftUI / AppKit 代码进行适配。')
-rows=[('Swift / SwiftUI / AppKit','窗口、系统玻璃、导航、实例管理、偏好、动画与原生汉化编辑器。'),('Java 17 字节码 / JDK 21','无窗口桥接 HMCL 认证、游戏依赖、下载、启动、元数据与语言文件处理。'),('JavaScript / Three.js','本地离线 skinview3d 角色与披风渲染；使用真实 Minecraft 皮肤 UV。'),('JavaScript / SQL / Python','Cloudflare Workers、SQLite Durable Objects 与 D1 提供内置好友和实时聊天；Python / SQLite 自建版随源码提供。')]
+rows=[('Swift / SwiftUI / AppKit','窗口、原生磨砂、导航、实例管理、偏好、动画与原生汉化编辑器。'),('Java 17 字节码 / JDK 21','无窗口桥接 HMCL 认证、游戏依赖、下载、启动、元数据与语言文件处理。'),('JavaScript / Three.js','本地离线 skinview3d 角色与披风渲染；使用真实 Minecraft 皮肤 UV。'),('JavaScript / SQL / Python','Cloudflare Workers、SQLite Durable Objects 与 D1 提供内置好友和实时聊天；Python / SQLite 自建版随源码提供。')]
 for title,body in rows:
     README.append('### '+title)
     txt(title,46,y,12,GREEN);y=para(body,46,y-14,W-92,10.3)-23
@@ -131,20 +132,20 @@ finish(6)
 
 # 06 - Validation and sources
 y=page(7,'VERIFICATION & SOURCES','可核对的功能与边界。','功能、许可和验证范围随对应源码与交付记录保留。')
-y=section('本轮验证','公网原生客户端 59 项、24 好友客户端 17 项、Worker 59 项、Python 服务 45 项、增量后端 22 项通过；实例资源 / 汉化 38 项、FTB / 数据包 39 项复跑通过。测试覆盖真实消息推送、离线未读、串聊隔离、长备注、皮肤头像与撤销好友权限。',y)
-y=section('已有基线','此前 20 项原生业务、11 项账号与资源、5 项下载事务通过；隔离环境实际安装 / 启动 1.20.1，并验证坏源回退、备份与 MultiMC 世界字节回环。初次接入时记录 27 个有效实例与 2 个账户；当前列表以目录扫描结果为准。',y)
-y=para('验证边界：没有逐个长时间试玩 27 个整合包，没有替用户在线身份上传测试皮肤；本包为 ARM64、本机临时签名，未 Apple 公证。外部服务可用性与任意模组包帧率不能作永久保证。',46,y,W-92,9.5,MUTED)-27
+y=section('本轮验证','Intel 客户端在 Rosetta 下通过 53 项功能检查、24 好友场景检查及 22 项 Java 后台检查；旧系统翻译分段、占位符保护和真实在线返回也已核对。Worker / Python 好友服务各自的隔离检查通过。',y)
+y=section('已有基线','原 1.5 版已检查原生业务、账号、下载与实例资源；隔离环境实际安装 / 启动 1.20.1，并验证坏源回退、备份与 MultiMC 世界字节回环。实际实例和账号以个人设备的配置为准。',y)
+y=para('验证边界：Intel 程序已在 Rosetta 运行，macOS 12—14 的实际界面与完整游戏尚未在对应设备上验收；未逐个试玩所有整合包，未 Apple 公证。外部服务与游戏表现不能永久保证。',46,y,W-92,9.5,MUTED)-27
 txt('主要开源来源',46,y,15);y-=24
 y=source('HMCL · GPL-3.0-or-later', 'https://github.com/HMCL-dev/HMCL',y)
 y=source('skinview3d / Three.js / skinview-utils · MIT', 'https://github.com/bs-community/skinview3d',y)
 y=source('CFPA 社区译库 · CC BY-NC-SA 4.0', 'https://github.com/CFPAOrg/Minecraft-Mod-Language-Package',y)
 y=source('I18nUpdateMod3 更新元数据 · AGPL-3.0', 'https://github.com/xfl03/I18nUpdateMod3',y)
 y=source('Terracotta · AGPL-3.0 与 IPC 例外', 'https://github.com/burningtnt/Terracotta',y)
-para('界面源于用户提供的 WinHarbor；材质使用系统 Liquid Glass。界面音效：JDSherbert；欢迎播报：用户提供的 Clara、Adam、Clara 2、Morgan 四份原 MP3。标准 h 源于参考设计，正式图标以透明原生矢量绘制，外围交由系统呈现。OpenJFX / BellSoft OpenJDK 为 GPLv2 + Classpath Exception，随包保留许可。',46,y,W-92,8.8,MUTED,14)
+para('界面源于用户提供的 WinHarbor；兼容版使用原生磨砂材质。界面音效：JDSherbert；欢迎播报：用户提供的 Clara、Adam、Clara 2、Morgan 四份原 MP3。标准 h 源于参考设计，正式图标以透明原生矢量绘制，外围交由系统呈现。OpenJFX / Eclipse Temurin OpenJDK 为 GPLv2 + Classpath Exception，随包保留许可。',46,y,W-92,8.8,MUTED,14)
 finish(7)
 # 08 - Native 1.5 update
-y=page(8,'LIBRARIES & TRANSLATION','更完整的汉化，更顺手的素材库。','1.5 更新继续保留已有玻璃、叠片、粒子、音效和原始 Clara 播报。')
-y=section('一键汉化：社区优先，本机补齐','先使用 CFPA 社区中文，未覆盖的英语文本继续调用 macOS 原生 Translation 引擎。FTB 任务、KubeJS、存档数据包的已识别显示文本与普通 lang 使用同一补全流程。无需云翻译密钥；系统首次使用可能需要下载语言模型。机器译文仍建议人工校对，未能安全处理的条目会保留并显示待翻译数量。',y)
+y=page(8,'LIBRARIES & TRANSLATION','更完整的汉化，更顺手的素材库。','Intel 版保留三层叠片、粒子、音效和原始 Clara 播报，用系统磨砂替代 Liquid Glass。')
+y=section('一键汉化：社区优先，再补齐','先使用 CFPA 社区中文；macOS 15 及以上可继续调用系统 Translation。macOS 12—14 可经确认使用 MyMemory 在线补全，每日有 5000 字符免费额度；系统翻译不可用时也可选择该回退。未完成的条目保留，支持手动校对或提取给 AI。',y)
 y=section('长段落与文本格式保护','长任务说明按词边界拆分，格式占位符、颜色代码、物品 / 任务链接和网址留在翻译引擎之外，写回前继续校验。保留已有中文与手动译文，拒绝写入原文已经改变的旧结果；可停止任务并保留完成部分。对照编辑区支持上下拖动、隐藏 / 再显示，并记住高度与显示状态。',y)
 y=section('LittleSkin 原生皮肤库','在账号页搜索公共皮肤、按收藏或最新排序、翻页、收藏与打开作者原网页。标准皮肤下载后验证 SHA256 与 PNG 尺寸，用现有 skinview3d 渲染真实 Minecraft 三维角色。确认后应用到所选账号；在线上传仍取决于该账号服务能力。高清皮肤会明确提示标准账号尺寸要求。',y)
 y=section('命名、预览、切换壁纸','壁纸库支持批量导入图片 / 视频，逐张命名、预览和切换。视频缩略图右下角显示视频标记，预览默认静音；原有背景登记到库中。新导入内容使用受管理的副本，移除不会删除原始文件。',y)
@@ -163,9 +164,9 @@ finish(9)
 # 10 - Multiplayer and service boundaries
 y=page(10,'PLAY TOGETHER','跨启动器，按标准联机。','陶瓦房间码与 Sakura Frp 两条路径；Minecraft 服务器地址不绑定启动器品牌。')
 y=section('标准地址，没有启动器品牌门槛','联机页填写服务器地址、选择兼容实例，可启动并直接加入。复制地址后，使用其他启动器的朋友也能加入同一服务器。游戏版本、模组配置、服务器认证与外部服务额度仍然适用，启动器不承诺绕过这些条件。',y)
-y=section('Sakura Frp：创建并开启 TCP 隧道','先在游戏中对局域网开放，再填写或从近期日志读取端口，选择节点并创建 TCP 隧道。官方 ARM64 frpc 按需下载、校验大小和 MD5；访问密钥保存在钥匙串，运行配置为私有权限文件，停止时删除。确认隧道成功后才显示可复制的地址。公开服务器模式只列服务允许的节点。',y)
+y=section('Sakura Frp：创建并开启 TCP 隧道','先在游戏中对局域网开放，再填写或从近期日志读取端口，选择节点并创建 TCP 隧道。官方 Intel frpc 按需下载、校验大小和 MD5；访问密钥保存在钥匙串，运行配置为私有权限文件，停止时删除。确认隧道成功后才显示可复制的地址。公开服务器模式只列服务允许的节点。',y)
 y=section('陶瓦房间：无需配置中转服务器','基于官方 Terracotta / EasyTier 模块，优先 P2P，按需从官方发布页下载并验证 SHA256。macOS 直接运行官方进程、读取本机端口并管理生命周期，无需安装系统后台服务。先进入存档、开放局域网，再创建房间；朋友通过支持陶瓦的启动器或独立客户端加入。',y)
 y=section('使用边界','好友聊天不需要玩家部署服务。陶瓦使用社区公共节点，NAT、网络质量和节点状态会影响连通；Sakura 需要玩家自己的访问密钥、可用节点及相应额度。普通地址可用于其他启动器，但 Minecraft 版本、模组配置和服务器认证仍须匹配，不绕过正版或服务器权限。',y)
-para('已实测官方 ARM64 陶瓦核心的 11 项端口 / 状态 / 扫描 / 退出检查，原生启动与退出另行验证；Sakura 官方客户端下载与版本校验通过。没有宣称完成两台外网设备长时间 Minecraft 联机，也未使用真实 Sakura 账号建立测试隧道。新版本读取 Mojang 实时清单，失败时使用镜像与缓存；后续格式、认证或 Java 要求变化仍需维护适配。',46,y,W-92,9.5,MUTED)
+para('Intel 版已在 Rosetta 下校验并启动官方陶瓦、退出房间，并验证 Sakura Intel 客户端版本；其他陶瓦数据未被改动。没有宣称完成两台外网设备长时间 Minecraft 联机，也未使用真实 Sakura 账号建立测试隧道。新版本读取 Mojang 实时清单，失败时使用镜像与缓存；后续格式、认证或 Java 要求变化仍需维护适配。',46,y,W-92,9.5,MUTED)
 finish(10)
 DOC.save();README += ['## 构建与许可','构建、开发测试、音效授权与免费服务边界详见 [BUILDING.md](BUILDING.md) 和 [docs/SERVICES.md](docs/SERVICES.md)。本工程为 GPL-3.0-or-later；第三方素材按各自许可分发。','如果喜欢，记得 Star 我（'];(ROOT/'README.md').write_text('\n\n'.join(README)+'\n');print(OUT)

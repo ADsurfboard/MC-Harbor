@@ -18,6 +18,7 @@ struct WindowConfigurator: NSViewRepresentable {
     private func configure(_ window: NSWindow?,coordinator:Coordinator) {
         guard let window,window !== coordinator.configuredWindow else { return }
         coordinator.configuredWindow=window
+        window.contentMinSize=NSSize(width:1040,height:700)
         window.isOpaque = false
         window.backgroundColor = .clear
         window.titlebarAppearsTransparent = true

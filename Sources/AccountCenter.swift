@@ -9,7 +9,7 @@ struct NativeAccountsView:View {
             if let account=model.selectedAccount{AccountSkinDetails(model:model,account:account).id(account.id).frame(maxWidth:.infinity)}
         }}
         AccountLoginControls(model:model)
-    }.padding(28)}.scrollIndicators(.hidden)}
+    }.padding(28)}.harborHideScrollIndicators()}
 }
 private struct AccountSkinDetails:View {
     @ObservedObject var model:LauncherModel;let account:LauncherAccount
@@ -31,6 +31,6 @@ private struct AccountSkinDetails:View {
         HStack(spacing:10){Button{chooseSkin()}label:{Label("导入皮肤",systemImage:"square.and.arrow.down")}.buttonStyle(HarborButtonStyle());Spacer();if pending{Button("取消预览"){draft=nil;draftModel=profile?.model ?? "default"}.buttonStyle(HarborBareButtonStyle()).font(.system(size:11));Button("应用皮肤"){if let path=draft ?? profile.map({URL(fileURLWithPath:$0.skinPath)}){applying=true;model.applySkin(path,slim:draftModel=="slim",account:account)}}.buttonStyle(HarborButtonStyle(prominent:true)).disabled(loading || (account.kind != "offline" && profile?.canUpload == false))}}
         if let error=model.skinErrors[account.id]{Text(error).font(.system(size:11)).foregroundStyle(.secondary).textSelection(.enabled)}else if !rendererError.isEmpty{Text(rendererError).font(.system(size:11)).foregroundStyle(.secondary)}else if pending{Text("预览尚未应用").font(.system(size:10)).foregroundStyle(.secondary)}else if profile?.isDefault == true{Text("默认 Minecraft 皮肤").font(.system(size:10)).foregroundStyle(.secondary)}
         if let uuid=profile?.uuid ?? (account.uuid.isEmpty ? nil:account.uuid){Text(uuid).font(.system(size:9,design:.monospaced)).foregroundStyle(.tertiary).textSelection(.enabled)}
-    }.padding(24).harborGlass(appearance:model.appearance,radius:26).task{draftModel=profile?.model ?? "default";model.loadSkin(account)}.onChange(of:profile?.skinPath){_,path in if draft==nil || draft?.path==path{draft=nil;draftModel=profile?.model ?? "default"}}.onChange(of:loading){_,value in if !value && applying{applying=false;if model.skinErrors[account.id]==nil{draft=nil;draftModel=profile?.model ?? "default"}}}}
+    }.padding(24).harborGlass(appearance:model.appearance,radius:26).task{draftModel=profile?.model ?? "default";model.loadSkin(account)}.harborOnChange(of:profile?.skinPath){_,path in if draft==nil || draft?.path==path{draft=nil;draftModel=profile?.model ?? "default"}}.harborOnChange(of:loading){_,value in if !value && applying{applying=false;if model.skinErrors[account.id]==nil{draft=nil;draftModel=profile?.model ?? "default"}}}}
     private func chooseSkin(){let panel=NSOpenPanel();panel.allowedContentTypes=[.png];panel.canChooseDirectories=false;if panel.runModal() == .OK,let file=panel.url{do{draft=try SkinStorage.importFile(file);rendererError=""}catch{model.skinErrors[account.id]=error.localizedDescription}}}
 }

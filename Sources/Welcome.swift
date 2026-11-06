@@ -37,10 +37,10 @@ struct WelcomeSequence:View {
         }.clipShape(RoundedRectangle(cornerRadius:12))
     }.task{
         playbackDuration=max(model.preferences.introDuration,model.preferences.voiceEnabled ? model.preferences.welcomeVoice.duration+1.1:0);began=Date();HarborAudio.shared.play(.startup)
-        try? await Task.sleep(for:.seconds(0.5));guard !Task.isCancelled else{return}
+        try? await HarborDelay.sleep(seconds:0.5);guard !Task.isCancelled else{return}
         withAnimation{reveal=true};if model.preferences.voiceEnabled{audio.play(model.preferences.welcomeVoice,volume:model.preferences.introVolume)}
-        try? await Task.sleep(for:.seconds(max(0.5,playbackDuration-1.05)));guard !Task.isCancelled else{return};leaving=true
-        try? await Task.sleep(for:.seconds(0.55));if !Task.isCancelled{finish()}
+        try? await HarborDelay.sleep(seconds:max(0.5,playbackDuration-1.05));guard !Task.isCancelled else{return};leaving=true
+        try? await HarborDelay.sleep(seconds:0.55);if !Task.isCancelled{finish()}
     }.onDisappear{audio.stop()}.accessibilityElement(children:.contain)}
     private func finish(){audio.stop();withAnimation(.easeInOut(duration:0.55)){model.showIntro=false}}
 }

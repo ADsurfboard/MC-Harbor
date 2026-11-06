@@ -1,0 +1,61 @@
+name: Intel compatibility
+on:
+  push:
+    branches: ["codex/intel-compat"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  intel-macos:
+    runs-on: macos-15-intel
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify native Intel runner
+        run: test "$(uname -m)" = x86_64
+      - name: Obtain pinned Intel runtime
+        run: python3 tools/setup-intel-deps.py
+      - name: Build test bundle
+        env:
+          HARBOR_TEST_WITHOUT_SFX: '1'
+        run: python3 tools/build-native.py
+      - name: Inspect Intel bundle
+        env:
+          HARBOR_TEST_WITHOUT_SFX: '1'
+        run: python3 tools/check-intel-bundle.py
+      - name: Test translation and architecture compatibility
+        run: python3 tools/check-intel-swift.py
+      - name: Test packaged Intel Java backend
+        run: python3 tools/check-intel-backend.py
+      - name: Prepare disposable test keychain
+        shell: bash
+        run: |
+          qa_keychain_password="$(openssl rand -hex 24)"
+          echo "::add-mask::$qa_keychain_password"
+          security create-keychain -p "$qa_keychain_password" "$RUNNER_TEMP/mcharbor-ci.keychain-db"
+          security unlock-keychain -p "$qa_keychain_password" "$RUNNER_TEMP/mcharbor-ci.keychain-db"
+          security list-keychains -d user -s "$RUNNER_TEMP/mcharbor-ci.keychain-db"
+          security default-keychain -d user -s "$RUNNER_TEMP/mcharbor-ci.keychain-db"
+      - name: Build production client test harness
+        run: python3 tools/build-update-checks.py
+      - name: Test native client and 24 friends
+        env:
+          HARBOR_SKIP_LIVE_QA: '1'
+        run: |
+          python3 tools/run-update-checks.py
+          python3 tools/check-intel-multifriend.py
+      - name: Test friends and chat services
+        run: |
+          mkdir -p evidence
+          node social-cloud/test-worker.mjs
+          python3 social-server/test_server.py

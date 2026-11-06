@@ -34,7 +34,7 @@ struct NativeDownloadsView:View {
                             .harborGlass(appearance:model.appearance,radius:24)
                             .padding(.horizontal,20).padding(.bottom,20)
                     } else {
-                        ContentUnavailableView("先安装 Minecraft 实例",systemImage:"shippingbox")
+                        HarborEmptyView("先安装 Minecraft 实例",systemImage:"shippingbox")
                     }
                 }
             }
@@ -69,5 +69,5 @@ struct NativeDownloadsView:View {
 
 private struct DownloadJobs:View {
     @ObservedObject var model:LauncherModel
-    var body:some View{ScrollView{VStack(alignment:.leading,spacing:18){Text("任务").font(.system(size:34,weight:.semibold));if model.works.isEmpty{ContentUnavailableView("没有下载任务",systemImage:"arrow.down.circle")};ForEach(model.works){work in VStack(alignment:.leading,spacing:12){HStack{Text(work.title).font(.system(size:15,weight:.medium));Spacer();if work.active{Button("取消"){model.cancel(work)}.buttonStyle(HarborButtonStyle())}else{Image(systemName:work.error ? "exclamationmark.circle":"checkmark.circle").foregroundStyle(work.error ? Color.orange:Color.secondary)}};if let progress=work.progress{ProgressView(value:progress)}else if work.active{ProgressView().controlSize(.small)};if !work.detail.isEmpty{Text(work.detail).font(.system(size:11)).foregroundStyle(.secondary).textSelection(.enabled)}}.padding(22).harborGlass(appearance:model.appearance,radius:22)}}.padding(28)}}
+    var body:some View{ScrollView{VStack(alignment:.leading,spacing:18){Text("任务").font(.system(size:34,weight:.semibold));if model.works.isEmpty{HarborEmptyView("没有下载任务",systemImage:"arrow.down.circle")};ForEach(model.works){work in VStack(alignment:.leading,spacing:12){HStack{Text(work.title).font(.system(size:15,weight:.medium));Spacer();if work.active{Button("取消"){model.cancel(work)}.buttonStyle(HarborButtonStyle())}else{Image(systemName:work.error ? "exclamationmark.circle":"checkmark.circle").foregroundStyle(work.error ? Color.orange:Color.secondary)}};if let progress=work.progress{ProgressView(value:progress)}else if work.active{ProgressView().controlSize(.small)};if !work.detail.isEmpty{Text(work.detail).font(.system(size:11)).foregroundStyle(.secondary).textSelection(.enabled)}}.padding(22).harborGlass(appearance:model.appearance,radius:22)}}.padding(28)}}
 }

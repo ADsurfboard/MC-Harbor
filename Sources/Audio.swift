@@ -56,7 +56,7 @@ struct HarborButtonStyle:ButtonStyle {
             .offset(y:configuration.isPressed && !reduceMotion ? 1:0)
             .opacity(enabled ? 1:0.42)
             .animation(reduceMotion ? .linear(duration:0.1):.spring(response:0.32,dampingFraction:0.68),value:configuration.isPressed)
-            .onChange(of:configuration.isPressed){_,pressed in if pressed && enabled{HarborAudio.shared.play(.select)}}
+            .harborOnChange(of:configuration.isPressed){_,pressed in if pressed && enabled{HarborAudio.shared.play(.select)}}
             .onHover{inside in if inside && enabled{HarborAudio.shared.play(.focus)}}
     }
 }
@@ -64,7 +64,7 @@ struct HarborButtonStyle:ButtonStyle {
 struct HarborBareButtonStyle:ButtonStyle {
     func makeBody(configuration:Configuration)->some View{
         configuration.label.frame(minWidth:28,minHeight:28).contentShape(.interaction,RoundedRectangle(cornerRadius:9)).harborPrism(radius:9).opacity(configuration.isPressed ? 0.72:1)
-            .onChange(of:configuration.isPressed){_,pressed in if pressed{HarborAudio.shared.play(.select)}}
+            .harborOnChange(of:configuration.isPressed){_,pressed in if pressed{HarborAudio.shared.play(.select)}}
             .onHover{inside in if inside{HarborAudio.shared.play(.focus)}}
     }
 }

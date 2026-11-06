@@ -6,9 +6,7 @@ import SwiftUI
     @StateObject private var model=LauncherModel()
     var body:some Scene {
         WindowGroup("MC Harbor") { LauncherRoot(model:model).frame(minWidth:1040,minHeight:700) }
-            .defaultSize(width:1180,height:780)
             .windowStyle(.hiddenTitleBar)
-            .windowResizability(.contentMinSize)
             .commands {
                 CommandGroup(replacing:.newItem){Button("刷新游戏库"){model.scan()}.keyboardShortcut("r");Button("导入整合包…"){model.importPack()}.keyboardShortcut("i")}
                 CommandGroup(after:.appInfo){Button("播放欢迎动画"){model.showIntro=true}}
@@ -70,10 +68,10 @@ struct LauncherRoot:View {
         .alert("MC Harbor",isPresented:Binding(get:{model.errorMessage != nil},set:{if !$0{model.errorMessage=nil}})){Button("好"){model.errorMessage=nil}} message:{Text(model.errorMessage ?? "")}
         .onReceive(NotificationCenter.default.publisher(for:NSApplication.willTerminateNotification)){_ in model.terracotta.stop(synchronous:true);model.sakura.stop();model.social.chat.disconnect();model.social.flush();model.flushPreferences()}
         .onAppear{model.social.connectIfConfigured()}
-        .onChange(of:model.section){_,_ in model.search="";HarborAudio.shared.play(.navigate)}
-        .onChange(of:model.inspectedGame?.id){old,new in HarborAudio.shared.play(new == nil ? .close:.open)}
-        .onChange(of:model.modal?.id){old,new in HarborAudio.shared.play(new == nil ? .close:.open)}
-        .onChange(of:model.errorMessage){_,message in if message != nil{HarborAudio.shared.play(.error)}}
+        .harborOnChange(of:model.section){_,_ in model.search="";HarborAudio.shared.play(.navigate)}
+        .harborOnChange(of:model.inspectedGame?.id){old,new in HarborAudio.shared.play(new == nil ? .close:.open)}
+        .harborOnChange(of:model.modal?.id){old,new in HarborAudio.shared.play(new == nil ? .close:.open)}
+        .harborOnChange(of:model.errorMessage){_,message in if message != nil{HarborAudio.shared.play(.error)}}
     }
     private var topBar:some View {
         HStack(spacing:16){Text(model.section.title).font(.system(size:13,weight:.semibold));Spacer();if let work=model.works.first(where:{$0.active}){ProgressView().controlSize(.mini);Text(work.title).font(.system(size:11)).foregroundStyle(.secondary).lineLimit(1)};Button{model.scan()}label:{Image(systemName:"arrow.clockwise").font(.system(size:12))}.buttonStyle(HarborBareButtonStyle()).help("刷新")}
@@ -107,7 +105,7 @@ struct NativeLibraryView:View {
                     Button{withAnimation(.smooth(duration:0.2)){model.preferences.selectedGame=game.id}}label:{HStack(spacing:14){WorldIcon(game:model.artworkGame(game)).frame(width:46,height:46);VStack(alignment:.leading,spacing:6){Text(model.displayName(game)).font(.system(size:14,weight:.medium)).lineLimit(1);Text(game.version+" · "+game.loader).font(.system(size:11)).foregroundStyle(.secondary).lineLimit(1)};Spacer(minLength:0);if model.preferences.favorites.contains(game.id){Image(systemName:"star.fill").font(.system(size:10)).foregroundStyle(.secondary)};Color.clear.frame(width:38,height:38)}.padding(16).frame(maxWidth:.infinity,alignment:.leading).background{ZStack{HarborMaterial(shape:RoundedRectangle(cornerRadius:19),appearance:model.appearance);if model.selected?.id==game.id{RoundedRectangle(cornerRadius:19).fill(model.themeColor.opacity(0.08))}}}.overlay(RoundedRectangle(cornerRadius:19).stroke(model.selected?.id==game.id ? model.themeColor.opacity(0.6):Color.white.opacity(0.2),lineWidth:0.7)).contentShape(RoundedRectangle(cornerRadius:19))}.buttonStyle(HarborPressButtonStyle(pressedScale:0.98,pressedOffset:0)).overlay(alignment:.trailing){InstanceMoreButton{model.inspectedGame=game}.padding(.trailing,16)}.contextMenu{Button("启动"){model.launch(game)};Button("管理"){model.inspectedGame=game};Button("更换图标…"){model.chooseInstanceIcon(game)};Button(model.preferences.favorites.contains(game.id) ? "取消收藏":"收藏"){model.favorite(game)};Button("打开目录"){model.open(game.runDirectory)}}
                 }}
             }.padding(.horizontal,28).padding(.top,14).padding(.bottom,28)
-        }.scrollIndicators(.hidden)
+        }.harborHideScrollIndicators()
     }
 }
 struct FeaturedWorld:View {

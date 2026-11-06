@@ -1,0 +1,30 @@
+[
+  {
+    "file": "temurin-jre-x64.tar.gz",
+    "bytes": 41902098,
+    "sha256": "c909674b1c10c261b9a3fb7e9c0efebd303e33f88a4fe84be7135b5e2d711f89",
+    "source": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.13%2B9/OpenJDK21U-jre_x64_mac_hotspot_21.0.13_9.tar.gz",
+    "publisherDigest": "sha256:c909674b1c10c261b9a3fb7e9c0efebd303e33f88a4fe84be7135b5e2d711f89"
+  },
+  {
+    "file": "javafx-base-21.0.8-mac.jar",
+    "bytes": 753858,
+    "sha256": "14273e778ae6ba4c049d15da4d37ab48d5703a5979ef897272ae8448d79ea0a0",
+    "source": "https://repo.maven.apache.org/maven2/org/openjfx/javafx-base/21.0.8/javafx-base-21.0.8-mac.jar",
+    "publisherDigest": "sha1:ce5cc0a19e2351281e1bf8d1cf798a9743739cfe"
+  },
+  {
+    "file": "javafx-graphics-21.0.8-mac.jar",
+    "bytes": 4879444,
+    "sha256": "bd0e7ed22660e12faff63fa26ca2e846679f0d8a7f05488a17c45a2445dd81b3",
+    "source": "https://repo.maven.apache.org/maven2/org/openjfx/javafx-graphics/21.0.8/javafx-graphics-21.0.8-mac.jar",
+    "publisherDigest": "sha1:dd15793df474565ec39def7c645ea88a06073848"
+  },
+  {
+    "file": "javafx-controls-21.0.8-mac.jar",
+    "bytes": 2585182,
+    "sha256": "a681e8056c4fb022f0590404b068080d408051f7a9a4da7db4f39dcc5ed8a136",
+    "source": "https://repo.maven.apache.org/maven2/org/openjfx/javafx-controls/21.0.8/javafx-controls-21.0.8-mac.jar",
+    "publisherDigest": "sha1:8dd8254e99be91c75c36756bba5c157275e44fa8"
+  }
+]

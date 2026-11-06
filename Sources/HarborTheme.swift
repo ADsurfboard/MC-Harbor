@@ -87,7 +87,7 @@ struct HarborMaterial<S:Shape>:View {
         ZStack{
             if reduceTransparency{shape.fill(appearance == .theme ? accent.paleThemeColor:base)}else{
                 if policy.diffusion>0.001{FrostedSurface(blur:36,radius:0,dark:!light).clipShape(shape).opacity(policy.diffusion)}
-                if policy.liquid>0.001{shape.fill(base.opacity(0.035)).glassEffect(Glass.clear.tint(accent.opacity(appearance == .theme ? 0.12:0.025)).interactive(interactive),in:shape).opacity(policy.liquid)}
+                if policy.liquid>0.001{shape.fill(base.opacity(0.035)).opacity(policy.liquid)}
                 // A constant neutral veil avoids changing hue as clarity moves.
                 shape.fill((appearance == .theme ? accent:base).opacity(frosted ? (light ? 0.12:0.10):(appearance == .theme ? 0.10:0.015)))
             }
@@ -178,7 +178,7 @@ struct HarborActionButtonStyle: ButtonStyle {
                     : .spring(response: 0.38, dampingFraction: 0.44, blendDuration: 0.08),
                 value: configuration.isPressed
             )
-            .onChange(of:configuration.isPressed){_,pressed in if pressed && isEnabled{HarborAudio.shared.play(.select)}}
+            .harborOnChange(of:configuration.isPressed){_,pressed in if pressed && isEnabled{HarborAudio.shared.play(.select)}}
             .onHover{inside in if inside && isEnabled{HarborAudio.shared.play(.focus)}}
     }
 }
@@ -210,7 +210,7 @@ struct HarborPressButtonStyle: ButtonStyle {
                     : .spring(response: 0.38, dampingFraction: 0.44, blendDuration: 0.08),
                 value: configuration.isPressed
             )
-            .onChange(of:configuration.isPressed){_,pressed in if pressed && isEnabled{HarborAudio.shared.play(.select)}}
+            .harborOnChange(of:configuration.isPressed){_,pressed in if pressed && isEnabled{HarborAudio.shared.play(.select)}}
             .onHover{inside in if inside && isEnabled{HarborAudio.shared.play(.focus)}}
     }
 }

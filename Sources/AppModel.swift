@@ -49,7 +49,7 @@ import UniformTypeIdentifiers
     var selectedAccount: LauncherAccount? { accounts.first{$0.id==preferences.selectedAccount} ?? accounts.first }
     var appearance: HarborAppearance { preferences.appearance }
     var themeColor: Color { let color=Color(hexString:preferences.themeHex);return appearance == .theme ? color.paleThemeColor:color }
-    var controlTint:Color{appearance.isLight ? themeColor.mix(with:HarborPalette.night,by:0.38):themeColor}
+    var controlTint:Color{appearance.isLight ? themeColor.harborMix(with:HarborPalette.night,by:0.38):themeColor}
     var surfaceClarity:Double{HarborSurfacePolicy(clarity:preferences.glassClarity,frosted:preferences.frostedGlass).clarity}
     func displayName(_ game:GameInstance)->String { let alias=(preferences.nickname[game.id] ?? "").trimmingCharacters(in:.whitespacesAndNewlines);return alias.isEmpty ? game.id:alias }
     var filteredGames: [GameInstance] { games.filter{search.isEmpty || ($0.id+" "+$0.version+" "+$0.loader).localizedCaseInsensitiveContains(search)}.sorted { a,b in let af=preferences.favorites.contains(a.id),bf=preferences.favorites.contains(b.id);if af != bf{return af};return a.modified > b.modified } }
@@ -78,7 +78,7 @@ import UniformTypeIdentifiers
     func flushPreferences(){preferenceWork?.cancel();guard let data=try? JSONEncoder().encode(preferences) else{return};preferenceQueue.sync{try? data.write(to:NativePaths.root.appendingPathComponent("preferences.json"),options:.atomic)}}
 
     func scan() { let root=preferences.gameRoot;Task { let scanned=await Task.detached(priority:.userInitiated){NativeScanner.scan(root)}.value;games=scanned } }
-    func toast(_ text:String) { toastTask?.cancel();toastMessage=text;toastTask=Task{try? await Task.sleep(for:.seconds(3.2));if !Task.isCancelled{toastMessage=nil}} }
+    func toast(_ text:String) { toastTask?.cancel();toastMessage=text;toastTask=Task{try? await HarborDelay.sleep(seconds:3.2);if !Task.isCancelled{toastMessage=nil}} }
     func open(_ path:String) { guard FileManager.default.fileExists(atPath:path) else{errorMessage="目录尚不存在。";return};NSWorkspace.shared.open(URL(fileURLWithPath:path)) }
     func selectRoot() { let panel=NSOpenPanel();panel.canChooseDirectories=true;panel.canChooseFiles=false;panel.prompt="选择游戏库";if panel.runModal() == .OK,let url=panel.url{preferences.gameRoot=url.path;scan()} }
     func favorite(_ game:GameInstance) { if preferences.favorites.contains(game.id){preferences.favorites.remove(game.id)}else{preferences.favorites.insert(game.id)} }

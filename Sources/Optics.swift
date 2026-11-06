@@ -19,7 +19,8 @@ extension Color{
     init(hexString:String){let clean=hexString.trimmingCharacters(in:CharacterSet(charactersIn:"#"));self.init(hex:UInt32(clean,radix:16) ?? 0x29825B)}
     var hexString:String{let rgb=NSColor(self).usingColorSpace(.deviceRGB) ?? .systemGreen;return String(format:"#%02X%02X%02X",Int(rgb.redComponent*255),Int(rgb.greenComponent*255),Int(rgb.blueComponent*255))}
     var readableInk:Color{let rgb=NSColor(self).usingColorSpace(.deviceRGB) ?? .systemGreen;return rgb.redComponent*0.2126+rgb.greenComponent*0.7152+rgb.blueComponent*0.0722 > 0.65 ? .black:.white}
-    var paleThemeColor:Color{let rgb=NSColor(self).usingColorSpace(.deviceRGB) ?? .systemGreen;let minimum=min(rgb.redComponent,min(rgb.greenComponent,rgb.blueComponent));let mix=max(0,(0.72-minimum)/max(0.001,1-minimum));return self.mix(with:.white,by:mix)}
+    func harborMix(with other:Color,by fraction:Double)->Color{let a=NSColor(self).usingColorSpace(.deviceRGB) ?? .systemGreen;let b=NSColor(other).usingColorSpace(.deviceRGB) ?? .white;return Color(nsColor:a.blended(withFraction:max(0,min(1,fraction)),of:b) ?? a)}
+    var paleThemeColor:Color{let rgb=NSColor(self).usingColorSpace(.deviceRGB) ?? .systemGreen;let minimum=min(rgb.redComponent,min(rgb.greenComponent,rgb.blueComponent));let mix=max(0,(0.72-minimum)/max(0.001,1-minimum));return self.harborMix(with:.white,by:mix)}
 }
 enum InstanceArt{
     private static let cache:NSCache<NSString,NSImage>={let cache=NSCache<NSString,NSImage>();cache.countLimit=64;cache.totalCostLimit=32*1024*1024;return cache}()
@@ -37,7 +38,7 @@ enum InstanceArt{
 enum BrandArtwork{static let icon=NSImage(contentsOf:NativePaths.resources.appendingPathComponent("Brand/Icon.png"))}
 
 // Rounded-surface Fresnel and wavelength separation, inspired by ReactDrops optical modes.
-// It renders only the rim. SwiftUI's system glass handles the backdrop; text is never sampled.
+// It renders only the rim. Native frosted material handles the backdrop; text is never sampled.
 struct OpticalRim:NSViewRepresentable{
     @Environment(\.harborRainbow) private var enabled
     var radius:CGFloat

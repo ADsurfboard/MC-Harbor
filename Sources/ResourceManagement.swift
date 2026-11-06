@@ -11,7 +11,7 @@ struct InstanceResourceRecord:Decodable,Identifiable,Sendable {
 struct ResourceArtwork:View {
     let iconPath:String?;let fallback:String
     @State private var image:NSImage?
-    var body:some View{Group{if let image{Image(nsImage:image).resizable().scaledToFit()}else{Image(systemName:fallback).resizable().scaledToFit().foregroundStyle(.secondary).padding(3)}}.task(id:iconPath){let path=iconPath;let loaded=await Task.detached{path.flatMap{HarborImageCache.thumbnail($0)}}.value;if !Task.isCancelled{image=loaded}}}
+    var body:some View{Group{if let image{Image(nsImage:image).resizable().scaledToFit()}else{Image(systemName:fallback).resizable().scaledToFit().foregroundStyle(.secondary).padding(3)}}.task(id:iconPath){guard let path=iconPath else{image=nil;return};if let cached=HarborImageCache.cachedThumbnail(path){image=cached;return};let bitmap=await Task.detached{HarborImageCache.decodeThumbnail(path,pixels:128)}.value;if !Task.isCancelled{image=bitmap.map{HarborImageCache.cacheThumbnail($0,path:path)}}}}
 }
 struct ResourceSourceButton:View {
     @ObservedObject var model:LauncherModel;let path:String

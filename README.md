@@ -1,8 +1,8 @@
 # MC Harbor
 
-1.5.0 · Apple Silicon · macOS 26 及以上
+1.5.1 Intel 兼容版 · macOS 12 及以上
 
-[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/latest) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.5.0/MC-Harbor-Introduction.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)
+[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/tag/v1.5.1-intel-preview.1) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.5.1-intel-preview.1/MC-Harbor-Intel-Introduction.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)
 
 以下正文与随包 PDF 同版。
 
@@ -10,8 +10,8 @@
 保留 HMCL 的游戏能力，采用真实 WinHarbor 原生界面，
 把账号、下载、实例资源与汉化工作集中在一个窗口。
 
-1.5.0 · Apple Silicon · macOS 26 及以上
-本机验证：Apple M3 / 8GB / macOS 27
+1.5.1 Intel 兼容版 · macOS 12 及以上
+本地验证：Apple Silicon 上以 Rosetta 运行 Intel 程序
 
 ## 日常操作，一处完成。
 
@@ -57,7 +57,7 @@
 
 ### 社区补全与逐条编辑
 
-一键按版本 / 加载器读取 CFPA 社区译库，校验 MD5 后补齐可用译文。已有中文和手动译文保留；未覆盖的英语原文继续由本机引擎补齐；无法安全处理的条目标记待翻译。
+一键按版本 / 加载器读取 CFPA 社区译库，校验 MD5 后补齐可用译文。已有中文和手动译文保留；未覆盖的英语原文可由系统或经确认的在线引擎补齐；无法安全处理的条目标记待翻译。
 
 ### 命名并导出汉化资源包
 
@@ -89,7 +89,7 @@
 
 普通 lang 导出为资源包；任务配置与数据包译文使用“应用任务 / 数据包”。先检查文件修订和存档占用，再保存原字节备份、校验 ZIP 并原子写回，失败回滚。导出的 ZIP 也包含 overrides 目录，可按实例根目录合并；原 JAR 不改写。
 
-自写 FTB 任务通常没有现成社区译文，1.5 可使用系统翻译补齐英语文本，仍支持逐条人工校对或提取给 AI。新增流程已完成 39 项隔离协议检查并完整复跑，包含中途写入失败的回滚；未替用户修改真实存档，也未冒称完成 FTB 游戏内全流程试玩。
+自写 FTB 任务通常没有现成社区译文。macOS 15 及以上可用系统翻译；12—14 可选择在线补全，也可逐条校对或提取给 AI。旧版的 39 项隔离检查包含写入失败回滚；未替用户修改真实存档。
 
 ## 编辑世界，补齐前置。
 
@@ -119,7 +119,7 @@
 
 ### Swift / SwiftUI / AppKit
 
-窗口、系统玻璃、导航、实例管理、偏好、动画与原生汉化编辑器。
+窗口、原生磨砂、导航、实例管理、偏好、动画与原生汉化编辑器。
 
 ### Java 17 字节码 / JDK 21
 
@@ -151,13 +151,13 @@ Java 任务按需启动；原壁纸和缩略图按文件修订缓存，资源索
 
 ### 本轮验证
 
-公网原生客户端 59 项、24 好友客户端 17 项、Worker 59 项、Python 服务 45 项、增量后端 22 项通过；实例资源 / 汉化 38 项、FTB / 数据包 39 项复跑通过。测试覆盖真实消息推送、离线未读、串聊隔离、长备注、皮肤头像与撤销好友权限。
+Intel 客户端在 Rosetta 下通过 53 项功能检查、24 好友场景检查及 22 项 Java 后台检查；旧系统翻译分段、占位符保护和真实在线返回也已核对。Worker / Python 好友服务各自的隔离检查通过。
 
 ### 已有基线
 
-此前 20 项原生业务、11 项账号与资源、5 项下载事务通过；隔离环境实际安装 / 启动 1.20.1，并验证坏源回退、备份与 MultiMC 世界字节回环。初次接入时记录 27 个有效实例与 2 个账户；当前列表以目录扫描结果为准。
+原 1.5 版已检查原生业务、账号、下载与实例资源；隔离环境实际安装 / 启动 1.20.1，并验证坏源回退、备份与 MultiMC 世界字节回环。实际实例和账号以个人设备的配置为准。
 
-验证边界：没有逐个长时间试玩 27 个整合包，没有替用户在线身份上传测试皮肤；本包为 ARM64、本机临时签名，未 Apple 公证。外部服务可用性与任意模组包帧率不能作永久保证。
+验证边界：Intel 程序已在 Rosetta 运行，macOS 12—14 的实际界面与完整游戏尚未在对应设备上验收；未逐个试玩所有整合包，未 Apple 公证。外部服务与游戏表现不能永久保证。
 
 [HMCL · GPL-3.0-or-later](https://github.com/HMCL-dev/HMCL)
 
@@ -169,15 +169,15 @@ Java 任务按需启动；原壁纸和缩略图按文件修订缓存，资源索
 
 [Terracotta · AGPL-3.0 与 IPC 例外](https://github.com/burningtnt/Terracotta)
 
-界面源于用户提供的 WinHarbor；材质使用系统 Liquid Glass。界面音效：JDSherbert；欢迎播报：用户提供的 Clara、Adam、Clara 2、Morgan 四份原 MP3。标准 h 源于参考设计，正式图标以透明原生矢量绘制，外围交由系统呈现。OpenJFX / BellSoft OpenJDK 为 GPLv2 + Classpath Exception，随包保留许可。
+界面源于用户提供的 WinHarbor；兼容版使用原生磨砂材质。界面音效：JDSherbert；欢迎播报：用户提供的 Clara、Adam、Clara 2、Morgan 四份原 MP3。标准 h 源于参考设计，正式图标以透明原生矢量绘制，外围交由系统呈现。OpenJFX / Eclipse Temurin OpenJDK 为 GPLv2 + Classpath Exception，随包保留许可。
 
 ## 更完整的汉化，更顺手的素材库。
 
-1.5 更新继续保留已有玻璃、叠片、粒子、音效和原始 Clara 播报。
+Intel 版保留三层叠片、粒子、音效和原始 Clara 播报，用系统磨砂替代 Liquid Glass。
 
-### 一键汉化：社区优先，本机补齐
+### 一键汉化：社区优先，再补齐
 
-先使用 CFPA 社区中文，未覆盖的英语文本继续调用 macOS 原生 Translation 引擎。FTB 任务、KubeJS、存档数据包的已识别显示文本与普通 lang 使用同一补全流程。无需云翻译密钥；系统首次使用可能需要下载语言模型。机器译文仍建议人工校对，未能安全处理的条目会保留并显示待翻译数量。
+先使用 CFPA 社区中文；macOS 15 及以上可继续调用系统 Translation。macOS 12—14 可经确认使用 MyMemory 在线补全，每日有 5000 字符免费额度；系统翻译不可用时也可选择该回退。未完成的条目保留，支持手动校对或提取给 AI。
 
 ### 长段落与文本格式保护
 
@@ -225,7 +225,7 @@ Java 任务按需启动；原壁纸和缩略图按文件修订缓存，资源索
 
 ### Sakura Frp：创建并开启 TCP 隧道
 
-先在游戏中对局域网开放，再填写或从近期日志读取端口，选择节点并创建 TCP 隧道。官方 ARM64 frpc 按需下载、校验大小和 MD5；访问密钥保存在钥匙串，运行配置为私有权限文件，停止时删除。确认隧道成功后才显示可复制的地址。公开服务器模式只列服务允许的节点。
+先在游戏中对局域网开放，再填写或从近期日志读取端口，选择节点并创建 TCP 隧道。官方 Intel frpc 按需下载、校验大小和 MD5；访问密钥保存在钥匙串，运行配置为私有权限文件，停止时删除。确认隧道成功后才显示可复制的地址。公开服务器模式只列服务允许的节点。
 
 ### 陶瓦房间：无需配置中转服务器
 
@@ -235,7 +235,7 @@ Java 任务按需启动；原壁纸和缩略图按文件修订缓存，资源索
 
 好友聊天不需要玩家部署服务。陶瓦使用社区公共节点，NAT、网络质量和节点状态会影响连通；Sakura 需要玩家自己的访问密钥、可用节点及相应额度。普通地址可用于其他启动器，但 Minecraft 版本、模组配置和服务器认证仍须匹配，不绕过正版或服务器权限。
 
-已实测官方 ARM64 陶瓦核心的 11 项端口 / 状态 / 扫描 / 退出检查，原生启动与退出另行验证；Sakura 官方客户端下载与版本校验通过。没有宣称完成两台外网设备长时间 Minecraft 联机，也未使用真实 Sakura 账号建立测试隧道。新版本读取 Mojang 实时清单，失败时使用镜像与缓存；后续格式、认证或 Java 要求变化仍需维护适配。
+Intel 版已在 Rosetta 下校验并启动官方陶瓦、退出房间，并验证 Sakura Intel 客户端版本；其他陶瓦数据未被改动。没有宣称完成两台外网设备长时间 Minecraft 联机，也未使用真实 Sakura 账号建立测试隧道。新版本读取 Mojang 实时清单，失败时使用镜像与缓存；后续格式、认证或 Java 要求变化仍需维护适配。
 
 ## 构建与许可
 
