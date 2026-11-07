@@ -80,7 +80,7 @@ struct HarborEmptyView: View {
 
     var body: some View {
         VStack(spacing: 9) {
-            Image(systemName: systemImage).font(.system(size: 30, weight: .light))
+            HarborSymbol(systemName: systemImage).font(.system(size: 30, weight: .light))
             Text(title).font(.system(size: 15, weight: .medium))
             if let description { description.font(.system(size: 11)).multilineTextAlignment(.center) }
         }

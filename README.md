@@ -1,8 +1,8 @@
 # MC Harbor
 
-1.5.2 Intel 兼容版 · macOS 12 及以上
+1.5.3 Intel 兼容版 · macOS 12 及以上
 
-[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/tag/v1.5.2-intel) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.5.2-intel/MC-Harbor-Intel-Introduction-1.5.2.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)
+[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/tag/v1.5.3-intel) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.5.3-intel/MC-Harbor-Intel-Introduction-1.5.3.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)
 
 以下正文与随包 PDF 同版。
 
@@ -10,7 +10,7 @@
 保留 HMCL 的游戏能力，采用真实 WinHarbor 原生界面，
 把账号、下载、实例资源与汉化工作集中在一个窗口。
 
-1.5.2 Intel 兼容版 · macOS 12 及以上
+1.5.3 Intel 兼容版 · macOS 12 及以上
 验证：Intel macOS 15 自动测试与 Rosetta 检查
 
 ## 日常操作，一处完成。
@@ -19,7 +19,7 @@
 
 ### 游戏库
 
-搜索、收藏、实例设置和依赖修复。支持更换图标；删除前检查版本依赖并移入废纸篓。
+搜索、收藏、图标更换与实例快捷方式。删除前检查版本依赖并移入废纸篓；改进最小化和关闭后的窗口恢复。
 
 ### 实例资源
 
@@ -27,7 +27,7 @@
 
 ### 下载中心
 
-联动 Modrinth 与 CurseForge。搜索实例资源；游戏和模组加载器默认优先使用国内镜像，并可切换下载来源。
+中英文搜索、简介自动汉化、兼容模组推荐和可搜索的备注列表。联动 Modrinth / CurseForge；游戏与加载器优先国内镜像。
 
 ### 账号与角色
 
@@ -35,7 +35,7 @@
 
 ### 外观与声音
 
-主题调色盘、图片 / 视频背景、三层叠片、0 至 100 通透度与独立深浅毛玻璃选项、可关闭的局部彩虹色散。弹层过渡、欢迎动画、四种原音播报与界面音效。
+主题作用范围、反色与自定义配色；图片 / 视频背景、三层叠片和深浅毛玻璃。保留弹层过渡、欢迎动画、四种播报与界面音效；已移除彩虹角。
 
 ### 存档与前置补全
 
@@ -241,7 +241,7 @@ Intel 版已在 Rosetta 下校验并启动官方陶瓦、退出房间，并验�
 
 <img src="Assets/Contributors/jiekee.png" width="72" height="72" alt="jiekee❄ 头像">
 
-**jiekee❄**：反馈加载器下载、实例管理、外置认证及程序坞窗口恢复问题，为兼容性与可用性改进提供测试线索。
+**jiekee❄**：反馈并复现下载、实例管理、外置认证与 Intel/macOS 窗口恢复问题；提出模组推荐、双语搜索、简介汉化及实例快捷方式建议。
 
 ## 构建与许可
 

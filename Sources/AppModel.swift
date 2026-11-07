@@ -49,7 +49,9 @@ import UniformTypeIdentifiers
     var selectedAccount: LauncherAccount? { accounts.first{$0.id==preferences.selectedAccount} ?? accounts.first }
     var appearance: HarborAppearance { preferences.appearance }
     var themeColor: Color { let color=Color(hexString:preferences.themeHex);return appearance == .theme ? color.paleThemeColor:color }
-    var controlTint:Color{appearance.isLight ? themeColor.harborMix(with:HarborPalette.night,by:0.38):themeColor}
+    var themeRuntime:HarborThemeRuntime{HarborThemeRuntime(settings:preferences.themeCustomization,appearance:appearance,theme:themeColor)}
+    var accentTextColor:Color{themeRuntime.accentText}
+    var controlTint:Color{themeRuntime.controlTint}
     var surfaceClarity:Double{HarborSurfacePolicy(clarity:preferences.glassClarity,frosted:preferences.frostedGlass).clarity}
     func displayName(_ game:GameInstance)->String { let alias=(preferences.nickname[game.id] ?? "").trimmingCharacters(in:.whitespacesAndNewlines);return alias.isEmpty ? game.id:alias }
     var filteredGames: [GameInstance] { games.filter{search.isEmpty || ($0.id+" "+$0.version+" "+$0.loader).localizedCaseInsensitiveContains(search)}.sorted { a,b in let af=preferences.favorites.contains(a.id),bf=preferences.favorites.contains(b.id);if af != bf{return af};return a.modified > b.modified } }

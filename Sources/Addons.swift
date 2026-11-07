@@ -2,7 +2,7 @@ import AppKit
 import CryptoKit
 import SwiftUI
 
-struct AddonProject:Decodable,Identifiable,Sendable {
+struct AddonProject:Codable,Identifiable,Sendable {
     let projectId:String
     let title:String
     let description:String
@@ -151,6 +151,7 @@ struct AddonBrowser:View {
     @State private var source:AddonSource = .modrinth
     @State private var page=0
     @State private var query=""
+    @State private var queryUsed=""
     @State private var result:AddonSearch?
     @State private var selected:AddonProject?
     @State private var versions:[AddonVersion]=[]
@@ -160,29 +161,113 @@ struct AddonBrowser:View {
     @State private var preparing=false
     @State private var failure=""
     @State private var searchTask:Task<Void,Never>?
+    @State private var showingRecommendations=true
+    @State private var recommendations:[RecommendedMod]=[]
+    @State private var recommending=false
+    @ObservedObject private var remarks=ModRemarkStore.shared
+    @State private var remarkListFilter=""
+    @State private var remarkListID="personal"
+    @State private var remarkName=""
+    @State private var newListName=""
+    @State private var creatingList=false
+    @State private var pendingRemark:ModRemark?
+    private var localRemarks:[ModRemark]{remarks.matches(query,listID:remarkListFilter)}
+    private var canRecommend:Bool{kind == .mods && source == .modrinth}
     private var selectedVersion:AddonVersion?{versions.first{$0.id==versionID}}
+    private var installedMods:[ModFile]{model.modMetadata[game.id] ?? NativeScanner.mods(game)}
+    private var selectedSuggestion:ModSuggestion?{recommendations.first{$0.project.id==selected?.id}?.suggestion}
     var body:some View{
-        VStack(spacing:0){if !embedded{HStack{VStack(alignment:.leading,spacing:5){Text("下载"+kind.title).font(.system(size:25,weight:.semibold));Text(game.version+" · "+(kind == .mods ? game.loader:"Modrinth")).font(.system(size:11)).foregroundStyle(.secondary)};Spacer();Button{model.modal=nil}label:{Image(systemName:"xmark")}.buttonStyle(HarborButtonStyle())}.padding(25)}
-            HStack(spacing:0){VStack(spacing:12){Picker("来源",selection:$source){Text("Modrinth").tag(AddonSource.modrinth).disabled(kind == .worlds);Text("CurseForge").tag(AddonSource.curseforge)}.pickerStyle(.segmented).labelsHidden();SearchBox(prompt:"搜索 "+source.title,query:$query).onSubmit{search()}.harborOnChange(of:query){_,_ in search(debounce:true)};if loading{ProgressView().controlSize(.small)};ScrollView{LazyVStack(spacing:5){ForEach(result?.hits ?? []){project in Button{selected=project;HarborAudio.shared.play(.navigate)}label:{HStack(alignment:.top,spacing:12){AddonIcon(url:project.iconUrl).frame(width:43,height:43);VStack(alignment:.leading,spacing:5){Text(project.title).font(.system(size:13,weight:.medium)).lineLimit(1);Text(project.author).font(.system(size:10)).foregroundStyle(.secondary);Text(project.description).font(.system(size:11)).foregroundStyle(.secondary).lineLimit(2)};Spacer(minLength:0)}.padding(12).frame(maxWidth:.infinity,alignment:.leading).background(model.themeColor.opacity(selected?.id==project.id ? 0.11:0.025),in:RoundedRectangle(cornerRadius:16)).contentShape(RoundedRectangle(cornerRadius:16))}.buttonStyle(HarborBareButtonStyle())}}}.harborHideScrollIndicators();if let result{HStack{Text("\(result.totalHits) 个结果");Spacer();Button{page=max(0,page-1);search()}label:{Image(systemName:"chevron.left")}.disabled(page==0);Text("\(page+1)");Button{page+=1;search()}label:{Image(systemName:"chevron.right")}.disabled((page+1)*30>=result.totalHits)}.buttonStyle(HarborBareButtonStyle()).font(.system(size:10)).foregroundStyle(.secondary)}}.padding(18).frame(minWidth:310,maxWidth:420)
+        VStack(spacing:0){
+            if !embedded{HStack{VStack(alignment:.leading,spacing:5){Text("下载"+kind.title).font(.system(size:25,weight:.semibold));Text(game.version+" · "+game.loader).font(.system(size:11)).foregroundStyle(.secondary)};Spacer();Button{model.modal=nil}label:{HarborSymbol(systemName:"xmark")}.buttonStyle(HarborButtonStyle())}.padding(25)}
+            HStack(spacing:0){
+                VStack(spacing:12){
+                    Picker("来源",selection:$source){Text("Modrinth").tag(AddonSource.modrinth).disabled(kind == .worlds);Text("CurseForge").tag(AddonSource.curseforge)}.pickerStyle(.segmented).labelsHidden()
+                    if canRecommend{Picker("浏览方式",selection:$showingRecommendations){Text("精选推荐").tag(true);Text("搜索全部").tag(false)}.pickerStyle(.segmented).labelsHidden()}
+                    SearchBox(prompt:remarkListFilter.isEmpty ? "中英文名称、关键词或备注":"搜索此列表的备注或模组",query:$query).onSubmit{showingRecommendations=false;search()}.harborOnChange(of:query){_,_ in if !query.isEmpty{showingRecommendations=false};search(debounce:true)}
+                    if queryUsed != query && !queryUsed.isEmpty{Text("搜索："+queryUsed).font(.system(size:10)).foregroundStyle(.secondary).frame(maxWidth:.infinity,alignment:.leading)}
+                    HStack{Toggle("简介自动汉化",isOn:$model.preferences.translateModDescriptions).toggleStyle(.switch).controlSize(.mini);Spacer()}.font(.system(size:10)).help("公开模组简介使用 MyMemory 在线翻译并缓存；服务不可用时保留原文。")
+                    if kind == .mods{remarkLists}
+                    if canRecommend && showingRecommendations && remarkListFilter.isEmpty{
+                        Text("适配 \(game.version) · \(game.loader)。请按需要选装，类似功能的模组可择一使用。").font(.system(size:10)).foregroundStyle(.secondary)
+                        if recommending{ProgressView().controlSize(.small)}
+                        ScrollView{LazyVStack(spacing:7){ForEach(recommendations){item in projectButton(item.project,suggestion:item.suggestion)};if !recommending && recommendations.isEmpty{Text("此版本暂未找到适配推荐，可搜索全部模组。").font(.system(size:12)).foregroundStyle(.secondary).padding()}}}.harborHideScrollIndicators()
+                    }else{
+                        if loading{ProgressView().controlSize(.small)}
+                        ScrollView{LazyVStack(spacing:5){
+                            if kind == .mods && !localRemarks.isEmpty{Text("我的备注").font(.system(size:11,weight:.semibold)).frame(maxWidth:.infinity,alignment:.leading);ForEach(localRemarks){remark in remarkButton(remark)};Divider()}
+                            if remarkListFilter.isEmpty{ForEach(result?.hits ?? []){project in projectButton(project)}}else if localRemarks.isEmpty{Text("此列表暂无匹配备注。选择模组后可保存到这里。").font(.system(size:11)).foregroundStyle(.secondary).padding()}
+                        }}.harborHideScrollIndicators()
+                        if let result,remarkListFilter.isEmpty{HStack{Text("\(result.totalHits) 个结果");Spacer();Button{page=max(0,page-1);search()}label:{HarborSymbol(systemName:"chevron.left").frame(width:28,height:28)}.disabled(page==0);Text("\(page+1)");Button{page+=1;search()}label:{HarborSymbol(systemName:"chevron.right").frame(width:28,height:28)}.disabled((page+1)*30>=result.totalHits)}.buttonStyle(HarborBareButtonStyle()).font(.system(size:10)).foregroundStyle(.secondary)}
+                    }
+                }.padding(18).frame(minWidth:310,maxWidth:420)
                 Divider().opacity(0.35)
                 detail.frame(maxWidth:.infinity,maxHeight:.infinity)
             }.frame(maxHeight:.infinity)
         }
-        .task{if kind == .worlds{source = .curseforge};search()}.harborOnChange(of:source){_,_ in page=0;result=nil;selected=nil;search()}.task(id:selected?.id){await loadVersions()}.task(id:versionID){await prepare()}
+        .task{if kind == .worlds{source = .curseforge};if kind == .mods{model.loadMods(game)};search()}
+        .task(id:canRecommend ? game.id+game.version+game.loader:""){if canRecommend{recommending=true;defer{recommending=false};do{recommendations=try await ModDiscovery.recommendations(game:game)}catch{if !Task.isCancelled{failure=error.localizedDescription}}}}
+        .harborOnChange(of:source){_,_ in page=0;result=nil;selected=pendingRemark?.project;pendingRemark=nil;search()}
+        .harborOnChange(of:remarkListFilter){_,value in if !value.isEmpty{showingRecommendations=false};search()}
+        .task(id:source.rawValue+":"+(selected?.id ?? "")){await loadVersions()}.task(id:versionID){await prepare()}
+        .onReceive(model.contentChanged){_ in if kind == .mods{model.loadMods(game,force:true)}}
         .onDisappear{searchTask?.cancel()}
     }
+    private var remarkLists:some View{
+        VStack(spacing:8){HStack{Picker("备注列表",selection:$remarkListFilter){Text("全部列表").tag("");ForEach(remarks.lists){Text($0.name).tag($0.id)}}.labelsHidden();Button{creatingList.toggle()}label:{HarborSymbol(systemName:"plus").frame(width:25,height:25)}.buttonStyle(HarborBareButtonStyle()).help("新建备注列表")}
+            if creatingList{HStack{TextField("新列表名称",text:$newListName).textFieldStyle(.roundedBorder);Button("创建"){do{let id=try remarks.createList(newListName);remarkListFilter=id;remarkListID=id;newListName="";creatingList=false}catch{failure=error.localizedDescription}}.buttonStyle(HarborButtonStyle())}}
+        }
+    }
+    private func remarkButton(_ remark:ModRemark)->some View{
+        Button{remarkName=remark.name;remarkListID=remark.listID;if source != remark.source{pendingRemark=remark;source=remark.source}else{selected=remark.project}}label:{HStack(spacing:10){AddonIcon(url:remark.project.iconUrl).frame(width:34,height:34);VStack(alignment:.leading,spacing:4){Text(remark.name).font(.system(size:13,weight:.semibold));Text(remark.project.title+" · "+remarks.listName(remark.listID)+" · "+remark.source.title).font(.system(size:10)).foregroundStyle(.secondary).lineLimit(2)};Spacer()}.padding(12).frame(maxWidth:.infinity,alignment:.leading).background(Color.primary.opacity(0.035),in:RoundedRectangle(cornerRadius:14)).contentShape(RoundedRectangle(cornerRadius:14))}.buttonStyle(HarborBareButtonStyle())
+    }
+    private func remarkEditor(_ project:AddonProject)->some View{
+        VStack(alignment:.leading,spacing:9){Text("我的备注").font(.system(size:12,weight:.semibold));TextField("输入以后想用来搜索的备注名",text:$remarkName).textFieldStyle(.roundedBorder);HStack{Picker("保存到",selection:$remarkListID){ForEach(remarks.lists){Text($0.name).tag($0.id)}};Button("保存"){do{try remarks.save(project:project,source:source,name:remarkName,listID:remarkListID);model.toast("备注已保存，可用备注名搜索")}catch{failure=error.localizedDescription}}.buttonStyle(HarborButtonStyle());if remarks.entry(project.id,source:source,listID:remarkListID) != nil{Button("移除备注"){do{try remarks.remove(project.id,source:source,listID:remarkListID);remarkName=""}catch{failure=error.localizedDescription}}.buttonStyle(HarborBareButtonStyle())}}}.padding(14).background(Color.primary.opacity(0.035),in:RoundedRectangle(cornerRadius:14))
+    }
+    private func projectButton(_ project:AddonProject,suggestion:ModSuggestion?=nil)->some View{
+        Button{selected=project;HarborAudio.shared.play(.navigate)}label:{
+            HStack(alignment:.top,spacing:12){AddonIcon(url:project.iconUrl).frame(width:43,height:43);VStack(alignment:.leading,spacing:5){
+                HStack{Text(suggestion?.chinese ?? project.title).font(.system(size:13,weight:.medium)).lineLimit(1);if let suggestion,ModDiscovery.installed(suggestion,mods:installedMods){Text("已安装").font(.system(size:9)).foregroundStyle(model.accentTextColor)}}
+                Text(suggestion == nil ? project.author:project.title).font(.system(size:10)).foregroundStyle(.secondary)
+                if let suggestion{Text(suggestion.reason).font(.system(size:11)).foregroundStyle(.secondary).lineLimit(2)}else{ModSummaryText(text:project.description,enabled:model.preferences.translateModDescriptions,compact:true)}
+            };Spacer(minLength:0)}.padding(12).frame(maxWidth:.infinity,alignment:.leading).background(model.controlTint.opacity(selected?.id==project.id ? 0.11:0.025),in:RoundedRectangle(cornerRadius:16)).contentShape(RoundedRectangle(cornerRadius:16))
+        }.buttonStyle(HarborBareButtonStyle())
+    }
     @ViewBuilder private var detail:some View{
-        if let project=selected{ScrollView{VStack(alignment:.leading,spacing:20){AddonIcon(url:project.iconUrl).frame(width:72,height:72);Text(project.title).font(.system(size:28,weight:.semibold));Text(project.description).font(.system(size:12)).foregroundStyle(.secondary);HStack{Text(project.author);Spacer();Text(project.downloads,format:.number.notation(.compactName));Image(systemName:"arrow.down")}.font(.system(size:11)).foregroundStyle(.secondary)
+        if let project=selected{ScrollView{VStack(alignment:.leading,spacing:20){
+            AddonIcon(url:project.iconUrl).frame(width:72,height:72)
+            Text(project.title).font(.system(size:28,weight:.semibold))
+            if kind == .mods{remarkEditor(project)}
+            if let suggestion=selectedSuggestion{Text(suggestion.chinese+" · "+suggestion.reason).font(.system(size:13)).foregroundStyle(model.accentTextColor)}
+            ModSummaryText(text:project.description,enabled:model.preferences.translateModDescriptions,compact:false)
+            HStack{Text(project.author);Spacer();Text(project.downloads,format:.number.notation(.compactName));HarborSymbol(systemName:"arrow.down")}.font(.system(size:11)).foregroundStyle(.secondary)
             if preparing{ProgressView().controlSize(.small)}
             if !versions.isEmpty{Picker("版本",selection:$versionID){ForEach(versions){Text($0.versionNumber).tag($0.id)}}}
-            if !plan.isEmpty{Divider().opacity(0.35);ForEach(plan){item in HStack(alignment:.top){Image(systemName:item.version.id==versionID ? "shippingbox":"link").foregroundStyle(model.themeColor);VStack(alignment:.leading,spacing:4){Text(item.version.name).font(.system(size:12));Text(item.file.filename).font(.system(size:9,design:.monospaced)).foregroundStyle(.secondary).lineLimit(2)};Spacer();Text(ByteCountFormatter.string(fromByteCount:item.file.size,countStyle:.file)).font(.system(size:10)).foregroundStyle(.secondary)}};Button{model.installAddon(plan,game:game,kind:kind,title:project.title);model.modal=nil}label:{Label("安装",systemImage:"arrow.down.circle.fill").frame(maxWidth:.infinity)}.buttonStyle(HarborButtonStyle(prominent:true)).disabled(preparing || model.running.contains(game.id))}
+            if !plan.isEmpty{Divider().opacity(0.35);ForEach(plan){item in HStack(alignment:.top){Image(systemName:item.version.id==versionID ? "shippingbox":"link").foregroundStyle(model.accentTextColor);VStack(alignment:.leading,spacing:4){Text(item.version.name).font(.system(size:12));Text(item.file.filename).font(.system(size:9,design:.monospaced)).foregroundStyle(.secondary).lineLimit(2)};Spacer();Text(ByteCountFormatter.string(fromByteCount:item.file.size,countStyle:.file)).font(.system(size:10)).foregroundStyle(.secondary)}};Button{model.installAddon(plan,game:game,kind:kind,title:project.title);if !embedded{model.modal=nil}}label:{Label("安装到 "+model.displayName(game),systemImage:"arrow.down.circle.fill").frame(maxWidth:.infinity)}.buttonStyle(HarborButtonStyle(prominent:true)).disabled(preparing || model.running.contains(game.id))}
             if !failure.isEmpty{Text(failure).font(.system(size:12)).foregroundStyle(.secondary)}
-            Button("查看项目页面"){NSWorkspace.shared.open(URL(string:project.pageUrl ?? "https://modrinth.com/"+kind.projectType+"/"+project.id)!)}.buttonStyle(HarborBareButtonStyle()).font(.system(size:11))
-        }.padding(28)}}else{VStack(spacing:14){Image(systemName:kind.symbol).font(.system(size:42,weight:.ultraLight)).foregroundStyle(model.themeColor.opacity(0.65));Text(failure.isEmpty ? (game.loader=="Minecraft" && kind == .mods ? "此实例尚未安装模组加载器":"选择"+kind.title):failure).font(.system(size:15)).foregroundStyle(.secondary)}}
+            Button("查看项目页面"){if let url=URL(string:project.pageUrl ?? "https://modrinth.com/"+kind.projectType+"/"+project.id){NSWorkspace.shared.open(url)}}.buttonStyle(HarborBareButtonStyle()).font(.system(size:11))
+        }.padding(28)}}else{VStack(spacing:14){Image(systemName:kind.symbol).font(.system(size:42,weight:.ultraLight)).foregroundStyle(model.themeColor.opacity(0.65));Text(failure.isEmpty ? (game.loader=="Minecraft" && kind == .mods ? "此实例尚未安装模组加载器":"选择"+kind.title+"，查看用途与安装依赖"):failure).font(.system(size:15)).foregroundStyle(.secondary)}}
     }
-    private func search(debounce:Bool=false){searchTask?.cancel();if debounce{page=0};let value=query;let chosenSource=source;let currentPage=page;searchTask=Task{if debounce{try? await HarborDelay.sleep(seconds:0.35);guard !Task.isCancelled else{return}};loading=true;defer{if !Task.isCancelled{loading=false}};do{let response=try await ResourceService.search(value,game:game,kind:kind,source:chosenSource,page:currentPage);guard !Task.isCancelled else{return};result=response;failure=""}catch{if !Task.isCancelled{failure=error.localizedDescription}}}}
-    private func loadVersions()async{versions=[];versionID="";plan=[];guard let selected else{return};preparing=true;defer{preparing=false};do{let values=try await ResourceService.versions(selected.id,game:game,kind:kind,source:source);try Task.checkCancellation();versions=values;versionID=values.first?.id ?? "";failure=values.isEmpty ? "暂无适配此实例的版本。":""}catch{if !Task.isCancelled{failure=error.localizedDescription}}}
+    private func search(debounce:Bool=false){
+        searchTask?.cancel();if debounce{page=0};if !remarkListFilter.isEmpty{loading=false;result=nil;return};let value=query;let chosenSource=source;let currentPage=page
+        searchTask=Task{if debounce{try? await HarborDelay.sleep(seconds:0.6);guard !Task.isCancelled else{return}};loading=true;defer{if !Task.isCancelled{loading=false}}
+            let effective=await ModTextTranslation.searchQuery(value);guard !Task.isCancelled else{return};queryUsed=effective
+            do{let response=try await ResourceService.search(effective,game:game,kind:kind,source:chosenSource,page:currentPage);guard !Task.isCancelled else{return};result=response;failure=""}catch{if !Task.isCancelled{failure=error.localizedDescription}}
+        }
+    }
+    private func loadVersions()async{versions=[];versionID="";plan=[];guard let selected else{return};let saved=remarks.entry(selected.id,source:source,listID:remarkListFilter.isEmpty ? remarkListID:remarkListFilter) ?? remarks.entry(selected.id,source:source);remarkName=saved?.name ?? "";remarkListID=saved?.listID ?? remarks.lists.first?.id ?? "personal";preparing=true;defer{preparing=false};do{let values=try await ResourceService.versions(selected.id,game:game,kind:kind,source:source);try Task.checkCancellation();versions=values;versionID=values.first?.id ?? "";failure=values.isEmpty ? "暂无适配此实例的版本。":""}catch{if !Task.isCancelled{failure=error.localizedDescription}}}
     private func prepare()async{plan=[];guard let version=selectedVersion else{return};preparing=true;defer{preparing=false};do{let result=try await ResourceService.plan(version,game:game,kind:kind,source:source);try Task.checkCancellation();plan=result;failure=""}catch{if !Task.isCancelled{failure=error.localizedDescription}}}
+}
+private struct ModSummaryText:View {
+    let text:String;let enabled:Bool;let compact:Bool
+    @State private var translated:String?
+    @State private var original=false
+    @State private var failed=false
+    private var needsTranslation:Bool{enabled && !text.isEmpty && text.range(of:"[A-Za-z]",options:.regularExpression) != nil && text.range(of:"[\\p{Han}]",options:.regularExpression)==nil}
+    var body:some View{
+        VStack(alignment:.leading,spacing:6){Text(enabled && !original ? translated ?? text:text).font(.system(size:compact ? 11:12)).foregroundStyle(.secondary).lineLimit(compact ? 2:nil)
+            if !compact && needsTranslation{HStack{if translated != nil{Button(original ? "查看中文译文":"查看原文"){original.toggle()}.buttonStyle(HarborBareButtonStyle())};Text(failed ? "翻译暂不可用，显示原文":translated == nil ? "正在翻译简介…":"机器翻译 · MyMemory").foregroundStyle(.tertiary)}.font(.system(size:10))}
+        }.task(id:text+String(enabled)){translated=nil;original=false;failed=false;guard enabled,!text.isEmpty,text.range(of:"[A-Za-z]",options:.regularExpression) != nil,text.range(of:"[\\p{Han}]",options:.regularExpression)==nil else{return};do{let value=try await ModTextTranslation.shared.translate(text);try Task.checkCancellation();translated=value}catch{if !Task.isCancelled{failed=true}}}
+    }
 }
 private struct AddonIcon:View {
     let url:String?

@@ -35,7 +35,7 @@ struct WorldEditorPanel:View {
     private var changes:[String:String]{draft.filter{key,value in snapshot?.values[key]?.string != value}}
     var body:some View {
         VStack(spacing:0){
-            HStack(spacing:14){Image(systemName:"square.and.pencil").font(.system(size:23,weight:.light)).foregroundStyle(model.controlTint);VStack(alignment:.leading,spacing:4){Text("编辑存档").font(.system(size:24,weight:.semibold));Text(world.name+" · "+(snapshot?.version ?? game.version)).font(.system(size:11)).foregroundStyle(.secondary).lineLimit(1)};Spacer();Button{close()}label:{Image(systemName:"xmark").frame(width:16,height:18)}.buttonStyle(HarborButtonStyle()).disabled(busy).help("关闭存档编辑")}.padding(26)
+            HStack(spacing:14){Image(systemName:"square.and.pencil").font(.system(size:23,weight:.light)).foregroundStyle(model.controlTint);VStack(alignment:.leading,spacing:4){Text("编辑存档").font(.system(size:24,weight:.semibold));Text(world.name+" · "+(snapshot?.version ?? game.version)).font(.system(size:11)).foregroundStyle(.secondary).lineLimit(1)};Spacer();Button{close()}label:{HarborSymbol(systemName:"xmark").frame(width:16,height:18)}.buttonStyle(HarborButtonStyle()).disabled(busy).help("关闭存档编辑")}.padding(26)
             Divider().opacity(0.25)
             if let snapshot {
                 ScrollView{VStack(alignment:.leading,spacing:20){
@@ -55,7 +55,7 @@ struct WorldEditorPanel:View {
                         }
                     }
                 }.padding(24)}.disabled(busy)
-            }else{VStack(spacing:15){if busy{ProgressView();Text("正在读取存档").font(.system(size:12))}else{Image(systemName:"exclamationmark.triangle").font(.system(size:28,weight:.light));Text(error.isEmpty ? "未能读取存档":error).font(.system(size:12)).multilineTextAlignment(.center);Button("重新读取"){load()}.buttonStyle(HarborButtonStyle())}}.padding(30).frame(maxWidth:.infinity,maxHeight:.infinity)}
+            }else{VStack(spacing:15){if busy{ProgressView();Text("正在读取存档").font(.system(size:12))}else{HarborSymbol(systemName:"exclamationmark.triangle").font(.system(size:28,weight:.light));Text(error.isEmpty ? "未能读取存档":error).font(.system(size:12)).multilineTextAlignment(.center);Button("重新读取"){load()}.buttonStyle(HarborButtonStyle())}}.padding(30).frame(maxWidth:.infinity,maxHeight:.infinity)}
             Divider().opacity(0.25)
             HStack(spacing:12){VStack(alignment:.leading,spacing:4){Text(error.isEmpty ? status.isEmpty ? "保存前自动备份修改涉及的 NBT 文件":status:error).font(.system(size:11)).foregroundStyle(error.isEmpty ? Color.secondary:Color.orange).lineLimit(2);if let backup{Button("查看本次备份"){NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath:backup)])}.font(.system(size:10)).buttonStyle(HarborBareButtonStyle())}};Spacer();if busy{ProgressView().controlSize(.small)};Button("重新读取"){if dirty{pendingPlayer=snapshot?.player;confirmDiscard=true}else{load(player:snapshot?.player)}}.buttonStyle(HarborButtonStyle()).disabled(busy || snapshot==nil);Button("保存修改"){save()}.buttonStyle(HarborButtonStyle(prominent:true)).disabled(busy || !dirty).keyboardShortcut("s",modifiers:.command)}.padding(.horizontal,24).padding(.vertical,17)
         }

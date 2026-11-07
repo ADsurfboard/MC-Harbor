@@ -16,7 +16,7 @@ struct HarborModalHost:View {
         case .skinLibrary:LittleSkinLibraryPanel(model:model).frame(width:min(1080,available.width-70),height:min(730,available.height-96))
         }}
         .harborGlass(appearance:model.appearance,radius:28)
-        .overlay(OpticalRim(radius:28,strength:0.35,color:model.themeColor,clarity:model.surfaceClarity).allowsHitTesting(false))
+
         .clipShape(RoundedRectangle(cornerRadius:28))
         .onExitCommand{if case .worldEditor = modal {}else{model.modal=nil}}
     }
@@ -33,7 +33,7 @@ struct ModalFluidBackdrop:View {
 struct OfflineAccountPanel:View {
     @ObservedObject var model:LauncherModel
     @State private var name=""
-    var body:some View{VStack(alignment:.leading,spacing:24){HStack{Text("离线账号").font(.system(size:26,weight:.semibold));Spacer();Button{model.modal=nil}label:{Image(systemName:"xmark")}.buttonStyle(HarborButtonStyle())};TextField("用户名",text:$name).textFieldStyle(.roundedBorder).onSubmit{add()};HStack{Spacer();Button("添加"){add()}.buttonStyle(HarborButtonStyle(prominent:true)).disabled(name.isEmpty)}}.padding(30)}
+    var body:some View{VStack(alignment:.leading,spacing:24){HStack{Text("离线账号").font(.system(size:26,weight:.semibold));Spacer();Button{model.modal=nil}label:{HarborSymbol(systemName:"xmark")}.buttonStyle(HarborButtonStyle())};TextField("用户名",text:$name).textFieldStyle(.roundedBorder).onSubmit{add()};HStack{Spacer();Button("添加"){add()}.buttonStyle(HarborButtonStyle(prominent:true)).disabled(name.isEmpty)}}.padding(30)}
     private func add(){model.addOffline(name);if model.errorMessage==nil{model.modal=nil;HarborAudio.shared.play(.success)}}
 }
 
@@ -46,7 +46,7 @@ struct ExternalAccountPanel:View {
     @State private var profiles:[[String:String]]=[]
     private var busy:Bool{model.works.contains{$0.title=="外置登录" && $0.active}}
     var body:some View{VStack(alignment:.leading,spacing:18){
-        HStack{Text("外置登录").font(.system(size:26,weight:.semibold));Spacer();Button{password="";model.modal=nil}label:{Image(systemName:"xmark")}.buttonStyle(HarborButtonStyle())}
+        HStack{Text("外置登录").font(.system(size:26,weight:.semibold));Spacer();Button{password="";model.modal=nil}label:{HarborSymbol(systemName:"xmark")}.buttonStyle(HarborButtonStyle())}
         Text("填写支持 authlib-injector / Yggdrasil 协议的认证服务器 API。账号凭据仅提交给该服务器，登录会话保存在本机钥匙串。使用 HTTP 时密码可能被网络窃听。") .font(.system(size:11)).foregroundStyle(.secondary)
         TextField("认证服务器 API 地址",text:$server).textFieldStyle(.roundedBorder)
         TextField("邮箱或用户名",text:$username).textFieldStyle(.roundedBorder)

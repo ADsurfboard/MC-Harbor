@@ -12,13 +12,14 @@ enum HarborPalette {
 
 struct HarborTheme {
     let appearance: HarborAppearance
+    var style:HarborThemeRuntime?=nil
 
     var primaryText: Color {
-        appearance.isLight ? HarborPalette.night : HarborPalette.fog
+        style?.primaryText ?? (appearance.isLight ? HarborPalette.night : HarborPalette.fog)
     }
 
     var secondaryText: Color {
-        primaryText.opacity(0.62)
+        style?.secondaryText ?? primaryText.opacity(appearance.isLight ? 0.78:0.74)
     }
 
     var sidebarTint: Color {
@@ -82,6 +83,7 @@ struct HarborMaterial<S:Shape>:View {
     @Environment(\.harborClarity) private var clarity
     @Environment(\.harborFrosted) private var frosted
     @Environment(\.harborAccent) private var accent
+    @Environment(\.harborThemeRuntime) private var customization
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     var body:some View{let policy=HarborSurfacePolicy(clarity:clarity,frosted:frosted);let light=appearance.isLight;let base=light ? Color(hex:0xF0F3F1):HarborPalette.nightRaised
         ZStack{
@@ -90,6 +92,7 @@ struct HarborMaterial<S:Shape>:View {
                 if policy.liquid>0.001{shape.fill(base.opacity(0.035)).opacity(policy.liquid)}
                 // A constant neutral veil avoids changing hue as clarity moves.
                 shape.fill((appearance == .theme ? accent:base).opacity(frosted ? (light ? 0.12:0.10):(appearance == .theme ? 0.10:0.015)))
+                if let surface=customization.surface{shape.fill(surface.opacity(customization.settings.surfaceStrength))}
             }
         }.allowsHitTesting(false).accessibilityHidden(true)
     }
@@ -98,9 +101,10 @@ struct HarborGlassModifier:ViewModifier {
     let appearance:HarborAppearance
     let radius:CGFloat
     let interactive:Bool
+    @Environment(\.harborThemeRuntime) private var customization
     func body(content:Content)->some View{let shape=RoundedRectangle(cornerRadius:radius,style:.continuous);let theme=HarborTheme(appearance:appearance)
         content.background{HarborMaterial(shape:shape,appearance:appearance,interactive:interactive)}
-            .overlay(shape.stroke(theme.border,lineWidth:0.7).allowsHitTesting(false))
+            .overlay(shape.stroke(customization.border ?? theme.border,lineWidth:0.7).allowsHitTesting(false))
             .shadow(color:theme.shadow,radius:20,y:10)
     }
 }
@@ -126,16 +130,18 @@ struct HarborActionButtonStyle: ButtonStyle {
     let appearance: HarborAppearance
     var prominent = false
     @Environment(\.harborAccent) private var accent
+    @Environment(\.harborThemeRuntime) private var customization
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.harborReduceMotion) private var customReduceMotion
     private var reduceMotion: Bool { systemReduceMotion || customReduceMotion }
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
-        let theme = HarborTheme(appearance: appearance)
+        let theme = HarborTheme(appearance: appearance,style:customization)
         configuration.label
             .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(prominent ? accent.readableInk : theme.primaryText)
+            .foregroundStyle(prominent ? customization.buttonInk : theme.primaryText)
+            .environment(\.harborIconInk,prominent ? customization.buttonInk:nil)
             .padding(.horizontal, 16)
             .padding(.vertical, 9)
             .background {
@@ -143,7 +149,7 @@ struct HarborActionButtonStyle: ButtonStyle {
                     Capsule()
                         .fill(
                             LinearGradient(
-                                colors: [accent, accent.opacity(0.82)],
+                                colors: [customization.buttonFill, customization.buttonFill.opacity(0.82)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -163,7 +169,7 @@ struct HarborActionButtonStyle: ButtonStyle {
                     )
             }
             .contentShape(.interaction,Capsule())
-            .harborPrism(radius:16)
+
             .scaleEffect(
                 configuration.isPressed
                     ? (reduceMotion ? 0.98 : 0.85)
@@ -195,7 +201,7 @@ struct HarborPressButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .contentShape(.interaction,RoundedRectangle(cornerRadius:16))
-            .harborPrism(radius:16)
+
             .scaleEffect(
                 configuration.isPressed
                     ? (reduceMotion ? 0.98 : pressedScale)

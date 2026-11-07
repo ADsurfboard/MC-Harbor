@@ -16,11 +16,11 @@ struct ResourceArtwork:View {
 struct ResourceSourceButton:View {
     @ObservedObject var model:LauncherModel;let path:String
     private var links:[String:String]{model.resourceRecords[path]?.links ?? [:]}
-    var body:some View{Menu{ForEach(["curseforge","modrinth"],id:\.self){source in Button(source == "curseforge" ? "CurseForge 原项目":"Modrinth 原项目"){if let address=links[source],let url=URL(string:address){NSWorkspace.shared.open(url)}}.disabled(links[source]==nil)}}label:{Image(systemName:"link").font(.system(size:12)).frame(width:28,height:28).contentShape(Circle())}.menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width:28).harborPrism(radius:14).disabled(links.isEmpty).opacity(links.isEmpty ? 0.35:1).help(links.isEmpty ? "未找到实例资源的原项目":"打开实例资源原项目")}
+    var body:some View{Menu{ForEach(["curseforge","modrinth"],id:\.self){source in Button(source == "curseforge" ? "CurseForge 原项目":"Modrinth 原项目"){if let address=links[source],let url=URL(string:address){NSWorkspace.shared.open(url)}}.disabled(links[source]==nil)}}label:{HarborSymbol(systemName:"link").font(.system(size:12)).frame(width:28,height:28).contentShape(Circle())}.menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width:28).disabled(links.isEmpty).opacity(links.isEmpty ? 0.35:1).help(links.isEmpty ? "未找到实例资源的原项目":"打开实例资源原项目")}
 }
 struct InstanceMoreButton:View {
     let action:()->Void
-    var body:some View{Button(action:action){Image(systemName:"ellipsis").font(.system(size:15,weight:.semibold)).frame(width:38,height:38).background(Color.primary.opacity(0.055),in:Circle()).overlay(Circle().stroke(.white.opacity(0.14),lineWidth:0.6)).contentShape(Circle())}.buttonStyle(HarborBareButtonStyle()).help("管理实例")}
+    var body:some View{Button(action:action){HarborSymbol(systemName:"ellipsis").font(.system(size:15,weight:.semibold)).frame(width:38,height:38).background(Color.primary.opacity(0.055),in:Circle()).overlay(Circle().stroke(.white.opacity(0.14),lineWidth:0.6)).contentShape(Circle())}.buttonStyle(HarborBareButtonStyle()).help("管理实例")}
 }
 @MainActor extension LauncherModel {
     func loadResourceIndex(_ game:GameInstance,force:Bool=false){

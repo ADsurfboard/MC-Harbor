@@ -92,7 +92,7 @@ struct TerracottaPanel:View {
         HStack{if connection.busy{ProgressView().controlSize(.small)};Text(connection.status).font(.system(size:12)).textSelection(.enabled)}
         if !connection.room.isEmpty{HStack{Text(connection.room).font(.system(size:16,weight:.medium,design:.monospaced)).textSelection(.enabled);Button("复制房间码"){NSPasteboard.general.clearContents();NSPasteboard.general.setString(connection.room,forType:.string);model.toast("房间码已复制")}.buttonStyle(HarborButtonStyle())}}
         if !connection.address.isEmpty{HStack{Text(connection.address).font(.system(size:12,design:.monospaced)).textSelection(.enabled);Button("启动并进入"){if let game=model.selected{model.launch(game,server:connection.address)}}.buttonStyle(HarborButtonStyle()).disabled(model.selected==nil)}}
-        if !connection.members.isEmpty{ForEach(connection.members){member in HStack{Image(systemName:member.kind=="HOST" ? "crown":"person.fill");Text(member.name);Spacer();Text(member.vendor).foregroundStyle(.secondary)}.font(.system(size:12))}}
+        if !connection.members.isEmpty{ForEach(connection.members){member in HStack{HarborSymbol(systemName:member.kind=="HOST" ? "crown":"person.fill");Text(member.name);Spacer();Text(member.vendor).foregroundStyle(.secondary)}.font(.system(size:12))}}
         HStack{Link("陶瓦联机 © burningtnt · AGPL-3.0",destination:URL(string:"https://github.com/burningtnt/Terracotta")!);Spacer();Link("独立客户端下载",destination:URL(string:"https://github.com/burningtnt/Terracotta/releases/latest")!)}.font(.system(size:11));Text("基于 EasyTier，优先 P2P；公共节点由社区提供，也可接入自建节点。版本、模组和网络条件仍需匹配。").font(.system(size:10)).foregroundStyle(.secondary)
     }.padding(24).frame(maxWidth:.infinity,alignment:.leading).harborGlass(appearance:model.appearance,radius:24)}
 }

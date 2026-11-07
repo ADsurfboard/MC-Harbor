@@ -26,7 +26,7 @@ struct NativePreferences: Codable {
     var frostedGlass = false
     var localizationEditorHeight: Double = 180
     var localizationEditorHidden = false
-    var rainbowCorners = true
+    var themeCustomization = HarborThemeSettings()
     var knownLibraries:[String] = []
     var appearance: HarborAppearance = .ultraClear
     var wallpaper = WallpaperSettings()
@@ -40,6 +40,7 @@ struct NativePreferences: Codable {
     var downloadSource = "auto"
     var downloadThreads = 8
     var completeDependencies = false
+    var translateModDescriptions = true
     var introEnabled = true
     var voiceEnabled = true
     var welcomeVoice:WelcomeVoice = .female

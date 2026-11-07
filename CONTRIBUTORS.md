@@ -8,4 +8,4 @@
 
 <img src="Assets/Contributors/jiekee.png" width="72" height="72" alt="jiekee❄ 头像">
 
-**jiekee❄**：反馈模组加载器下载、实例管理、外置认证及 macOS 程序坞窗口恢复问题，为兼容性和可用性改进提供测试线索。
+**jiekee❄**：反馈并复现模组加载器下载、实例管理、外置认证及 Intel/macOS 程序坞窗口恢复问题，提供兼容性测试线索；提出模组推荐、中英文搜索、简介自动汉化和实例快捷方式等功能建议。

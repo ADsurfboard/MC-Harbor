@@ -1,6 +1,6 @@
 import Foundation
 
-enum AddonSource:String,CaseIterable,Identifiable {case modrinth,curseforge;var id:String{rawValue};var title:String{self == .modrinth ? "Modrinth":"CurseForge"}}
+enum AddonSource:String,Codable,CaseIterable,Identifiable {case modrinth,curseforge;var id:String{rawValue};var title:String{self == .modrinth ? "Modrinth":"CurseForge"}}
 private final class QueryProcess:@unchecked Sendable {
     let lock=NSLock();var process:Process?;var continuation:CheckedContinuation<[String:Any],Error>?;var finished=false;var cancelled=false
     func register(_ continuation:CheckedContinuation<[String:Any],Error>){lock.lock();self.continuation=continuation;let cancel=cancelled;lock.unlock();if cancel{resolve(.failure(CancellationError()))}}

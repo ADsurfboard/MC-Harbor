@@ -38,6 +38,7 @@ enum HarborSound:String,CaseIterable {
 struct HarborButtonStyle:ButtonStyle {
     var prominent=false
     @Environment(\.harborAccent) private var accent
+    @Environment(\.harborThemeRuntime) private var customization
     @Environment(\.harborClarity) private var clarity
     @Environment(\.harborAppearance) private var appearance
     @Environment(\.harborFrosted) private var frosted
@@ -46,12 +47,13 @@ struct HarborButtonStyle:ButtonStyle {
     func makeBody(configuration:Configuration)->some View {
         configuration.label
             .font(.system(size:12,weight:.medium))
-            .foregroundStyle(prominent ? accent.readableInk:Color.primary)
+            .foregroundStyle(prominent ? customization.buttonInk:customization.primaryText)
+            .environment(\.harborIconInk,prominent ? customization.buttonInk:nil)
             .padding(.horizontal,16).padding(.vertical,9)
-            .background{ZStack{HarborMaterial(shape:Capsule(),appearance:appearance,interactive:true);if prominent{Capsule().fill(accent.opacity(frosted ? 0.8:1))}}}
+            .background{ZStack{HarborMaterial(shape:Capsule(),appearance:appearance,interactive:true);if prominent{Capsule().fill(customization.buttonFill.opacity(frosted ? 0.8:1))}}}
             .contentShape(.interaction,Capsule())
-            .overlay(Capsule().stroke(.white.opacity(prominent ? 0.25:0.12),lineWidth:0.6))
-            .harborPrism(radius:16)
+            .overlay(Capsule().stroke(customization.border ?? .white.opacity(prominent ? 0.25:0.12),lineWidth:0.6))
+
             .scaleEffect(configuration.isPressed ? (reduceMotion ? 0.98:0.94):1)
             .offset(y:configuration.isPressed && !reduceMotion ? 1:0)
             .opacity(enabled ? 1:0.42)
@@ -63,33 +65,8 @@ struct HarborButtonStyle:ButtonStyle {
 
 struct HarborBareButtonStyle:ButtonStyle {
     func makeBody(configuration:Configuration)->some View{
-        configuration.label.frame(minWidth:28,minHeight:28).contentShape(.interaction,RoundedRectangle(cornerRadius:9)).harborPrism(radius:9).opacity(configuration.isPressed ? 0.72:1)
+        configuration.label.frame(minWidth:28,minHeight:28).contentShape(.interaction,RoundedRectangle(cornerRadius:9)).opacity(configuration.isPressed ? 0.72:1)
             .harborOnChange(of:configuration.isPressed){_,pressed in if pressed{HarborAudio.shared.play(.select)}}
             .onHover{inside in if inside{HarborAudio.shared.play(.focus)}}
     }
-}
-private struct HarborPrismModifier:ViewModifier {
-    let radius:CGFloat
-    @Environment(\.harborRainbow) private var enabled
-    @Environment(\.harborAccent) private var accent
-    @Environment(\.harborClarity) private var clarity
-    func body(content:Content)->some View{content.overlay{if enabled{ButtonOpticalCorners(radius:radius).allowsHitTesting(false).accessibilityHidden(true)}}}
-}
-extension View{func harborPrism(radius:CGFloat=16)->some View{modifier(HarborPrismModifier(radius:radius))}}
-
-/// Pure SwiftUI edges keep all button labels accessible and share the native glass compositor.
-private struct ButtonOpticalCorners:View {
-    let radius:CGFloat
-    var body:some View{GeometryReader{geometry in
-        let r=min(radius,geometry.size.height/2)
-        let shape=RoundedRectangle(cornerRadius:r,style:.continuous)
-        let reach=max(10,min(24,min(geometry.size.width*0.18,geometry.size.height*0.9)))
-        ZStack{
-            shape.inset(by:0.45).stroke(AngularGradient(colors:[Color(hex:0xC4E8E9),Color(hex:0xC2C9E3),Color(hex:0xD7BEDB),Color(hex:0xEDD1B8),.white,Color(hex:0xB6DEDA)],center:.center),lineWidth:1.1)
-            shape.inset(by:1.3).stroke(.white.opacity(0.5),lineWidth:0.4)
-        }
-        .mask{ZStack{RadialGradient(stops:[.init(color:.white,location:0),.init(color:.white.opacity(0.72),location:0.3),.init(color:.white.opacity(0.18),location:0.62),.init(color:.clear,location:1)],center:.topTrailing,startRadius:0,endRadius:reach);RadialGradient(stops:[.init(color:.white,location:0),.init(color:.white.opacity(0.72),location:0.3),.init(color:.white.opacity(0.18),location:0.62),.init(color:.clear,location:1)],center:.bottomLeading,startRadius:0,endRadius:reach)}}
-        .opacity(0.38)
-        .clipShape(shape)
-    }}
 }
