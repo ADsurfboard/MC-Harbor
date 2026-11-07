@@ -54,6 +54,7 @@ public final class NativeBridge {
             org.jackhuang.hmcl.util.CacheRepository.getInstance().changeDirectory(data);
             String command=text("command","");
             if(command.equals("login")){result(login());System.exit(0);}
+            if(command.equals("externalLogin")){result(externalLogin());System.exit(0);}
             if(command.equals("migrate")){result(migrate());System.exit(0);}
             if(command.equals("diagnostics")){result(diagnostics());System.exit(0);}
             if(command.equals("worldRead")||command.equals("worldSave")){NativeWorldEditor editor=new NativeWorldEditor(request,data);result(command.equals("worldRead")?editor.read():editor.save());System.exit(0);}
@@ -65,7 +66,7 @@ public final class NativeBridge {
             Path root=Path.of(text("root","/Applications/.minecraft")).toAbsolutePath().normalize();
             repository=new Repository(root,text("runDirectory",""));repository.refreshVersions();
             DownloadProvider official=new MojangDownloadProvider(),mirror=new BMCLAPIDownloadProvider("https://bmclapi2.bangbang93.com");
-            provider=text("source","auto").equals("mirror")?new AutoDownloadProvider(mirror,official):new AutoDownloadProvider(official,mirror);
+            provider=text("source","auto").equals("official")?new AutoDownloadProvider(official,mirror):new AutoDownloadProvider(mirror,official);
             FetchTask.setDownloadExecutorConcurrency(Math.max(4,Math.min(24,integer("threads",8))));
             dependency=new DefaultDependencyManager(repository,provider,new DefaultCacheRepository(root));
             Map<String,Object> output=switch(command){
@@ -81,7 +82,7 @@ public final class NativeBridge {
                 default->throw new IOException("未知操作："+command);
             };
             result(output);System.exit(0);
-        }catch(Throwable e){Throwable cause=e;while(cause.getCause()!=null)cause=cause.getCause();String message=cause.getMessage();if(message==null||message.isBlank())message=cause.getClass().getSimpleName();message=message.replaceAll("(?i)(access_token|refresh_token|authorization|client_secret)([\\s:=]+)[^\\s,}]+","$1$2[redacted]");emit(Map.of("event","error","message",message.substring(0,Math.min(800,message.length()))));e.printStackTrace(System.err);System.exit(1);}
+        }catch(Throwable e){Throwable cause=e;while(cause.getCause()!=null)cause=cause.getCause();String message=cause.getMessage();if(message==null||message.isBlank())message=cause.getClass().getSimpleName();message=message.replaceAll("(?i)(access_token|refresh_token|authorization|client_secret)([\\s:=]+)[^\\s,}]+","$1$2[redacted]");if(request!=null&&request.has("password")){String secret=text("password","");if(!secret.isEmpty())message=message.replace(secret,"[redacted]");}emit(Map.of("event","error","message",message.substring(0,Math.min(800,message.length()))));e.printStackTrace(System.err);System.exit(1);}
     }
     private static synchronized void emit(Map<String,?> object){protocol.println(JsonUtils.UGLY_GSON.toJson(object));}
     private static void result(Map<String,?> object){emit(Map.of("event","result","data",object));}
@@ -216,6 +217,22 @@ public final class NativeBridge {
     }
     private static Map<String,Object> serialize(Account account,String type){JsonObject meta=new JsonObject(),privateData=new JsonObject();account.writeMetadata(meta);account.writePrivateData(privateData);return Map.of("metadata",Map.of("name",account.getProfileName(),"uuid",account.getProfileID().toString(),"kind",type,"id",account.getAccountID().toString()),"hmclMetadata",meta,"privateData",privateData);}
     private static Map<String,Object> login()throws Exception{MicrosoftAccountFactory factory=new MicrosoftAccountFactory(service());MicrosoftAccount account=factory.create(null,null,null,null,OAuth.GrantFlow.DEVICE);account.logIn();return serialize(account,"microsoft");}
+    private static Map<String,Object> externalLogin()throws Exception{
+        String address=text("server","").strip(),username=text("username","").strip(),password=text("password","");
+        if(!address.contains("://"))address="https://"+address;
+        URI uri=URI.create(address);if(!List.of("http","https").contains(uri.getScheme())||uri.getHost()==null||uri.getUserInfo()!=null||uri.getFragment()!=null||uri.getQuery()!=null)throw new IOException("认证服务器地址无效");
+        if(username.isBlank()||password.isEmpty())throw new IOException("请输入账号和密码");
+        AuthlibInjectorServer server=AuthlibInjectorServer.locateServer(address);
+        URI resolved=URI.create(server.getUrl());if(uri.getScheme().equals("https")&&!resolved.getScheme().equals("https"))throw new IOException("认证服务器重定向到不安全的 HTTP 地址");
+        List<Map<String,String>> choices=new ArrayList<>();String selected=text("profile","");
+        CharacterSelector selector=(service,profiles)->{
+            if(profiles.size()==1)return profiles.get(0);
+            for(var profile:profiles){choices.add(Map.of("id",profile.getId().toString(),"name",profile.getName()));if(profile.getId().toString().equalsIgnoreCase(selected))return profile;}
+            throw new NoSelectedCharacterException();
+        };
+        try{AuthlibInjectorAccount account=new AuthlibInjectorAccountFactory(injector(),AuthlibInjectorServer::new).create(selector,username,password,null,server);return serialize(account,"authlibInjector");}
+        catch(NoSelectedCharacterException e){if(!choices.isEmpty())return Map.of("profiles",choices);throw e;}
+    }
     private static Map<String,Object> migrate()throws Exception{
         Path home=Path.of(System.getProperty("user.home"));Path shared=home.resolve("Library/Application Support/HMCL");Path local=Path.of(text("root","/Applications/.minecraft")).getParent().resolve(".hmcl");
         List<Map<String,Object>> results=new ArrayList<>();Set<String> seen=new HashSet<>();List<String> failures=new ArrayList<>();

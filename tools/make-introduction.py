@@ -10,13 +10,13 @@ from reportlab.platypus import Paragraph
 from reportlab.lib.styles import ParagraphStyle
 
 ROOT=Path(__file__).resolve().parent.parent
-OUT=ROOT.parents[1]/'outputs/MC-Harbor-启动器介绍.pdf';OUT.parent.mkdir(exist_ok=True)
+OUT=ROOT.parents[1]/'outputs/MC-Harbor-Apple-Introduction-1.5.2.pdf';OUT.parent.mkdir(exist_ok=True)
 pdfmetrics.registerFont(TTFont('CJK','/System/Library/Fonts/Supplemental/Arial Unicode.ttf'))
 W,H=595.276,841.89
 INK=HexColor('#10271E');GREEN=HexColor('#29825B');MUTED=HexColor('#5C6E65');PALE=HexColor('#EDF4EE');LINE=HexColor('#D9E5DD')
 DOC=canvas.Canvas(str(OUT),pagesize=(W,H),pageCompression=1)
-DOC.setTitle('MC Harbor | 启动器介绍');DOC.setAuthor('morben 墨尔本');DOC.setSubject('1.5.0：原生 macOS Minecraft 启动器，架构、功能与实例资源汉化')
-README=['# MC Harbor','1.5.0 · Apple Silicon · macOS 26 及以上','[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/latest) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.5.0/MC-Harbor-Introduction.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)','以下正文与随包 PDF 同版。']
+DOC.setTitle('MC Harbor | 启动器介绍');DOC.setAuthor('morben 墨尔本');DOC.setSubject('1.5.2：原生 macOS Minecraft 启动器，架构、功能与实例资源汉化')
+README=['# MC Harbor','1.5.2 · Apple Silicon · macOS 26 及以上','[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/latest) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.5.2-intel/MC-Harbor-Apple-Introduction-1.5.2.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)','以下正文与随包 PDF 同版。']
 STYLE=ParagraphStyle('body',fontName='CJK',fontSize=10.4,leading=17.4,textColor=INK,wordWrap='CJK',spaceAfter=0)
 
 def txt(text,x,y,size=11,color=INK,font='CJK'):
@@ -38,7 +38,7 @@ def page(number,tag,title,description):
     y=para(description,46,H-132,W-92,11,MUTED)
     rule(y-21);return y-52
 def finish(number):
-    rule(52);txt('MC Harbor  ·  1.5.0  ·  2026.10.26',46,33,8,MUTED)
+    rule(52);txt('MC Harbor  ·  1.5.2  ·  2026.11.08',46,33,8,MUTED)
     txt(f'{number:02d} / 10',W-86,33,8,MUTED);DOC.showPage()
 def section(title,text,y):
     README.append('### '+title)
@@ -66,17 +66,17 @@ para('为 macOS 重新设计的 Minecraft 启动器。\n保留 HMCL 的游戏能
 DOC.setStrokeColor(HexColor('#375448'));DOC.line(48,269,W-48,269)
 for x,big,small in [(48,'SwiftUI','原生界面'),(218,'HMCL','稳定内核'),(388,'Liquid Glass','系统材质')]:
     txt(big,x,231,17,HexColor('#F4F8F4'));txt(small,x,207,10,HexColor('#A9C7B4'))
-para('1.5.0 · Apple Silicon · macOS 26 及以上\n本机验证：Apple M3 / 8GB / macOS 27',48,132,W-96,10,HexColor('#ADC4B5'),17)
-txt('产品与技术介绍 / 2026.10.26',48,51,9,HexColor('#A9C7B4'));txt('01 / 10',W-91,51,9,HexColor('#A9C7B4'));DOC.showPage()
+para('1.5.2 · Apple Silicon · macOS 26 及以上\n本机验证：Apple M3 / 8GB / macOS 27',48,132,W-96,10,HexColor('#ADC4B5'),17)
+txt('产品与技术介绍 / 2026.11.08',48,51,9,HexColor('#A9C7B4'));txt('01 / 10',W-91,51,9,HexColor('#A9C7B4'));DOC.showPage()
 
 # 02 - Features
 y=page(2,'DAILY USE','日常操作，一处完成。','以实例为中心。默认加载器图标高清重绘，保留实例资源原图标、可视化资源管理与明确的下载目标。')
 col=(W-104)/2
-card('游戏库','搜索、收藏、显示名称、加载器识别、实例设置、启动与依赖修复。实例可更换图标，也可恢复原图标。',46,y,col,133)
+card('游戏库','搜索、收藏与管理实例。删除实例前确认并移入废纸篓，保护共享目录和被依赖的版本。',46,y,col,133)
 card('实例资源','模组、资源包、光影、地图等统称实例资源。原图标优先；支持多选、启停、本地导入与打开原项目页面。',58+col,y,col,133)
 y-=147
-card('下载中心','联动 Modrinth 与 CurseForge。搜索模组、资源包、光影、地图和整合包，筛选兼容版本与加载器，解析必要依赖并校验文件。',46,y,col,151)
-card('账号与角色','导入原 HMCL 账号；Microsoft、第三方认证、离线身份。真实皮肤头部头像、开源 3D 预览、导入皮肤并按身份能力应用。',58+col,y,col,151)
+card('下载中心','模组加载器优先使用国内镜像，失败时回退；搜索 Modrinth 与 CurseForge 资源，筛选版本并校验下载。',46,y,col,151)
+card('账号与角色','支持 Microsoft、离线账号和自定义外置登录 API。显示皮肤头像与 3D 角色，支持按账号能力更换皮肤。',58+col,y,col,151)
 y-=165
 card('外观与声音','主题调色盘、图片 / 视频背景、三层叠片、0 至 100 通透度与独立深浅毛玻璃选项、可关闭的局部彩虹色散。弹层过渡、欢迎动画、四种原音播报与界面音效。',46,y,col,151)
 card('存档与前置补全','原生编辑模式、天数、经验和生命等状态。可选前置补全在启动前检测并补齐必需模组；另有存档备份与便携模式。',58+col,y,col,151)
@@ -131,7 +131,7 @@ finish(6)
 
 # 06 - Validation and sources
 y=page(7,'VERIFICATION & SOURCES','可核对的功能与边界。','功能、许可和验证范围随对应源码与交付记录保留。')
-y=section('本轮验证','公网原生客户端 59 项、24 好友客户端 17 项、Worker 59 项、Python 服务 45 项、增量后端 22 项通过；实例资源 / 汉化 38 项、FTB / 数据包 39 项复跑通过。测试覆盖真实消息推送、离线未读、串聊隔离、长备注、皮肤头像与撤销好友权限。',y)
+y=section('此前版本验证','公网原生客户端 59 项、24 好友客户端 17 项、Worker 59 项、Python 服务 45 项、增量后端 22 项通过；实例资源 / 汉化 38 项、FTB / 数据包 39 项复跑通过。测试覆盖真实消息推送、离线未读、串聊隔离、长备注、皮肤头像与撤销好友权限。',y)
 y=section('已有基线','此前 20 项原生业务、11 项账号与资源、5 项下载事务通过；隔离环境实际安装 / 启动 1.20.1，并验证坏源回退、备份与 MultiMC 世界字节回环。初次接入时记录 27 个有效实例与 2 个账户；当前列表以目录扫描结果为准。',y)
 y=para('验证边界：没有逐个长时间试玩 27 个整合包，没有替用户在线身份上传测试皮肤；本包为 ARM64、本机临时签名，未 Apple 公证。外部服务可用性与任意模组包帧率不能作永久保证。',46,y,W-92,9.5,MUTED)-27
 txt('主要开源来源',46,y,15);y-=24
@@ -168,4 +168,4 @@ y=section('陶瓦房间：无需配置中转服务器','基于官方 Terracotta 
 y=section('使用边界','好友聊天不需要玩家部署服务。陶瓦使用社区公共节点，NAT、网络质量和节点状态会影响连通；Sakura 需要玩家自己的访问密钥、可用节点及相应额度。普通地址可用于其他启动器，但 Minecraft 版本、模组配置和服务器认证仍须匹配，不绕过正版或服务器权限。',y)
 para('已实测官方 ARM64 陶瓦核心的 11 项端口 / 状态 / 扫描 / 退出检查，原生启动与退出另行验证；Sakura 官方客户端下载与版本校验通过。没有宣称完成两台外网设备长时间 Minecraft 联机，也未使用真实 Sakura 账号建立测试隧道。新版本读取 Mojang 实时清单，失败时使用镜像与缓存；后续格式、认证或 Java 要求变化仍需维护适配。',46,y,W-92,9.5,MUTED)
 finish(10)
-DOC.save();README += ['## 构建与许可','构建、开发测试、音效授权与免费服务边界详见 [BUILDING.md](BUILDING.md) 和 [docs/SERVICES.md](docs/SERVICES.md)。本工程为 GPL-3.0-or-later；第三方素材按各自许可分发。','如果喜欢，记得 Star 我（'];(ROOT/'README.md').write_text('\n\n'.join(README)+'\n');print(OUT)
+DOC.save();README += ['## 贡献者', '<img src="Assets/Contributors/jiekee.png" width="72" height="72" alt="jiekee❄ 头像">', '**jiekee❄**：反馈模组加载器下载、实例删除、外置登录及窗口恢复方面的问题，推动相关体验改进。', '## 构建与许可','构建、开发测试、音效授权与免费服务边界详见 [BUILDING.md](BUILDING.md) 和 [docs/SERVICES.md](docs/SERVICES.md)。本工程为 GPL-3.0-or-later；第三方素材按各自许可分发。','如果喜欢，记得 Star 我（'];(ROOT/'README.md').write_text('\n\n'.join(README)+'\n');print(OUT)

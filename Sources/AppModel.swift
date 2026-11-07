@@ -86,7 +86,7 @@ import UniformTypeIdentifiers
     func fetchCatalog() async {
         guard !loadingCatalog else{return};loadingCatalog=true;defer{loadingCatalog=false}
         let official="https://piston-meta.mojang.com/mc/game/version_manifest_v2.json",mirror="https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json"
-        let endpoints=preferences.downloadSource=="mirror" ? [mirror,official]:[official,mirror]
+        let endpoints=preferences.downloadSource=="official" ? [official,mirror]:[mirror,official]
         let config=URLSessionConfiguration.ephemeral;config.timeoutIntervalForRequest=8;config.timeoutIntervalForResource=15;let session=URLSession(configuration:config);defer{session.invalidateAndCancel()}
         var failures:[String]=[]
         for url in endpoints {
@@ -134,6 +134,15 @@ import UniformTypeIdentifiers
         }
     }
 
+    func saveExternalAccount(_ result:[String:Any]) throws {
+        guard let metadata=result["metadata"] as? [String:Any],let name=metadata["name"] as? String,let uuid=metadata["uuid"] as? String,let raw=result["hmclMetadata"] as? [String:Any],let server=raw["serverBaseURL"] as? String else{throw NSError(domain:"MC Harbor",code:1,userInfo:[NSLocalizedDescriptionKey:"认证服务未返回完整账号信息。"])}
+        let existing=accounts.first{account in guard account.kind=="authlibInjector",account.uuid.replacingOccurrences(of:"-",with:"").lowercased()==uuid.replacingOccurrences(of:"-",with:"").lowercased(),let bytes=KeychainStore.read(account.id),let object=(try? JSONSerialization.jsonObject(with:bytes)) as? [String:Any],let prior=object["hmclMetadata"] as? [String:Any] else{return false};return (prior["serverBaseURL"] as? String)==server}
+        let id=existing?.id ?? UUID().uuidString
+        try KeychainStore.write(try JSONSerialization.data(withJSONObject:result),id:id)
+        let account=LauncherAccount(id:id,name:name,kind:"authlibInjector",uuid:uuid)
+        if let index=accounts.firstIndex(where:{$0.id==id}){accounts[index]=account}else{accounts.append(account)}
+        preferences.selectedAccount=id;saveAccounts();loadSkin(account,refresh:true);toast("外置账号已添加")
+    }
     func removeAccount(_ account:LauncherAccount) { accounts.removeAll{$0.id==account.id};KeychainStore.remove(account.id);saveAccounts() }
     func saveAccounts() { if let data=try? JSONEncoder().encode(accounts){try? data.write(to:NativePaths.root.appendingPathComponent("accounts.json"),options:.atomic)} }
     func backend(_ command:String,title:String,arguments:[String:Any],silent:Bool=false,done:@escaping([String:Any])->Void) {

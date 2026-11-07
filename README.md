@@ -1,8 +1,8 @@
 # MC Harbor
 
-1.5.0 · Apple Silicon · macOS 26 及以上
+1.5.2 · Apple Silicon · macOS 26 及以上
 
-[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/latest) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.5.0/MC-Harbor-Introduction.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)
+[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/latest) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.5.2-intel/MC-Harbor-Apple-Introduction-1.5.2.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)
 
 以下正文与随包 PDF 同版。
 
@@ -10,7 +10,7 @@
 保留 HMCL 的游戏能力，采用真实 WinHarbor 原生界面，
 把账号、下载、实例资源与汉化工作集中在一个窗口。
 
-1.5.0 · Apple Silicon · macOS 26 及以上
+1.5.2 · Apple Silicon · macOS 26 及以上
 本机验证：Apple M3 / 8GB / macOS 27
 
 ## 日常操作，一处完成。
@@ -19,7 +19,7 @@
 
 ### 游戏库
 
-搜索、收藏、显示名称、加载器识别、实例设置、启动与依赖修复。实例可更换图标，也可恢复原图标。
+搜索、收藏与管理实例。删除实例前确认并移入废纸篓，保护共享目录和被依赖的版本。
 
 ### 实例资源
 
@@ -27,11 +27,11 @@
 
 ### 下载中心
 
-联动 Modrinth 与 CurseForge。搜索模组、资源包、光影、地图和整合包，筛选兼容版本与加载器，解析必要依赖并校验文件。
+模组加载器优先使用国内镜像，失败时回退；搜索 Modrinth 与 CurseForge 资源，筛选版本并校验下载。
 
 ### 账号与角色
 
-导入原 HMCL 账号；Microsoft、第三方认证、离线身份。真实皮肤头部头像、开源 3D 预览、导入皮肤并按身份能力应用。
+支持 Microsoft、离线账号和自定义外置登录 API。显示皮肤头像与 3D 角色，支持按账号能力更换皮肤。
 
 ### 外观与声音
 
@@ -149,7 +149,7 @@ Java 任务按需启动；原壁纸和缩略图按文件修订缓存，资源索
 
 功能、许可和验证范围随对应源码与交付记录保留。
 
-### 本轮验证
+### 此前版本验证
 
 公网原生客户端 59 项、24 好友客户端 17 项、Worker 59 项、Python 服务 45 项、增量后端 22 项通过；实例资源 / 汉化 38 项、FTB / 数据包 39 项复跑通过。测试覆盖真实消息推送、离线未读、串聊隔离、长备注、皮肤头像与撤销好友权限。
 
@@ -236,6 +236,12 @@ Java 任务按需启动；原壁纸和缩略图按文件修订缓存，资源索
 好友聊天不需要玩家部署服务。陶瓦使用社区公共节点，NAT、网络质量和节点状态会影响连通；Sakura 需要玩家自己的访问密钥、可用节点及相应额度。普通地址可用于其他启动器，但 Minecraft 版本、模组配置和服务器认证仍须匹配，不绕过正版或服务器权限。
 
 已实测官方 ARM64 陶瓦核心的 11 项端口 / 状态 / 扫描 / 退出检查，原生启动与退出另行验证；Sakura 官方客户端下载与版本校验通过。没有宣称完成两台外网设备长时间 Minecraft 联机，也未使用真实 Sakura 账号建立测试隧道。新版本读取 Mojang 实时清单，失败时使用镜像与缓存；后续格式、认证或 Java 要求变化仍需维护适配。
+
+## 贡献者
+
+<img src="Assets/Contributors/jiekee.png" width="72" height="72" alt="jiekee❄ 头像">
+
+**jiekee❄**：反馈模组加载器下载、实例删除、外置登录及窗口恢复方面的问题，推动相关体验改进。
 
 ## 构建与许可
 

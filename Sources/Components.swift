@@ -1,8 +1,20 @@
 import AppKit
 import SwiftUI
 
+final class HarborAppDelegate:NSObject,NSApplicationDelegate {
+    func applicationShouldHandleReopen(_ sender:NSApplication,hasVisibleWindows flag:Bool)->Bool {
+        if let window=sender.windows.first(where:{$0.identifier?.rawValue=="MCHarborMainWindow"}) {
+            if window.isMiniaturized{window.deminiaturize(nil)}
+            window.makeKeyAndOrderFront(nil);sender.activate(ignoringOtherApps:true);return true
+        }
+        return true
+    }
+}
+
 struct WindowConfigurator: NSViewRepresentable {
-    final class Coordinator { weak var configuredWindow:NSWindow? }
+    final class Coordinator:NSObject { weak var configuredWindow:NSWindow?
+        @objc func hideMainWindow(_ sender:Any?){configuredWindow?.orderOut(sender)}
+    }
     func makeCoordinator()->Coordinator{Coordinator()}
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
@@ -18,6 +30,9 @@ struct WindowConfigurator: NSViewRepresentable {
     private func configure(_ window: NSWindow?,coordinator:Coordinator) {
         guard let window,window !== coordinator.configuredWindow else { return }
         coordinator.configuredWindow=window
+        window.identifier=NSUserInterfaceItemIdentifier("MCHarborMainWindow")
+        window.isReleasedWhenClosed=false
+        if let button=window.standardWindowButton(.closeButton){button.target=coordinator;button.action=#selector(Coordinator.hideMainWindow(_:))}
         window.isOpaque = false
         window.backgroundColor = .clear
         window.titlebarAppearsTransparent = true

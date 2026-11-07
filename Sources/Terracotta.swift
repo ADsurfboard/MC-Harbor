@@ -55,13 +55,18 @@ enum TerracottaControl {
     private func start(path:String,query:[URLQueryItem]){guard !busy,!controlled else{return};busy=true;let id=UUID();generation=id;operation=Task{defer{if generation==id{busy=false}};do{
         status="正在校验陶瓦官方模块…";let binary=try await TerracottaModule.obtain();try Task.checkCancellation();guard generation==id else{return}
         let folder=NativePaths.root.appendingPathComponent("network/terracotta",isDirectory:true)
-        var discovered=Self.corePort()
+        // Confine upstream cleanup to the app-owned runtime directory.
+        let temporary=folder.appendingPathComponent("runtime",isDirectory:true)
+        try FileManager.default.createDirectory(at:temporary,withIntermediateDirectories:true,attributes:[.posixPermissions:0o700])
+        let coreRoot=temporary.appendingPathComponent("terracotta",isDirectory:true)
+        var discovered=Self.corePort(in:coreRoot)
         if discovered>0{let meta=try? await TerracottaControl.json(port:discovered,path:"/meta");if meta?["target_os"] as? String != "macos"{discovered=0}}
         if discovered==0 {
             let p=Process(),pipe=Pipe();p.executableURL=binary;p.currentDirectoryURL=folder;p.arguments=["--daemon"];p.standardOutput=pipe;p.standardError=pipe;p.standardInput=FileHandle.nullDevice
+            var environment=ProcessInfo.processInfo.environment;environment.removeValue(forKey:"HOME");environment["TMPDIR"]=temporary.path;p.environment=environment
             pipe.fileHandleForReading.readabilityHandler={handle in if handle.availableData.isEmpty{handle.readabilityHandler=nil}}
             try p.run();self.process=p
-            for _ in 0..<160{try Task.checkCancellation();let candidate=Self.corePort();if candidate>0,let meta=try? await TerracottaControl.json(port:candidate,path:"/meta"),meta["target_os"] as? String=="macos"{discovered=candidate;break};if !p.isRunning{throw FileTransactions.error("陶瓦在发布本机端口前退出。")};try await Task.sleep(for:.milliseconds(100))}
+            for _ in 0..<160{try Task.checkCancellation();let candidate=Self.corePort(in:coreRoot);if candidate>0,let meta=try? await TerracottaControl.json(port:candidate,path:"/meta"),meta["target_os"] as? String=="macos"{discovered=candidate;break};if !p.isRunning{throw FileTransactions.error("陶瓦在发布本机端口前退出。")};try await Task.sleep(for:.milliseconds(100))}
         }
         guard discovered>0 else{throw FileTransactions.error("陶瓦启动超时。")};port=discovered
         let meta=try await TerracottaControl.json(port:port,path:"/meta");guard let v=meta["version"] as? String,meta["target_os"] as? String=="macos" else{throw FileTransactions.error("本机陶瓦端口身份校验失败。")};version=v
@@ -71,7 +76,7 @@ enum TerracottaControl {
     private func endpoint(_ path:String,query:[URLQueryItem]=[])->URL{var url=URLComponents();url.scheme="http";url.host="127.0.0.1";url.port=port;url.path=path;url.queryItems=query.isEmpty ? nil:query;return url.url!}
     private func beginPolling(_ id:UUID){poll?.cancel();poll=Task{var failures=0;while !Task.isCancelled,generation==id,controlled{do{let snapshot=try TerracottaSnapshot.decode(await TerracottaControl.data(endpoint("/state")));try Task.checkCancellation();guard generation==id else{return};failures=0;if snapshot.index>index{index=snapshot.index;state=snapshot.state;room=snapshot.room;address=snapshot.address;members=snapshot.members;switch state{case "host-scanning":status="等待发现本机游戏，请在存档中开放局域网。";case "host-starting":status="正在创建房间…";case "host-ok":status="房间已创建，复制房间码邀请好友。";case "guest-connecting","guest-starting":status="正在与房主建立连接…";case "guest-ok":status="已加入，可从游戏多人列表或本机地址进入。";case "exception":status=Self.error(snapshot.exception);default:status="陶瓦："+state}}}catch{if Task.isCancelled{return};failures += 1;if failures>=5{status="陶瓦本机连接已中断。";state="exception";return}};try? await Task.sleep(for:.seconds(NSApp.isActive ? 0.75:8))}}}
     static func error(_ code:Int?)->String{switch code{case 0:return "无法连接房主，请检查房间码与房主网络。";case 1:return "与房主的连接已中断。";case 2,3:return "陶瓦网络引擎异常，请退出房间后重试。";case 4:return "房主已退出游戏存档。";default:return "房间连接异常，请退出后重试。"}}
-    private static func corePort()->Int{let url=FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("terracotta/terracotta.lock");guard let file=try? FileHandle(forReadingFrom:url) else{return 0};defer{try? file.close()};guard let bytes=try? file.read(upToCount:3),bytes.count==2 else{return 0};return Int(bytes[0])*256+Int(bytes[1])}
+    private static func corePort(in root:URL)->Int{let url=root.appendingPathComponent("terracotta.lock");guard let file=try? FileHandle(forReadingFrom:url) else{return 0};defer{try? file.close()};guard let bytes=try? file.read(upToCount:3),bytes.count==2 else{return 0};return Int(bytes[0])*256+Int(bytes[1])}
     func stop(synchronous:Bool=false){let oldPort=port,wasControlled=controlled,p=process;generation=UUID();operation?.cancel();poll?.cancel();operation=nil;poll=nil;controlled=false;process=nil;port=0;state="waiting";room="";address="";members=[];busy=false;status="已退出房间"
         if wasControlled,oldPort>0{let url=URL(string:"http://127.0.0.1:\(oldPort)/state/ide")!;let configuration=URLSessionConfiguration.ephemeral;configuration.connectionProxyDictionary=[:];configuration.timeoutIntervalForRequest=2;configuration.timeoutIntervalForResource=2;let session=URLSession(configuration:configuration);let done=DispatchSemaphore(value:0);session.dataTask(with:url){_,_,_ in if let p,p.isRunning{p.terminate()};session.finishTasksAndInvalidate();done.signal()}.resume();if synchronous{_ = done.wait(timeout:.now()+2.2);if let p,p.isRunning{p.terminate()}}}else if let p,p.isRunning{p.terminate()}}
 
