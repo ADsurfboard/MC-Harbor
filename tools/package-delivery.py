@@ -1,4 +1,4 @@
-"""Package and verify the committed Intel preview without including player data."""
+"""Package and verify the committed Intel release without including player data."""
 from pathlib import Path
 import hashlib
 import json
@@ -12,10 +12,10 @@ ROOT = Path(__file__).resolve().parent.parent
 OUTPUT = Path(os.environ.get('HARBOR_DELIVERY_DIR', ROOT / 'outputs')).resolve()
 APP = ROOT / 'build/MC Harbor.app'
 PDF = ROOT / 'MC-Harbor-Introduction.pdf'
-VERSION = '1.5.1'
+VERSION = '1.5.2'
 APP_ZIP = OUTPUT / f'MC-Harbor-{VERSION}-Intel-macOS12.zip'
 SOURCE_ZIP = OUTPUT / f'MC-Harbor-{VERSION}-Intel-source.zip'
-PDF_OUT = OUTPUT / 'MC-Harbor-Intel-Introduction.pdf'
+PDF_OUT = OUTPUT / 'MC-Harbor-Intel-Introduction-1.5.2.pdf'
 SUMS = OUTPUT / f'SHA256SUMS-{VERSION}-intel.txt'
 
 
@@ -63,16 +63,16 @@ with tempfile.TemporaryDirectory(prefix='mcharbor-intel-delivery-') as temporary
     command('/usr/bin/ditto', str(APP), str(stage / APP.name))
     command('/usr/bin/codesign', '--verify', '--deep', '--strict', str(stage / APP.name))
     shutil.copy2(PDF, stage / PDF_OUT.name)
-    (stage / 'README-Install.txt').write_text('''MC Harbor 1.5.1 Intel 兼容预览
+    (stage / 'README-Install.txt').write_text('''MC Harbor 1.5.2 Intel 兼容版
 
-适用 Intel 芯片、macOS 12 或以上。此预览版尚未在 macOS 12—14 实机完成界面验收。
+适用 Intel 芯片、macOS 12 或以上。此版本尚未在 macOS 12—14 实机完成界面验收。
 先阅读随包 PDF；备份既有游戏和启动器数据后，再将 MC Harbor.app 放入应用程序文件夹。
 本包为临时签名，尚未经过 Apple 公证；下载后如被系统阻止，请在“系统设置→隐私与安全性”查看打开选项。
 好友与聊天内置默认服务；第三方服务、免费额度和网络连接可能变化。Sakura Frp 需要自己的账号、访问密钥和节点额度。
 旧系统可选择在线汉化回退，确认后才会向第三方发送待翻译文本；免费额度和实际可用性受服务方限制。
 游戏、账号和存档数据不包含在安装包内。完整验证范围见源码的 docs/QA-INTEL.md。
 
-项目：https://github.com/ADsurfboard/MC-Harbor/tree/codex/intel-compat
+项目：https://github.com/ADsurfboard/MC-Harbor/tree/codex/intel-release
 反馈：https://github.com/ADsurfboard/MC-Harbor/issues
 ''', encoding='utf-8')
     APP_ZIP.unlink(missing_ok=True)

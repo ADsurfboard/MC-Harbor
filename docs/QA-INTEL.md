@@ -19,3 +19,7 @@
 GitHub Actions 配置了 `macos-15-intel` 原生 x86_64 运行器，用于重新构建与运行客户端和后端测试；实际结果以该分支的 Actions 记录为准。该运行器不能代替 macOS 12—14 的实机检查。
 
 Mac 锁屏使本轮界面目视验收无法进行。尚未覆盖：macOS 12—14 实机界面、全部整合包长时间游戏、两台外网设备长时间联机、真实 Sakura 账号隧道、所有旧显卡及 Apple 公证。这里的测试结果不能证明没有任何错误或安全漏洞。
+
+## 1.5.2 Intel 修复
+
+镜像优先、Yggdrasil API 自动定位与多角色登录、实例目录与继承关系校验分别提供独立回归：`tools/check-external-login.py`、`tools/check-instance-deletion.py`。`tools/check-loader-install.py` 可在隔离目录执行联网的加载器列表和完整安装检查；可用 `HARBOR_QA_SEED_ROOT` 只读克隆官方资源以减少下载。程序坞恢复及删除面板还需运行实际窗口检查。持续集成记录和发布说明列出各项实际结果；旧系统实机及第三方服务不可用时的情况仍不能由这些测试代替。

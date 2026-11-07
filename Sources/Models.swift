@@ -71,8 +71,8 @@ enum ContentKind: String, CaseIterable, Identifiable {
     var symbol:String { switch self {case .mods:return "puzzlepiece.extension";case .resourcepacks:return "square.stack.3d.up";case .shaderpacks:return "sun.max";case .worlds:return "globe.europe.africa";case .modpacks:return "shippingbox"} }
 }
 enum HarborModal: Identifiable {
-    case install(RemoteGame), offline, addons(GameInstance,ContentKind),worldEditor(GameInstance,LocalContent),wallpapers,skinLibrary
-    var id:String {switch self {case .install(let v):return "install-"+v.id;case .offline:return "offline";case .addons(let g,let k):return "addons-"+g.id+k.rawValue;case .worldEditor(let g,let w):return "world-"+g.id+w.id;case .wallpapers:return "wallpapers";case .skinLibrary:return "skinLibrary"}}
+    case install(RemoteGame), offline, externalAccount, addons(GameInstance,ContentKind),worldEditor(GameInstance,LocalContent),wallpapers,skinLibrary
+    var id:String {switch self {case .install(let v):return "install-"+v.id;case .offline:return "offline";case .externalAccount:return "externalAccount";case .addons(let g,let k):return "addons-"+g.id+k.rawValue;case .worldEditor(let g,let w):return "world-"+g.id+w.id;case .wallpapers:return "wallpapers";case .skinLibrary:return "skinLibrary"}}
 }
 struct GameInstance: Identifiable, Hashable, Sendable {
     let id: String

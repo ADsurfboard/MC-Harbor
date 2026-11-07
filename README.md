@@ -1,8 +1,8 @@
 # MC Harbor
 
-1.5.1 Intel 兼容版 · macOS 12 及以上
+1.5.2 Intel 兼容版 · macOS 12 及以上
 
-[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/tag/v1.5.1-intel-preview.1) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.5.1-intel-preview.1/MC-Harbor-Intel-Introduction.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)
+[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/tag/v1.5.2-intel) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.5.2-intel/MC-Harbor-Intel-Introduction-1.5.2.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)
 
 以下正文与随包 PDF 同版。
 
@@ -10,8 +10,8 @@
 保留 HMCL 的游戏能力，采用真实 WinHarbor 原生界面，
 把账号、下载、实例资源与汉化工作集中在一个窗口。
 
-1.5.1 Intel 兼容版 · macOS 12 及以上
-本地验证：Apple Silicon 上以 Rosetta 运行 Intel 程序
+1.5.2 Intel 兼容版 · macOS 12 及以上
+验证：Intel macOS 15 自动测试与 Rosetta 检查
 
 ## 日常操作，一处完成。
 
@@ -19,7 +19,7 @@
 
 ### 游戏库
 
-搜索、收藏、显示名称、加载器识别、实例设置、启动与依赖修复。实例可更换图标，也可恢复原图标。
+搜索、收藏、实例设置和依赖修复。支持更换图标；删除前检查版本依赖并移入废纸篓。
 
 ### 实例资源
 
@@ -27,11 +27,11 @@
 
 ### 下载中心
 
-联动 Modrinth 与 CurseForge。搜索模组、资源包、光影、地图和整合包，筛选兼容版本与加载器，解析必要依赖并校验文件。
+联动 Modrinth 与 CurseForge。搜索实例资源；游戏和模组加载器默认优先使用国内镜像，并可切换下载来源。
 
 ### 账号与角色
 
-导入原 HMCL 账号；Microsoft、第三方认证、离线身份。真实皮肤头部头像、开源 3D 预览、导入皮肤并按身份能力应用。
+导入原 HMCL 账号；支持 Microsoft、离线及自定义 authlib-injector API 外置登录。真实皮肤头像与 3D 预览。
 
 ### 外观与声音
 
@@ -236,6 +236,12 @@ Intel 版保留三层叠片、粒子、音效和原始 Clara 播报，用系统�
 好友聊天不需要玩家部署服务。陶瓦使用社区公共节点，NAT、网络质量和节点状态会影响连通；Sakura 需要玩家自己的访问密钥、可用节点及相应额度。普通地址可用于其他启动器，但 Minecraft 版本、模组配置和服务器认证仍须匹配，不绕过正版或服务器权限。
 
 Intel 版已在 Rosetta 下校验并启动官方陶瓦、退出房间，并验证 Sakura Intel 客户端版本；其他陶瓦数据未被改动。没有宣称完成两台外网设备长时间 Minecraft 联机，也未使用真实 Sakura 账号建立测试隧道。新版本读取 Mojang 实时清单，失败时使用镜像与缓存；后续格式、认证或 Java 要求变化仍需维护适配。
+
+## 社区贡献者
+
+<img src="Assets/Contributors/jiekee.png" width="72" height="72" alt="jiekee❄ 头像">
+
+**jiekee❄**：反馈加载器下载、实例管理、外置认证及程序坞窗口恢复问题，为兼容性与可用性改进提供测试线索。
 
 ## 构建与许可
 
