@@ -15,7 +15,7 @@ struct FluidField:View{let dark:Bool;let color:Color;let active:Bool;var body:so
         let config=NativeScanner.readJSON(URL(fileURLWithPath:CommandLine.arguments[1]))
         let root=URL(fileURLWithPath:CommandLine.arguments[2]);setenv("SHENGGAN_DATA_DIR",root.path,1);NativePaths.prepare()
         let assets=URL(fileURLWithPath:CommandLine.arguments[3])
-        if config["discovery"] as? Bool==true{try await discovery(config,root:root);return}
+        if config["discovery"] as? Bool==true{do{try await discovery(config,root:root)}catch{print("FAIL discovery: "+error.localizedDescription);exit(1)};return}
         if config["multi"] as? Bool==true{try await multi(config,root:root);return}
         if config["terracotta"] as? Bool==true{try await terracotta(root);return}
         var checks:[String:Bool]=[:];var notes:[String:Any]=[:]

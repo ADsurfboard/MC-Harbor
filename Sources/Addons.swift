@@ -218,7 +218,7 @@ struct AddonBrowser:View {
                             if kind == .mods && !localRemarks.isEmpty{Text("我的备注").font(.system(size:11,weight:.semibold)).frame(maxWidth:.infinity,alignment:.leading);ForEach(localRemarks){remark in remarkButton(remark)};Divider()}
                             if remarkListFilter.isEmpty{ForEach(result?.hits ?? []){project in projectButton(project)}}else if localRemarks.isEmpty{Text("此列表暂无匹配备注。选择模组后可保存到这里。").font(.system(size:11)).harborSecondaryText().padding()}
                         }}.harborHideScrollIndicators()
-                        if let result,remarkListFilter.isEmpty{HStack{Text("\(result.totalHits) 个结果");Spacer();Button{page=max(0,page-1);search()}label:{HarborSymbol(systemName:"chevron.left").frame(width:28,height:28)}.disabled(page==0);Text("\(page+1)");Button{page+=1;search()}label:{HarborSymbol(systemName:"chevron.right").frame(width:28,height:28)}.disabled((page+1)*30>=result.totalHits)}.buttonStyle(HarborBareButtonStyle()).font(.system(size:10)).foregroundStyle(.secondary)}
+                        if let result,remarkListFilter.isEmpty{HStack{Text("平台 \(result.totalHits) 个结果");Spacer();Button{page=max(0,page-1);search()}label:{HarborSymbol(systemName:"chevron.left").frame(width:28,height:28)}.disabled(page==0);Text("\(page+1)");Button{page+=1;search()}label:{HarborSymbol(systemName:"chevron.right").frame(width:28,height:28)}.disabled((page+1)*30>=result.totalHits)}.buttonStyle(HarborBareButtonStyle()).font(.system(size:10)).foregroundStyle(.secondary)}
                     }
                 }.padding(18).frame(minWidth:310,maxWidth:420)
                 Divider().opacity(0.35)
@@ -285,12 +285,12 @@ struct ModSummaryText:View {
     @State private var original=false
     @State private var failed=false
     @State private var retry=0
-    private var needsTranslation:Bool{enabled && !text.isEmpty && text.range(of:"[A-Za-z]",options:.regularExpression) != nil && text.range(of:"[\\p{Han}]",options:.regularExpression)==nil}
+    private var needsTranslation:Bool{enabled && !ModDiscovery.identifierOnly(text) && !text.isEmpty && text.range(of:"[A-Za-z]",options:.regularExpression) != nil && text.range(of:"[\\p{Han}]",options:.regularExpression)==nil}
     var body:some View{
         VStack(alignment:.leading,spacing:6){Text(enabled && !original ? translated ?? text:text).font(.system(size:compact ? 11:12)).harborSecondaryText().lineLimit(compact ? 2:nil)
             if failed && needsTranslation{Button("翻译未完成 · 重试"){retry+=1}.font(.system(size:10)).buttonStyle(HarborBareButtonStyle())}
             if !compact && needsTranslation{HStack{if translated != nil{Button(original ? "查看中文译文":"查看原文"){original.toggle()}.buttonStyle(HarborBareButtonStyle())};Text(failed ? "翻译暂不可用，显示原文":translated == nil ? "正在翻译简介…":"在线机器翻译").foregroundStyle(.tertiary)}.font(.system(size:10))}
-        }.task(id:text+String(enabled)+String(retry)){translated=nil;original=false;failed=false;guard enabled,!text.isEmpty,text.range(of:"[A-Za-z]",options:.regularExpression) != nil,text.range(of:"[\\p{Han}]",options:.regularExpression)==nil else{return};do{let value=try await ModTextTranslation.shared.translate(text);try Task.checkCancellation();translated=value}catch{if !Task.isCancelled{failed=true}}}
+        }.task(id:text+String(enabled)+String(retry)){translated=nil;original=false;failed=false;guard enabled,!ModDiscovery.identifierOnly(text),!text.isEmpty,text.range(of:"[A-Za-z]",options:.regularExpression) != nil,text.range(of:"[\\p{Han}]",options:.regularExpression)==nil else{return};do{let value=try await ModTextTranslation.shared.translate(text);try Task.checkCancellation();translated=value}catch{if !Task.isCancelled{failed=true}}}
     }
 }
 private struct AddonIcon:View {

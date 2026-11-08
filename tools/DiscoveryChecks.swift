@@ -45,7 +45,7 @@ extension UpdateChecks {
             check("live-general-Chinese-query",translatedQuery.range(of:"[A-Za-z]",options:.regularExpression) != nil)
             for page in 0..<8 {
                 let response=try await ResourceService.search("",game:game,kind:.mods,source:.modrinth,page:page)
-                guard let project=response.hits.first(where:{!$0.description.isEmpty}) else{check("live-page-"+String(page+1),false);continue}
+                guard let project=response.hits.first(where:{$0.description.contains(" ") && !ModDiscovery.identifierOnly($0.description)}) else{check("live-page-"+String(page+1),false);continue}
                 let chinese=try await ModTextTranslation.shared.translate(project.description)
                 check("live-page-"+String(page+1),chinese.range(of:"[\\p{Han}]",options:.regularExpression) != nil)
             }
@@ -60,6 +60,7 @@ extension UpdateChecks {
         if config["live"] as? Bool != true{
             for page in 0..<8{var complete=true;for row in 0..<30{let index=page*30+row;let value=try await ModTextTranslation.shared.translate("QA summary "+String(index));complete=complete && value=="汉化简介 "+String(index)};check("translation-page-"+String(page+1),complete)}
         }
+        check("hashtag-kept-without-translation",try await ModTextTranslation.shared.translate("#listentonature")=="#listentonature")
         check("installed-mod-Chinese-name",ModDiscovery.chineseName(mod)=="钠")
         check("optimization-category",ModSection.optimization.facet=="optimization")
         check("pvp-search-section",ModSection.pvp.query("",source:.modrinth)=="pvp")

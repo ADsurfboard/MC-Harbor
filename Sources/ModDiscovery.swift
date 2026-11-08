@@ -39,6 +39,7 @@ enum ModDiscovery {
         "小地图":"minimap","光影":"shader","动态帧率":"Dynamic FPS","实体渲染":"Entity Culling",
         "布料":"Fabric API","布料接口":"Fabric API","樱花":"Sakura","农夫乐事":"Farmers Delight"
     ]
+    static func identifierOnly(_ text:String)->Bool{text.range(of:"^(?:[#@][A-Za-z0-9_]+|[A-Z0-9_.:+/\\-]+)$",options:.regularExpression) != nil}
     static func knownQuery(_ query:String)->String?{aliases[query.trimmingCharacters(in:.whitespacesAndNewlines).lowercased()]}
     static func installed(_ suggestion:ModSuggestion,mods:[ModFile])->Bool {
         mods.contains{mod in suggestion.modIDs.contains(mod.modID.lowercased()) || suggestion.modIDs.contains{mod.path.lastPathComponent.lowercased().hasPrefix($0+"-")}}
@@ -92,6 +93,7 @@ actor ModTextTranslation {
     private var activeRequests=0
     private let file=NativePaths.root.appendingPathComponent("cache/mod-text-translations.json")
     func translate(_ text:String,toChinese:Bool=true)async throws->String {
+        if ModDiscovery.identifierOnly(text){return text}
         if !loaded{loaded=true;cache=(try? JSONDecoder().decode([String:String].self,from:Data(contentsOf:file))) ?? [:]}
         let pair=toChinese ? "en|zh-CN":"zh-CN|en",key=pair+"|"+text
         if let saved=cache[key]{return saved}
@@ -105,7 +107,7 @@ actor ModTextTranslation {
         for part in try LegacyLanguageTranslation.chunks(text) {
             try Task.checkCancellation()
             if !part.translate{translated+=part.text;continue}
-            translated+=try await PublicModTranslation.shared.translate(part.text,toChinese:toChinese)
+            do{translated+=try await PublicModTranslation.shared.translate(part.text,toChinese:toChinese)}catch LegacyLanguageTranslation.Failure.unchanged{translated+=part.text}
         }
         guard !toChinese || translated.range(of:"[\\p{Han}]",options:.regularExpression) != nil else{throw LegacyLanguageTranslation.Failure.unchanged}
         try Task.checkCancellation()
