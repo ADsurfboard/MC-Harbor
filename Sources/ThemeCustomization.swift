@@ -44,7 +44,6 @@ struct HarborThemeRuntime {
     }
     var buttonFill:Color{color(.buttonFill,default:HarborPalette.oxide)}
     var buttonInk:Color{color(.buttonText,default:buttonFill.readableInk,text:true,on:buttonFill)}
-    var nativeControlTint:Color{color(.controls,default:HarborPalette.oxide)}
     var controlTint:Color{color(.controls,default:HarborPalette.oxide,text:true)}
     var iconColor:Color{color(.icons,default:basicInk,text:true)}
     var accentText:Color{color(.accentText,default:basicInk,text:true)}

@@ -132,7 +132,7 @@ extension UpdateChecks {
         check("rgb-inverse",abs(inverse.redComponent-0.8)<0.015 && abs(inverse.greenComponent-0.6)<0.015 && abs(inverse.blueComponent-0.4)<0.015)
         settings.inverseMode = .custom;settings.inverseHex="#557799"
         check("custom-inverse",HarborThemeRuntime(settings:settings,appearance:.light,theme:.green).inverse.hexString=="#557799")
-        check("native-control-uses-original-color",HarborThemeRuntime(settings:HarborThemeSettings(),appearance:.light,theme:Color(hex:0xC3E3D4)).nativeControlTint.hexString=="#C3E3D4")
+        check("native-control-readable",HarborColorContrast.ratio(NSColor(HarborThemeRuntime(settings:HarborThemeSettings(),appearance:.light,theme:Color(hex:0xC3E3D4)).controlTint),HarborColorContrast.reference(light:true))>=4.5)
         check("theme-settings-persist",try JSONDecoder().decode(HarborThemeSettings.self,from:JSONEncoder().encode(settings))==settings)
         guard failed==0 else{exit(1)}
     }

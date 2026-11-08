@@ -61,7 +61,7 @@ struct LauncherRoot:View {
         .foregroundStyle(theme.primaryText)
         .buttonStyle(HarborButtonStyle())
         .preferredColorScheme(model.appearance.isLight ? .light:.dark)
-        .tint(model.themeRuntime.nativeControlTint)
+        .tint(model.controlTint)
         .environment(\.harborAccent,model.themeRuntime.effects)
         .environment(\.harborClarity,model.surfaceClarity)
         .environment(\.harborFrosted,model.preferences.frostedGlass)
