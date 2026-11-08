@@ -17,8 +17,10 @@ final class HarborAppDelegate:NSObject,NSApplicationDelegate {
 final class HarborWindowController:NSObject {
     static let shared=HarborWindowController()
     private(set) weak var mainWindow:NSWindow?
+    private var closeDelegate:HarborCloseDelegate?
     func register(_ window:NSWindow) {
         mainWindow=window
+        if closeDelegate==nil || window.delegate !== closeDelegate{let proxy=HarborCloseDelegate(original:window.delegate);closeDelegate=proxy;window.delegate=proxy}
         installReopenHandler()
     }
     func installReopenHandler() {
@@ -28,6 +30,7 @@ final class HarborWindowController:NSObject {
     @objc private func reopen(_ event:NSAppleEventDescriptor,withReplyEvent reply:NSAppleEventDescriptor) {showMainWindow()}
     @objc func showMainWindow() {
         guard let window=mainWindow else{return}
+        register(window)
         NSApp.unhide(nil)
         if window.isMiniaturized{window.deminiaturize(nil)}
         window.makeKeyAndOrderFront(nil)
@@ -35,10 +38,17 @@ final class HarborWindowController:NSObject {
     }
 }
 
+/// Preserve SwiftUI's delegate callbacks while keeping the launcher scene alive.
+private final class HarborCloseDelegate:NSObject,NSWindowDelegate {
+    weak var original:NSWindowDelegate?
+    init(original:NSWindowDelegate?){self.original=original;super.init()}
+    func windowShouldClose(_ sender:NSWindow)->Bool{sender.orderOut(nil);return false}
+    override func responds(to selector:Selector!)->Bool{super.responds(to:selector) || (original?.responds(to:selector) ?? false)}
+    override func forwardingTarget(for selector:Selector!)->Any?{if let original,original.responds(to:selector){return original};return super.forwardingTarget(for:selector)}
+}
+
 struct WindowConfigurator: NSViewRepresentable {
-    final class Coordinator:NSObject { weak var configuredWindow:NSWindow?
-        @objc func hideMainWindow(_ sender:Any?){configuredWindow?.orderOut(sender)}
-    }
+    final class Coordinator:NSObject {weak var configuredWindow:NSWindow?}
     func makeCoordinator()->Coordinator{Coordinator()}
     func makeNSView(context: Context) -> NSView {
         let view = WindowAttachmentView()
@@ -56,9 +66,7 @@ struct WindowConfigurator: NSViewRepresentable {
         guard let window,window !== coordinator.configuredWindow else { return }
         coordinator.configuredWindow=window
         // The identifier belongs to SwiftUI's scene lifecycle; do not replace it.
-        HarborWindowController.shared.register(window)
         window.isReleasedWhenClosed=false
-        if let button=window.standardWindowButton(.closeButton){button.target=coordinator;button.action=#selector(Coordinator.hideMainWindow(_:))}
         window.contentMinSize=NSSize(width:1040,height:700)
         window.isOpaque = false
         window.backgroundColor = .clear
@@ -69,6 +77,7 @@ struct WindowConfigurator: NSViewRepresentable {
         window.toolbarStyle = .unifiedCompact
         window.contentView?.wantsLayer = true
         window.contentView?.layer?.backgroundColor = NSColor.clear.cgColor
+        HarborWindowController.shared.register(window)
 
         if !window.styleMask.contains(.fullScreen),
            let visibleFrame = window.screen?.visibleFrame,
