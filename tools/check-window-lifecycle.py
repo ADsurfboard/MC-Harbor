@@ -1,6 +1,7 @@
 from pathlib import Path
 import subprocess
 root=Path(__file__).resolve().parent.parent
+(root/'build').mkdir(exist_ok=True)
 source=(root/'Sources/Components.swift').read_text().split('struct WindowDragRegion:')[0]
 source+='''
 final class QAWindowDelegate:NSObject,NSWindowDelegate{var resizes=0;func windowDidResize(_ notification:Notification){resizes+=1}}
