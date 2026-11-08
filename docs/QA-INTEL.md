@@ -50,3 +50,5 @@ GitHub Actions 配置了 `macos-15-intel` 原生 x86_64 运行器，用于重新
 安装占用标记按任务隔离，取消另一个任务不会清除当前提交的标记；地图导入也阻止同一目录在写入期间启动。新增两个所有权回归断言。
 
 最终关闭策略使用转发原委托回调的 NSWindowDelegate 代理拦截 windowShouldClose；红色按钮与 performClose 都只隐藏，保留 SwiftUI 场景。独立检查显式完成 NSApplication 启动并等待 AppKit 事件，覆盖空委托注册、原委托 resize 回调转发与快捷关闭，共 25 项本地通过。
+
+独立窗口检查使用 NSApplication.run 主循环和主线程异步等待，让原生标题栏动作在正常 AppKit 事件分派下执行；不再靠嵌套 RunLoop 模拟应用运行。全部 25 项断言保留。
