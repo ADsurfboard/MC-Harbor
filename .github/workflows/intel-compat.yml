@@ -23,6 +23,8 @@ jobs:
           node-version: '24'
       - name: Verify native Intel runner
         run: test "$(uname -m)" = x86_64
+      - name: Test native window lifecycle
+        run: python3 tools/check-window-lifecycle.py
       - name: Obtain pinned Intel runtime
         run: python3 tools/setup-intel-deps.py
       - name: Build test bundle
@@ -59,7 +61,6 @@ jobs:
           python3 tools/check-discovery.py
       - name: Test instance deletion and external authentication
         run: |
-          python3 tools/check-window-lifecycle.py
           python3 tools/check-instance-deletion.py
           python3 tools/check-external-login.py
       - name: Test friends and chat services
