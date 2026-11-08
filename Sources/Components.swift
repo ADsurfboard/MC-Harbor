@@ -17,19 +17,13 @@ final class HarborAppDelegate:NSObject,NSApplicationDelegate {
 final class HarborWindowController:NSObject {
     static let shared=HarborWindowController()
     private(set) weak var mainWindow:NSWindow?
-    private var activationObserver:NSObjectProtocol?
     func register(_ window:NSWindow) {
         mainWindow=window
         installReopenHandler()
     }
     func installReopenHandler() {
         NSAppleEventManager.shared().setEventHandler(self,andSelector:#selector(reopen(_:withReplyEvent:)),forEventClass:AEEventClass(kCoreEventClass),andEventID:AEEventID(kAEReopenApplication))
-        if activationObserver==nil {
-            activationObserver=NotificationCenter.default.addObserver(forName:NSApplication.didBecomeActiveNotification,object:nil,queue:.main){[weak self] _ in
-                guard let window=self?.mainWindow,!window.isVisible || window.isMiniaturized else{return}
-                self?.showMainWindow()
-            }
-        }
+
     }
     @objc private func reopen(_ event:NSAppleEventDescriptor,withReplyEvent reply:NSAppleEventDescriptor) {showMainWindow()}
     @objc func showMainWindow() {

@@ -24,6 +24,8 @@ source+='''
    check("reopen-suppresses-default-new-window-\\(attempt)",!handled)
    window.standardWindowButton(.closeButton)!.performClick(nil);settle()
    check("close-hides-retains-window-\\(attempt)",!window.isVisible && HarborWindowController.shared.mainWindow===window)
+   NotificationCenter.default.post(name:NSApplication.didBecomeActiveNotification,object:NSApp);settle()
+   check("late-activation-keeps-closed-\\(attempt)",!window.isVisible)
    _ = delegate.applicationShouldHandleReopen(NSApp,hasVisibleWindows:false);settle()
    check("reopen-restores-closed-\\(attempt)",window.isVisible)
   }

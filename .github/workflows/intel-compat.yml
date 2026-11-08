@@ -47,6 +47,8 @@ jobs:
           security list-keychains -d user -s "$RUNNER_TEMP/mcharbor-ci.keychain-db"
           security default-keychain -d user -s "$RUNNER_TEMP/mcharbor-ci.keychain-db"
       - name: Build production client test harness
+        env:
+          HARBOR_FAST_QA: '1'
         run: python3 tools/build-update-checks.py
       - name: Test native client and 24 friends
         env:
