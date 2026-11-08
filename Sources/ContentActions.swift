@@ -22,7 +22,7 @@ import UniformTypeIdentifiers
         guard !pairs.isEmpty else{return};editingContent=true
         Task{defer{editingContent=false};do{try await Task.detached{try FileTransactions.move(pairs)}.value
             let destinations=Dictionary(uniqueKeysWithValues:pairs.map{($0.0.path,$0.1)})
-            if let cached=modMetadata[game.id]{modMetadata[game.id]=cached.map{mod in guard let path=destinations[mod.path.path] else{return mod};return ModFile(id:mod.id,name:mod.name,path:path,enabled:enabled,size:mod.size,version:mod.version,authors:mod.authors,modID:mod.modID,iconPath:mod.iconPath)}}
+            if let cached=modMetadata[game.id]{modMetadata[game.id]=cached.map{mod in guard let path=destinations[mod.path.path] else{return mod};return ModFile(id:mod.id,name:mod.name,path:path,enabled:enabled,size:mod.size,version:mod.version,authors:mod.authors,modID:mod.modID,iconPath:mod.iconPath,summary:mod.summary)}}
             contentChanged.send()}catch{errorMessage=error.localizedDescription;HarborAudio.shared.play(.error)}}
     }
     func setContentActive(_ url:URL,active:Bool,game:GameInstance){

@@ -24,6 +24,12 @@ enum ModDiscovery {
         .init(slug:"controlling",chinese:"按键冲突显示",reason:"搜索按键并排查快捷键冲突",modIDs:["controlling"]),
         .init(slug:"entityculling",chinese:"实体渲染机制优化",reason:"跳过被遮挡实体的渲染",modIDs:["entityculling"])
     ]
+    static func chineseName(_ mod:ModFile)->String {
+        let id=mod.modID.lowercased()
+        if let item=catalog.first(where:{$0.modIDs.contains(id) || $0.slug==id}){return item.chinese}
+        if let entry=aliases.first(where:{$0.value.lowercased().replacingOccurrences(of:" ",with:"")==mod.name.lowercased().replacingOccurrences(of:" ",with:"")}){return entry.key}
+        return ""
+    }
     static let aliases:[String:String]=[
         "钠":"sodium","锂":"lithium","铁氧体磁芯":"ferritecore","现代化修复":"ModernFix",
         "物品管理器":"JEI","jei物品管理器":"JEI","配方查询":"JEI","苹果皮":"AppleSkin","玉":"Jade",
@@ -95,14 +101,11 @@ actor ModTextTranslation {
         try Task.checkCancellation()
         if let saved=cache[key]{return saved}
         activeRequests+=1;defer{activeRequests-=1}
-        var url=URLComponents(string:"https://api.mymemory.translated.net/get")!
         var translated=""
         for part in try LegacyLanguageTranslation.chunks(text) {
             try Task.checkCancellation()
             if !part.translate{translated+=part.text;continue}
-            url.queryItems=[.init(name:"q",value:part.text),.init(name:"langpair",value:pair)]
-            let bytes=try await HarborHTTP.data(url.url!,limit:100_000)
-            translated+=try LegacyLanguageTranslation.parseResponse(bytes,source:part.text)
+            translated+=try await PublicModTranslation.shared.translate(part.text,toChinese:toChinese)
         }
         guard !toChinese || translated.range(of:"[\\p{Han}]",options:.regularExpression) != nil else{throw LegacyLanguageTranslation.Failure.unchanged}
         try Task.checkCancellation()
@@ -116,5 +119,43 @@ actor ModTextTranslation {
         guard original.range(of:"[\\p{Han}]",options:.regularExpression) != nil else{return original}
         if let known=ModDiscovery.knownQuery(original){return known}
         return (try? await shared.translate(original,toChinese:false)) ?? original
+    }
+}
+
+/// Public descriptions only. A provider's quota never disables later pages.
+actor PublicModTranslation {
+    static let shared=PublicModTranslation()
+    private var primaryRetryAfter=Date.distantPast
+    static func parseBackup(_ data:Data,source:String)throws->String {
+        guard let root=try JSONSerialization.jsonObject(with:data) as? [Any],let segments=root.first as? [[Any]] else{throw LegacyLanguageTranslation.Failure.unchanged}
+        let result=segments.compactMap{$0.first as? String}.joined()
+        guard !result.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty,result.caseInsensitiveCompare(source) != .orderedSame else{throw LegacyLanguageTranslation.Failure.unchanged}
+        return result
+    }
+    func translate(_ text:String,toChinese:Bool)async throws->String {
+        if Date()>=primaryRetryAfter {
+            do {
+                var url=URLComponents(string:"https://api.mymemory.translated.net/get")!
+                url.queryItems=[.init(name:"q",value:text),.init(name:"langpair",value:toChinese ? "en|zh-CN":"zh-CN|en")]
+                return try LegacyLanguageTranslation.parseResponse(await HarborHTTP.data(url.url!,limit:100_000),source:text)
+            }catch{try Task.checkCancellation();primaryRetryAfter=Date().addingTimeInterval(600)}
+        }
+        // The Googletrans project documents this public web endpoint. It has no SLA.
+        var url=URLComponents(string:"https://translate.googleapis.com/translate_a/single")!
+        url.queryItems=[.init(name:"client",value:"gtx"),.init(name:"sl",value:toChinese ? "en":"zh-CN"),.init(name:"tl",value:toChinese ? "zh-CN":"en"),.init(name:"dt",value:"t"),.init(name:"q",value:text)]
+        return try Self.parseBackup(await HarborHTTP.data(url.url!,limit:100_000),source:text)
+    }
+}
+
+enum ModSection:String,CaseIterable,Identifiable {
+    case all,optimization,pvp,utility,adventure
+    var id:String{rawValue}
+    var title:String{switch self{case .all:return "全部分区";case .optimization:return "优化分区";case .pvp:return "PVP 分区";case .utility:return "实用分区";case .adventure:return "冒险分区"}}
+    var facet:String?{switch self{case .all,.pvp:return nil;case .optimization:return "optimization";case .utility:return "utility";case .adventure:return "adventure"}}
+    func query(_ original:String,source:AddonSource)->String {
+        let keyword:String
+        switch self{case .all:return original;case .pvp:keyword="pvp";case .optimization:keyword="performance";case .utility:keyword="utility";case .adventure:keyword="adventure"}
+        if source == .modrinth && self != .pvp{return original}
+        return original.isEmpty ? keyword:original+" "+keyword
     }
 }

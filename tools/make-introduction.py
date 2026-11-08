@@ -74,9 +74,9 @@ txt('Intel 兼容版 / 2026.11.08',48,51,9,HexColor('#A9C7B4'));txt('01 / 10',W-
 y=page(2,'DAILY USE','日常操作，一处完成。','以实例为中心。默认加载器图标高清重绘，保留实例资源原图标、可视化资源管理与明确的下载目标。')
 col=(W-104)/2
 card('游戏库','搜索、收藏、图标更换与实例快捷方式。删除前检查版本依赖并移入废纸篓；改进最小化和关闭后的窗口恢复。',46,y,col,133)
-card('实例资源','模组、资源包、光影、地图等统称实例资源。原图标优先；支持多选、启停、本地导入与打开原项目页面。',58+col,y,col,133)
+card('实例资源','模组、资源包、光影、地图等统称实例资源。原图标优先；支持多选、启停、模组中文名与简介、本地导入和原项目页面。',58+col,y,col,133)
 y-=147
-card('下载中心','中英文搜索、简介自动汉化、兼容模组推荐和可搜索的备注列表。联动 Modrinth / CurseForge；游戏与加载器优先国内镜像。',46,y,col,151)
+card('下载中心','中英文搜索、简介汉化、模组推荐、备注搜索和优化 / PVP 等分区。下载开始有提示；游戏运行时先下载，退出后再安装。',46,y,col,151)
 card('账号与角色','导入原 HMCL 账号；支持 Microsoft、离线及自定义 authlib-injector API 外置登录。真实皮肤头像与 3D 预览。',58+col,y,col,151)
 y-=165
 card('外观与声音','主题作用范围、反色与自定义配色；图片 / 视频背景、三层叠片和深浅毛玻璃。保留弹层过渡、欢迎动画、四种播报与界面音效；已移除彩虹角。',46,y,col,151)
@@ -169,4 +169,4 @@ y=section('陶瓦房间：无需配置中转服务器','基于官方 Terracotta 
 y=section('使用边界','好友聊天不需要玩家部署服务。陶瓦使用社区公共节点，NAT、网络质量和节点状态会影响连通；Sakura 需要玩家自己的访问密钥、可用节点及相应额度。普通地址可用于其他启动器，但 Minecraft 版本、模组配置和服务器认证仍须匹配，不绕过正版或服务器权限。',y)
 para('Intel 版已在 Rosetta 下校验并启动官方陶瓦、退出房间，并验证 Sakura Intel 客户端版本；其他陶瓦数据未被改动。没有宣称完成两台外网设备长时间 Minecraft 联机，也未使用真实 Sakura 账号建立测试隧道。新版本读取 Mojang 实时清单，失败时使用镜像与缓存；后续格式、认证或 Java 要求变化仍需维护适配。',46,y,W-92,9.5,MUTED)
 finish(10)
-DOC.save();README += ['## 社区贡献者', '<img src="Assets/Contributors/jiekee.png" width="72" height="72" alt="jiekee❄ 头像">', '**jiekee❄**：反馈并复现下载、实例管理、外置认证与 Intel/macOS 窗口恢复问题；提出模组推荐、双语搜索、简介汉化及实例快捷方式建议。', '## 构建与许可','构建、开发测试、音效授权与免费服务边界详见 [BUILDING.md](BUILDING.md) 和 [docs/SERVICES.md](docs/SERVICES.md)。本工程为 GPL-3.0-or-later；第三方素材按各自许可分发。','如果喜欢，记得 Star 我（'];(ROOT/'README.md').write_text('\n\n'.join(README)+'\n');print(OUT)
+DOC.save();README += ['## 社区贡献者', '<img src="Assets/Contributors/jiekee.png" width="72" height="72" alt="jiekee❄ 头像">', '**jiekee❄**：反馈并复现下载、实例管理、外置认证与 Intel/macOS 窗口恢复问题；提出模组推荐、双语搜索、简介汉化及实例快捷方式建议；反馈实例模组列表重叠、运行中下载受阻、翻页汉化失效与下载超时，提出实例模组汉化、下载提示和资源分区建议。', '## 构建与许可','构建、开发测试、音效授权与免费服务边界详见 [BUILDING.md](BUILDING.md) 和 [docs/SERVICES.md](docs/SERVICES.md)。本工程为 GPL-3.0-or-later；第三方素材按各自许可分发。','如果喜欢，记得 Star 我（'];(ROOT/'README.md').write_text('\n\n'.join(README)+'\n');print(OUT)

@@ -21,6 +21,8 @@ import UniformTypeIdentifiers
     @Published var downloadCategory="minecraft"
     @Published var works: [WorkItem] = []
     @Published var errorMessage: String?
+    @Published var downloadNotice:String?
+    var resourceInstalling:Set<String>=[]
     @Published var toastMessage: String?
     @Published var inspectedGame: GameInstance?
     @Published var modal: HarborModal?
@@ -105,6 +107,7 @@ import UniformTypeIdentifiers
     }
     func launch(_ game:GameInstance,server:String?=nil) {
         guard !running.contains(game.id) else{return}
+        guard !resourceInstalling.contains(resourceDirectoryKey(game)) else{toast("正在完成此实例的资源安装，请稍后启动");return}
         guard let account=selectedAccount else{inspectedGame=nil;section = .accounts;return}
         var args:[String:Any]=["historySessionID":UUID().uuidString,"id":game.id,"runDirectory":game.runDirectory,"memory":preferences.memory,"gameJava":preferences.javaPath,"accountType":account.kind,"username":account.name,"uuid":account.uuid,"accountID":account.id,"javaExplicit":false,"completeDependencies":preferences.completeDependencies,"loader":game.loader,"version":game.version]
         if let server{args["serverAddress"]=server}
@@ -165,7 +168,7 @@ import UniformTypeIdentifiers
     func loadMods(_ game:GameInstance,force:Bool=false) {
         if modMetadata[game.id] != nil && !force{return}
         backend("mods",title:"读取模组",arguments:["id":game.id,"runDirectory":game.runDirectory],silent:true){result in
-            self.modMetadata[game.id]=(result["mods"] as? [[String:Any]] ?? []).compactMap{m in guard let path=m["path"] as? String else{return nil};return ModFile(id:path.replacingOccurrences(of:".disabled",with:""),name:m["name"] as? String ?? URL(fileURLWithPath:path).lastPathComponent,path:URL(fileURLWithPath:path),enabled:m["enabled"] as? Bool ?? true,size:(m["size"] as? NSNumber)?.int64Value ?? 0,version:m["version"] as? String ?? "",authors:m["authors"] as? String ?? "",modID:m["modId"] as? String ?? "",iconPath:m["iconPath"] as? String)}
+            self.modMetadata[game.id]=(result["mods"] as? [[String:Any]] ?? []).compactMap{m in guard let path=m["path"] as? String else{return nil};return ModFile(id:path.replacingOccurrences(of:".disabled",with:""),name:m["name"] as? String ?? URL(fileURLWithPath:path).lastPathComponent,path:URL(fileURLWithPath:path),enabled:m["enabled"] as? Bool ?? true,size:(m["size"] as? NSNumber)?.int64Value ?? 0,version:m["version"] as? String ?? "",authors:m["authors"] as? String ?? "",modID:m["modId"] as? String ?? "",iconPath:m["iconPath"] as? String,summary:m["description"] as? String ?? "")}
         }
     }
     func cancel(_ work:WorkItem) { processes[work.id]?.terminate();nativeTasks[work.id]?.cancel() }

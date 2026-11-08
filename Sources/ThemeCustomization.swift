@@ -44,6 +44,7 @@ struct HarborThemeRuntime {
     }
     var buttonFill:Color{color(.buttonFill,default:HarborPalette.oxide)}
     var buttonInk:Color{color(.buttonText,default:buttonFill.readableInk,text:true,on:buttonFill)}
+    var nativeControlTint:Color{color(.controls,default:HarborPalette.oxide)}
     var controlTint:Color{color(.controls,default:HarborPalette.oxide,text:true)}
     var iconColor:Color{color(.icons,default:basicInk,text:true)}
     var accentText:Color{color(.accentText,default:basicInk,text:true)}
@@ -87,10 +88,16 @@ struct ThemeCustomizationPanel:View {
                 HStack{Text("卡片染色强度").frame(width:90,alignment:.leading);Slider(value:configuration.surfaceStrength,in:0...0.7)}
                 HStack{Text("边框强度").frame(width:90,alignment:.leading);Slider(value:configuration.borderStrength,in:0...1)}
                 Toggle("自动保护文字对比度",isOn:configuration.protectContrast)
-                Text("每类元素可独立使用默认色、主题色、反色或自定义色。自动保护会调整文字明暗；关闭后按原色显示。模组原图标与皮肤保持原图。").font(.system(size:11)).foregroundStyle(.secondary)
+                Text("每类元素可独立使用默认色、主题色、反色或自定义色。自动保护会调整文字明暗；关闭后按原色显示。模组原图标与皮肤保持原图。").font(.system(size:11)).harborSecondaryText()
                 HStack{Text("主题按钮预览").padding(12).foregroundStyle(model.themeRuntime.buttonInk).background(model.themeRuntime.buttonFill,in:Capsule());Text("强调文字预览").foregroundStyle(model.themeRuntime.accentText);Spacer()}
             }
         }.padding(24).harborGlass(appearance:model.appearance,radius:24)
     }
     private func swatch(_ color:Color,title:String)->some View{VStack(spacing:5){RoundedRectangle(cornerRadius:9).fill(color).frame(width:42,height:30);Text(title).font(.system(size:10))}}
 }
+
+private struct HarborSecondaryTextModifier:ViewModifier {
+    @Environment(\.harborThemeRuntime) private var style
+    func body(content:Content)->some View{content.foregroundStyle(style.secondaryText)}
+}
+extension View {func harborSecondaryText()->some View{modifier(HarborSecondaryTextModifier())}}

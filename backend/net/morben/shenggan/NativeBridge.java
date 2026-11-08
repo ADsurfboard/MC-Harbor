@@ -63,6 +63,12 @@ public final class NativeBridge {
                 Map<String,Object> profile=command.equals("applySkin")?NativeProfiles.apply(account,Path.of(text("skinFile","")),request.has("slim")&&request.get("slim").getAsBoolean(),data):NativeProfiles.describe(account,data,request.has("refresh")&&request.get("refresh").getAsBoolean());
                 emit(Map.of("event","accountUpdated","data",serialize(account,type)));result(profile);System.exit(0);
             }
+            if(command.equals("downloadCandidates")){
+                URI address=URI.create(text("url",""));if(!"https".equalsIgnoreCase(address.getScheme())||address.getHost()==null)throw new IOException("下载地址必须使用 HTTPS");
+                DownloadProvider original=new MojangDownloadProvider(),domestic=new BMCLAPIDownloadProvider("https://bmclapi2.bangbang93.com");
+                DownloadProvider selected=text("source","auto").equals("official")?new AutoDownloadProvider(original,domestic):new AutoDownloadProvider(domestic,original);
+                result(Map.of("urls",selected.injectURLWithCandidates(address.toString()).stream().map(URI::toString).distinct().toList()));System.exit(0);
+            }
             Path root=Path.of(text("root","/Applications/.minecraft")).toAbsolutePath().normalize();
             repository=new Repository(root,text("runDirectory",""));repository.refreshVersions();
             DownloadProvider official=new MojangDownloadProvider(),mirror=new BMCLAPIDownloadProvider("https://bmclapi2.bangbang93.com");
@@ -101,7 +107,7 @@ public final class NativeBridge {
     private static String validName(String name)throws IOException{if(name.isBlank()||name.equals(".")||name.equals("..")||name.contains("/")||name.contains("\\"))throw new IOException("无效的实例名称");return name;}
     private static Map<String,Object> mods()throws Exception{
         String id=validName(text("id",""));var manager=repository.getModManager(id);manager.refresh();List<Map<String,Object>> list=new ArrayList<>();
-        for(var mod:manager.getLocalFiles()){Map<String,Object> item=new LinkedHashMap<>();item.put("path",mod.getFile().toString());item.put("name",Objects.toString(mod.getName(),mod.getFileName()));item.put("version",Objects.toString(mod.getVersion(),""));item.put("authors",Objects.toString(mod.getAuthors(),""));item.put("modId",Objects.toString(mod.getId(),""));item.put("enabled",mod.isActive());item.put("size",Files.size(mod.getFile()));item.put("loader",mod.getModLoaderType().name());item.put("iconPath",NativeResourceFiles.icon(mod.getFile(),mod.getLogoPath(),data));item.put("website",mod.getUrl());list.add(item);}
+        for(var mod:manager.getLocalFiles()){Map<String,Object> item=new LinkedHashMap<>();item.put("path",mod.getFile().toString());item.put("name",Objects.toString(mod.getName(),mod.getFileName()));item.put("version",Objects.toString(mod.getVersion(),""));item.put("description",mod.getDescription()==null?"":mod.getDescription().toStringSingleLine());item.put("authors",Objects.toString(mod.getAuthors(),""));item.put("modId",Objects.toString(mod.getId(),""));item.put("enabled",mod.isActive());item.put("size",Files.size(mod.getFile()));item.put("loader",mod.getModLoaderType().name());item.put("iconPath",NativeResourceFiles.icon(mod.getFile(),mod.getLogoPath(),data));item.put("website",mod.getUrl());list.add(item);}
         return Map.of("mods",list);
     }
     @SuppressWarnings("unchecked") private static Map<String,Object> resources()throws Exception{

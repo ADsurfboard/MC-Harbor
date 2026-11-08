@@ -47,7 +47,7 @@ struct ExternalAccountPanel:View {
     private var busy:Bool{model.works.contains{$0.title=="外置登录" && $0.active}}
     var body:some View{VStack(alignment:.leading,spacing:18){
         HStack{Text("外置登录").font(.system(size:26,weight:.semibold));Spacer();Button{password="";model.modal=nil}label:{HarborSymbol(systemName:"xmark")}.buttonStyle(HarborButtonStyle())}
-        Text("填写支持 authlib-injector / Yggdrasil 协议的认证服务器 API。账号凭据仅提交给该服务器，登录会话保存在本机钥匙串。使用 HTTP 时密码可能被网络窃听。") .font(.system(size:11)).foregroundStyle(.secondary)
+        Text("填写支持 authlib-injector / Yggdrasil 协议的认证服务器 API。账号凭据仅提交给该服务器，登录会话保存在本机钥匙串。使用 HTTP 时密码可能被网络窃听。") .font(.system(size:11)).harborSecondaryText()
         TextField("认证服务器 API 地址",text:$server).textFieldStyle(.roundedBorder)
         TextField("邮箱或用户名",text:$username).textFieldStyle(.roundedBorder)
         SecureField("密码",text:$password).textFieldStyle(.roundedBorder)

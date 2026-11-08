@@ -98,7 +98,7 @@ struct LauncherAccount: Codable, Identifiable {
     var kind: String
     var uuid: String
 }
-struct ModFile: Identifiable { let id: String; let name: String; let path: URL; let enabled: Bool; let size: Int64; var version = ""; var authors = ""; var modID = "";var iconPath:String? = nil }
+struct ModFile: Identifiable { let id: String; let name: String; let path: URL; let enabled: Bool; let size: Int64; var version = ""; var authors = ""; var modID = "";var iconPath:String? = nil;var summary:String="" }
 struct WorkItem: Identifiable { let id=UUID(); var title: String; var detail=""; var progress: Double? = nil; var active=true; var error=false }
 enum NativeSection: String, CaseIterable, Identifiable {
     case library, downloads, accounts, multiplayer, friends, settings
