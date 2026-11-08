@@ -22,7 +22,7 @@ import UniformTypeIdentifiers
     @Published var works: [WorkItem] = []
     @Published var errorMessage: String?
     @Published var downloadNotice:String?
-    var resourceInstalling:Set<String>=[]
+    var resourceInstalling:[String:Set<UUID>]=[:]
     @Published var toastMessage: String?
     @Published var inspectedGame: GameInstance?
     @Published var modal: HarborModal?
@@ -107,7 +107,7 @@ import UniformTypeIdentifiers
     }
     func launch(_ game:GameInstance,server:String?=nil) {
         guard !running.contains(game.id) else{return}
-        guard !resourceInstalling.contains(resourceDirectoryKey(game)) else{toast("正在完成此实例的资源安装，请稍后启动");return}
+        guard resourceInstalling[resourceDirectoryKey(game),default:[]].isEmpty else{toast("正在完成此实例的资源安装，请稍后启动");return}
         guard let account=selectedAccount else{inspectedGame=nil;section = .accounts;return}
         var args:[String:Any]=["historySessionID":UUID().uuidString,"id":game.id,"runDirectory":game.runDirectory,"memory":preferences.memory,"gameJava":preferences.javaPath,"accountType":account.kind,"username":account.name,"uuid":account.uuid,"accountID":account.id,"javaExplicit":false,"completeDependencies":preferences.completeDependencies,"loader":game.loader,"version":game.version]
         if let server{args["serverAddress"]=server}
