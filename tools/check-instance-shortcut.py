@@ -7,7 +7,13 @@ REGISTER='/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchSer
 with tempfile.TemporaryDirectory(prefix='mcharbor-shortcut-') as temporary:
     qa=Path(temporary).resolve();app=qa/'Shortcut QA.app';helper=qa/'Quick Launch.app'
     shutil.copytree(ROOT/'build/MC Harbor.app',app,symlinks=True)
-    info_file=app/'Contents/Info.plist';info=plistlib.loads(info_file.read_bytes());info['CFBundleIdentifier']='net.morben.harbor.shortcut-qa.'+uuid.uuid4().hex;info['CFBundleName']='Shortcut QA';info_file.write_bytes(plistlib.dumps(info))
+    info_file=app/'Contents/Info.plist';info=plistlib.loads(info_file.read_bytes());info['CFBundleIdentifier']='net.morben.harbor.shortcut-qa.'+uuid.uuid4().hex;info['CFBundleName']='Shortcut QA';
+    if os.environ.get('GITHUB_ACTIONS')=='true':
+        # Hosted Intel guests expose an AppleParavirt GPU with no matching RenderBox archive slice.
+        # Compile the same pipelines instead; leave Metal errors, rendering and every assertion enabled.
+        info.setdefault('LSEnvironment',{})['RB_USE_BINARY_ARCHIVE']='0'
+        print('CI virtual GPU: compile RenderBox pipelines without its unsupported binary archive cache.',flush=True)
+    info_file.write_bytes(plistlib.dumps(info))
     resources=app/'Contents/Resources';(resources/'Services.json').write_text('{"friends":""}')
     (qa/'MCHarbor.portable').touch();data=qa/'MCHarborData';library=data/'game';game=library/'versions/快捷启动 中文';game.mkdir(parents=True)
     (game/(game.name+'.json')).write_text(json.dumps({'id':game.name,'gameVersion':'1.20.1','mainClass':'net.minecraft.client.main.Main','type':'release','libraries':[],'arguments':{'game':[],'jvm':[]}}))

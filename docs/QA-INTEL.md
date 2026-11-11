@@ -58,3 +58,5 @@ GitHub Actions 配置了 `macos-15-intel` 原生 x86_64 运行器，用于重新
 隔离后端检查包含内容白名单导出、未知分类拒绝、归档私有数据排除，以及仅停止指定 Process、不停止旁路进程。中文搜索加载 HMCL 同款内置名称库，简介支持 MCIM 现成译文及国内翻译。新增模组夹持久化、去重、改名改色和快捷应用检查。锁屏期间无法完成鼠标操作验收，原生离屏渲染只用于检查布局，不能视为真实磨砂材质目视验收。最终 Actions 与发行包哈希见 Release。
 
 1.6.0 快捷方式补充：独立 `.app` 将已登记、带有效期的请求写入本机私有收件目录；启动器启动时接收，运行期间监听。比较游戏库前统一两端路径，兼容 macOS 的 `/private` 等价路径。`tools/check-instance-shortcut.py` 使用真实发布客户端和快捷组件测试冷启动、后台再次调用；只替换游戏 JVM 为隔离协议记录器，不表示实际游戏会话验收。离线发现回归增至 97 项，覆盖私有权限、过期 / 无效请求拒绝、单次消费与文件监听。
+
+原生 CI 的完整界面检查曾在 `AppleParavirtGPUMetal` 的 `MTLLoader sliceIDForDevice` 断言处退出。仅隔离测试副本通过 `LSEnvironment` 设置 `RB_USE_BINARY_ARCHIVE=0`，避开该虚拟 GPU 不支持的 RenderBox 二进制缓存，仍正常编译和渲染管线；未改变 Metal 错误模式、未隐藏窗口、未跳过冷 / 热启动断言，发行 App 的配置不加入此设置。相关背景：[GitHub Runner GPU 问题](https://github.com/actions/runner-images/issues/14751)、[虚拟 GPU 作者的缓存路径分析](https://github.com/steelbrain/reims-vgpu/blob/master/docs/qemu.md)、[Apple LSEnvironment 文档](https://developer.apple.com/documentation/bundleresources/information-property-list/lsenvironment)。
