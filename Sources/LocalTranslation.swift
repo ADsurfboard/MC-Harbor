@@ -62,7 +62,7 @@ enum LegacyLanguageTranslation {
         }
     }
 
-    // MyMemory accepts at most 500 UTF-8 bytes per segment. Preserve whitespace
+    // Keep short, bounded UTF-8 segments and preserve whitespace
     // between segments instead of asking the remote service to recreate it.
     static func chunks(_ input: String, limit: Int = 400) throws -> [TranslationText.Part] {
         var rest = input

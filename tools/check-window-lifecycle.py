@@ -24,7 +24,13 @@ final class QAWindowDelegate:NSObject,NSWindowDelegate{var resizes=0;func window
   check("scene-identifier-preserved",window.identifier?.rawValue=="QA-SwiftUI-scene-identifier")
   check("close-delegate-registered",window.delegate is HarborCloseDelegate)
   let original=QAWindowDelegate();window.delegate=original;HarborWindowController.shared.register(window)
-  window.setContentSize(NSSize(width:1080,height:720));await settle()
+  // Hosted runners can have a 1024px work area: asking for a larger
+  // window may be clamped to the same size, producing no resize event.
+  window.minSize=NSSize(width:400,height:300)
+  let beforeResize=window.frame.size
+  window.setContentSize(NSSize(width:640,height:460));await settle()
+  print("resize-state",beforeResize,window.frame.size,"forwarded",original.resizes)
+  check("native-frame-actually-resized",window.frame.size != beforeResize)
   check("original-delegate-resize-forwarded",original.resizes>0)
   let delegate=HarborAppDelegate()
   for attempt in 1...3{
