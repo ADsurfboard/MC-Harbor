@@ -60,6 +60,7 @@ jobs:
           python3 tools/build-update-checks.py
           python3 tools/run-update-checks.py
           python3 tools/check-discovery.py
+          python3 tools/check-instance-shortcut.py
       - name: Test friends and chat services
         run: |
           mkdir -p evidence

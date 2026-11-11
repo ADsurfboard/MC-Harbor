@@ -31,6 +31,24 @@ extension UpdateChecks {
         do{try InstanceShortcuts.create(game:game,library:library.path,destination:root.appendingPathComponent("bad.command"));check("reject-executable-shortcut",false)}catch{check("reject-executable-shortcut",true)}
         check("shortcut-explicit-app-target",plist["HarborApplication"] as? String == Bundle.main.bundleURL.path)
         check("shortcut-bundled-executable",FileManager.default.isExecutableFile(atPath:destination.appendingPathComponent("Contents/MacOS/InstanceShortcut").path))
+        check("shortcut-explicit-private-data-root",plist["HarborDataRoot"] as? String == NativePaths.root.standardizedFileURL.resolvingSymlinksInPath().path)
+        try InstanceShortcutInbox.prepare()
+        check("shortcut-inbox-private",(try FileManager.default.attributesOfItem(atPath:InstanceShortcutInbox.directory.path)[.posixPermissions] as? Int)==0o700)
+        func enqueue(_ request:InstanceShortcutRequest)throws{try JSONEncoder().encode(request).write(to:InstanceShortcutInbox.directory.appendingPathComponent(UUID().uuidString+".json"),options:.atomic)}
+        try enqueue(InstanceShortcutRequest(url:url.absoluteString,created:Date().timeIntervalSince1970))
+        try enqueue(InstanceShortcutRequest(url:url.absoluteString,created:Date().timeIntervalSince1970-600))
+        try enqueue(InstanceShortcutRequest(url:"mcharbor://launch/"+UUID().uuidString,created:Date().timeIntervalSince1970))
+        try Data("invalid".utf8).write(to:InstanceShortcutInbox.directory.appendingPathComponent(UUID().uuidString+".json"))
+        let inbox=try InstanceShortcutInbox.take()
+        check("shortcut-inbox-only-valid-requests",inbox==[url])
+        check("shortcut-inbox-consumed-once",try InstanceShortcutInbox.take().isEmpty)
+        var notified=false
+        let watcher=try InstanceShortcutWatcher{notified=true}
+        try enqueue(InstanceShortcutRequest(url:url.absoluteString,created:Date().timeIntervalSince1970))
+        for _ in 0..<40{if notified{break};try await Task.sleep(nanoseconds:50_000_000)}
+        check("shortcut-inbox-filesystem-notifies",notified)
+        check("shortcut-inbox-warm-request",try InstanceShortcutInbox.take()==[url])
+        withExtendedLifetime(watcher){}
         let collections=ModCollectionStore(root:root.appendingPathComponent("collections"))
         let collectionID=try collections.create("优化 模组夹",color:"#ABCDEF")
         check("collection-create",collections.folders.count==1)

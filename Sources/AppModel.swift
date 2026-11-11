@@ -47,6 +47,7 @@ import UniformTypeIdentifiers
     @Published var logLines: [String] = []
     private var processes: [UUID:Process] = [:]
     var gameControls:[String:URL]=[:]
+    var shortcutWatcher:InstanceShortcutWatcher?
     private var preferenceWork:DispatchWorkItem?
     private let preferenceQueue=DispatchQueue(label:"net.morben.mcharbor.preferences")
     private var toastTask: Task<Void,Never>?
@@ -76,6 +77,7 @@ import UniformTypeIdentifiers
         scan()
         if let bytes=try? Data(contentsOf:NativePaths.root.appendingPathComponent("migration.json")),let receipt=try? JSONDecoder().decode(MigrationReceipt.self,from:bytes){migrationStatus="已接入 \(receipt.instances) 个游戏 · \(accounts.count) 个账号"}
         else if ProcessInfo.processInfo.environment["SHENGGAN_DATA_DIR"]==nil{Task{migrateHMCL()}}
+        monitorInstanceShortcuts()
     }
     func persist() {
         ResourceMirror.source=preferences.downloadSource
