@@ -31,14 +31,23 @@ print(json.dumps({"event":"result","data":{}}),flush=True)
     (helper/'Contents/Info.plist').write_bytes(plistlib.dumps({'CFBundleName':'Quick Launch QA','CFBundleExecutable':'InstanceShortcut','CFBundleIdentifier':info['CFBundleIdentifier']+'.helper','CFBundlePackageType':'APPL','LSUIElement':True,'HarborURL':'mcharbor://launch/'+token,'HarborApplication':str(app),'HarborDataRoot':str(data),'HarborBundleID':info['CFBundleIdentifier']}))
     subprocess.run(['codesign','--force','--sign','-',str(app)],check=True,capture_output=True)
     children=[]
+    helper_log=qa/'helper.log'
+    def diagnostics():
+        preferences=json.loads((data/'preferences.json').read_text())
+        listing=subprocess.run(['ps','-axo','pid=,command='],capture_output=True,text=True).stdout
+        executable=str(app/'Contents/MacOS/MCHarbor')
+        owned=[line.strip().split(maxsplit=1)[0] for line in listing.splitlines() if executable in line]
+        return {'selected':preferences.get('selectedGame'),'library':preferences.get('gameRoot'),'helperExit':[c.poll() for c in children],'launcherPIDs':owned,'pendingRequests':[p.read_text()[:4096] for p in (data/'shortcut-inbox').glob('*.json')],'helperLog':helper_log.read_text()[-3000:] if helper_log.exists() else '', 'backendRecorderExists':bridge.is_file(),'systemPython':subprocess.run(['/usr/bin/python3','--version'],capture_output=True,text=True).stdout.strip()}
+
     try:
         for attempt in [1,2]:
-            child=subprocess.Popen([str(macos/'InstanceShortcut')],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);children.append(child)
+            with helper_log.open('ab') as log:child=subprocess.Popen([str(macos/'InstanceShortcut')],stdout=log,stderr=log)
+            children.append(child)
             deadline=time.monotonic()+60
             while time.monotonic()<deadline:
                 if receipt.exists() and len(json.loads(receipt.read_text()))>=attempt:break
                 time.sleep(0.2)
-            else:raise RuntimeError('No instance dispatch for '+('cold' if attempt==1 else 'warm')+' shortcut')
+            else:raise RuntimeError('No instance dispatch for '+('cold' if attempt==1 else 'warm')+' shortcut; diagnostics: '+json.dumps(diagnostics(),ensure_ascii=False))
             record=json.loads(receipt.read_text())[-1]
             assert record['id']==game.name and record['accountType']=='offline' and record['root']==str(library),record
             child.wait(timeout=15)
