@@ -37,7 +37,11 @@ print(json.dumps({"event":"result","data":{}}),flush=True)
         listing=subprocess.run(['ps','-axo','pid=,command='],capture_output=True,text=True).stdout
         executable=str(app/'Contents/MacOS/MCHarbor')
         owned=[line.strip().split(maxsplit=1)[0] for line in listing.splitlines() if executable in line]
-        return {'selected':preferences.get('selectedGame'),'library':preferences.get('gameRoot'),'helperExit':[c.poll() for c in children],'launcherPIDs':owned,'pendingRequests':[p.read_text()[:4096] for p in (data/'shortcut-inbox').glob('*.json')],'helperLog':helper_log.read_text()[-3000:] if helper_log.exists() else '', 'backendRecorderExists':bridge.is_file(),'systemPython':subprocess.run(['/usr/bin/python3','--version'],capture_output=True,text=True).stdout.strip()}
+        crashes=[]
+        for report in sorted((Path.home()/'Library/Logs/DiagnosticReports').glob('MCHarbor*.ips'),key=lambda p:p.stat().st_mtime,reverse=True)[:3]:
+            raw=report.read_text(errors='replace')
+            if info['CFBundleIdentifier'] in raw:crashes.append(raw[:14000])
+        return {'crashes':crashes,'selected':preferences.get('selectedGame'),'library':preferences.get('gameRoot'),'helperExit':[c.poll() for c in children],'launcherPIDs':owned,'pendingRequests':[p.read_text()[:4096] for p in (data/'shortcut-inbox').glob('*.json')],'helperLog':helper_log.read_text()[-3000:] if helper_log.exists() else '', 'backendRecorderExists':bridge.is_file(),'systemPython':subprocess.run(['/usr/bin/python3','--version'],capture_output=True,text=True).stdout.strip()}
 
     try:
         for attempt in [1,2]:
