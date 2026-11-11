@@ -4,7 +4,8 @@ import SwiftUI
 
 @main struct ShengganApp: App {
     @NSApplicationDelegateAdaptor(HarborAppDelegate.self) private var appDelegate
-    @StateObject private var model=LauncherModel()
+    @StateObject private var model:LauncherModel
+    init(){let initial=LauncherModel();_model=StateObject(wrappedValue:initial)}
     var body:some Scene {
         WindowGroup("MC Harbor") { LauncherRoot(model:model).frame(minWidth:1040,minHeight:700).handlesExternalEvents(preferring:["*"],allowing:["*"]) }
             .windowStyle(.hiddenTitleBar)
