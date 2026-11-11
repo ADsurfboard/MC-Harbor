@@ -220,7 +220,7 @@ struct HarborAmbientWallpaper: View {
             }
         }
         .onAppear { updateAnimation(isAnimating) }
-        .onChange(of: isAnimating) { _, active in
+        .harborOnChange(of: isAnimating) { _, active in
             updateAnimation(active)
         }
     }

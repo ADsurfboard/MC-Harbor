@@ -22,7 +22,7 @@ enum SkinStorage {
 private final class SkinResponseBox:@unchecked Sendable {let lock=NSLock();var account:Data?}
 enum SkinService {
     static func load(_ account:LauncherAccount,refresh:Bool=false,file:URL?=nil,slim:Bool=false)async throws->(SkinProfile,Data?){
-        let stored=await Task.detached{KeychainStore.read(account.id)}.value
+        let stored=account.kind=="offline" ? nil:await Task.detached{KeychainStore.read(account.id)}.value
         var raw:[String:Any]
         if let stored,let value=(try? JSONSerialization.jsonObject(with:stored)) as? [String:Any]{raw=value}
         else if account.kind=="offline"{var metadata:[String:Any]=["accountID":account.id.hasPrefix("account:") ? account.id:"account:"+account.id,"profileName":account.name];if !account.uuid.isEmpty{metadata["profileID"]=account.uuid};raw=["hmclMetadata":metadata,"privateData":[:]]}

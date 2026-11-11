@@ -1,34 +1,75 @@
 import Foundation
 
-private final class ResourceTransfer:NSObject,URLSessionDownloadDelegate,@unchecked Sendable {
+final class ResourceTransfer:NSObject,URLSessionDownloadDelegate,@unchecked Sendable {
     let file:AddonFile;let destination:URL;let progress:@Sendable(Double,String)async->Void
     private let lock=NSLock();private var continuation:CheckedContinuation<URL,Error>?;private var complete=false;private var cancelled=false;private var session:URLSession?;private var lastUpdate=Date.distantPast
     init(file:AddonFile,destination:URL,progress:@escaping @Sendable(Double,String)async->Void){self.file=file;self.destination=destination;self.progress=progress}
-    func start(_ continuation:CheckedContinuation<URL,Error>){lock.lock();self.continuation=continuation;let cancel=cancelled;lock.unlock();if cancel{finish(.failure(CancellationError()));return};guard let url=URL(string:file.url),url.scheme=="https" else{finish(.failure(FileTransactions.error("资源下载地址无效。")));return};let configuration=URLSessionConfiguration.ephemeral;configuration.timeoutIntervalForRequest=30;configuration.timeoutIntervalForResource=3600;configuration.httpAdditionalHeaders=["User-Agent":"MC-harbor/1.2"];let session=URLSession(configuration:configuration,delegate:self,delegateQueue:nil);self.session=session;session.downloadTask(with:url).resume()}
+    func start(_ continuation:CheckedContinuation<URL,Error>){lock.lock();self.continuation=continuation;let cancel=cancelled;lock.unlock();if cancel{finish(.failure(CancellationError()));return};guard let url=URL(string:file.url),url.scheme=="https" else{finish(.failure(FileTransactions.error("资源下载地址无效。")));return};let configuration=URLSessionConfiguration.ephemeral;configuration.timeoutIntervalForRequest=60;configuration.timeoutIntervalForResource=3600;configuration.httpAdditionalHeaders=["User-Agent":"MC-harbor/1.2"];let session=URLSession(configuration:configuration,delegate:self,delegateQueue:nil);self.session=session;session.downloadTask(with:url).resume()}
     func cancel(){lock.lock();cancelled=true;lock.unlock();session?.invalidateAndCancel();finish(.failure(CancellationError()))}
     private func finish(_ result:Result<URL,Error>){lock.lock();guard !complete,let continuation else{lock.unlock();return};complete=true;lock.unlock();continuation.resume(with:result);session?.finishTasksAndInvalidate()}
-    func urlSession(_ session:URLSession,downloadTask:URLSessionDownloadTask,didWriteData bytesWritten:Int64,totalBytesWritten:Int64,totalBytesExpectedToWrite:Int64){guard Date().timeIntervalSince(lastUpdate)>0.18 else{return};lastUpdate=Date();let total=max(file.size,totalBytesExpectedToWrite);let fraction=Double(totalBytesWritten)/Double(max(1,total));let text=ByteCountFormatter.string(fromByteCount:totalBytesWritten,countStyle:.file)+" / "+ByteCountFormatter.string(fromByteCount:total,countStyle:.file);Task{await progress(min(0.94,fraction*0.94),text)}}
+    func urlSession(_ session:URLSession,downloadTask:URLSessionDownloadTask,didWriteData bytesWritten:Int64,totalBytesWritten:Int64,totalBytesExpectedToWrite:Int64){guard totalBytesWritten<=file.size+8192 else{downloadTask.cancel();finish(.failure(FileTransactions.error("服务器返回的文件超过声明大小。")));return};guard Date().timeIntervalSince(lastUpdate)>0.18 else{return};lastUpdate=Date();let total=max(file.size,totalBytesExpectedToWrite);let fraction=Double(totalBytesWritten)/Double(max(1,total));let text=ByteCountFormatter.string(fromByteCount:totalBytesWritten,countStyle:.file)+" / "+ByteCountFormatter.string(fromByteCount:total,countStyle:.file);Task{await progress(min(0.94,fraction*0.94),text)}}
     func urlSession(_ session:URLSession,downloadTask:URLSessionDownloadTask,didFinishDownloadingTo location:URL){guard (downloadTask.response as? HTTPURLResponse)?.statusCode==200 else{finish(.failure(FileTransactions.error("资源服务器未返回可下载文件。")));return};do{try FileManager.default.moveItem(at:location,to:destination);finish(.success(destination))}catch{finish(.failure(error))}}
     func urlSession(_ session:URLSession,task:URLSessionTask,didCompleteWithError error:Error?){if let error{finish(.failure(error))}}
-    static func download(_ file:AddonFile,to destination:URL,progress:@escaping @Sendable(Double,String)async->Void)async throws->URL{let transfer=ResourceTransfer(file:file,destination:destination,progress:progress);return try await withTaskCancellationHandler{try await withCheckedThrowingContinuation{transfer.start($0)}}onCancel:{transfer.cancel()}}
+    private static func once(_ file:AddonFile,to destination:URL,progress:@escaping @Sendable(Double,String)async->Void)async throws->URL{let transfer=ResourceTransfer(file:file,destination:destination,progress:progress);return try await withTaskCancellationHandler{try await withCheckedThrowingContinuation{transfer.start($0)}}onCancel:{transfer.cancel()}}
+    static func download(_ file:AddonFile,to destination:URL,source:String="auto",progress:@escaping @Sendable(Double,String)async->Void)async throws->URL {
+        var candidates=[file.url]
+        if let result=try? await BackendQuery.run(["command":"downloadCandidates","root":NativePaths.root.path,"url":file.url,"source":source]),let urls=result["urls"] as? [String],!urls.isEmpty{candidates=urls}
+        return try await ResourceDownloadPolicy.perform(file,to:destination,candidates:candidates,progress:progress){candidate,location in try await once(candidate,to:location,progress:progress)}
+    }
 }
 enum ResourceInstall {
-    static func archive(_ item:AddonPlanItem,progress:@escaping @Sendable(Double,String)async->Void)async throws->URL{
+    static func archive(_ item:AddonPlanItem,source:String="auto",progress:@escaping @Sendable(Double,String)async->Void)async throws->URL{
         guard item.version.projectId.range(of:"^[A-Za-z0-9_-]{1,100}$",options:.regularExpression) != nil,item.version.id.range(of:"^[A-Za-z0-9_-]{1,100}$",options:.regularExpression) != nil,["zip","mrpack"].contains(URL(fileURLWithPath:item.file.filename).pathExtension.lowercased()),item.file.size>0,item.file.size<2_000_000_000 else{throw FileTransactions.error("这不是可导入的地图或整合包文件。")}
         let folder=NativePaths.root.appendingPathComponent("downloads");try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true,attributes:[.posixPermissions:0o700]);let target=folder.appendingPathComponent(item.version.projectId+"-"+item.version.id+"."+URL(fileURLWithPath:item.file.filename).pathExtension)
         if FileManager.default.fileExists(atPath:target.path),try await Task.detached(operation:{try AddonService.verify(target,file:item.file)}).value{return target}
         let free=(try folder.resourceValues(forKeys:[.volumeAvailableCapacityForImportantUsageKey])).volumeAvailableCapacityForImportantUsage ?? Int64.max;guard free>item.file.size+64*1024*1024 else{throw FileTransactions.error("磁盘空间不足，无法下载此资源。")}
-        let stage=folder.appendingPathComponent(".download-"+UUID().uuidString);defer{try? FileManager.default.removeItem(at:stage)};_ = try await ResourceTransfer.download(item.file,to:stage,progress:progress);try Task.checkCancellation();await progress(0.96,"校验文件");guard try await Task.detached(operation:{try AddonService.verify(stage,file:item.file)}).value else{throw FileTransactions.error("资源文件完整性校验失败。")};if FileManager.default.fileExists(atPath:target.path){try FileManager.default.removeItem(at:target)};try FileManager.default.moveItem(at:stage,to:target);return target
+        let stage=folder.appendingPathComponent(".download-"+UUID().uuidString);defer{try? FileManager.default.removeItem(at:stage)};_ = try await ResourceTransfer.download(item.file,to:stage,source:source,progress:progress);try Task.checkCancellation();await progress(0.96,"校验文件");guard try await Task.detached(operation:{try AddonService.verify(stage,file:item.file)}).value else{throw FileTransactions.error("资源文件完整性校验失败。")};if FileManager.default.fileExists(atPath:target.path){try FileManager.default.removeItem(at:target)};try FileManager.default.moveItem(at:stage,to:target);return target
     }
     static func uniqueName(_ title:String,root:String)->String{let cleaned=title.replacingOccurrences(of:"[\\\\/:\\p{Cntrl}]",with:"-",options:.regularExpression).trimmingCharacters(in:.whitespacesAndNewlines);let name=String((cleaned.isEmpty ? "Minecraft 整合包":cleaned).prefix(100));let versions=URL(fileURLWithPath:root).appendingPathComponent("versions");var candidate=name;var number=2;while FileManager.default.fileExists(atPath:versions.appendingPathComponent(candidate).path){candidate=name+" (\(number))";number+=1};return candidate}
 }
 @MainActor extension LauncherModel {
     func installArchiveResource(_ item:AddonPlanItem,game:GameInstance,kind:ContentKind,title:String){
+        resourceDownloadNotice(title:title,game:game)
         let job=WorkItem(title:"安装 "+title);works.insert(job,at:0);let root=preferences.gameRoot
-        let task=Task{do{let file=try await ResourceInstall.archive(item){progress,message in await MainActor.run{if let index=self.works.firstIndex(where:{$0.id==job.id}){self.works[index].progress=progress;self.works[index].detail=message}}};try Task.checkCancellation();let name=ResourceInstall.uniqueName(title,root:root);var input:[String:Any]=["command":kind == .worlds ? "installWorld":"import","root":root,"file":file.path,"name":kind == .worlds ? title:name,"runDirectory":game.runDirectory,"source":preferences.downloadSource,"threads":preferences.downloadThreads];input["clientID"]=preferences.microsoftClientID
+        let task=Task{defer{finishResourceCommit(game,jobID:job.id)};do{let file=try await ResourceInstall.archive(item,source:preferences.downloadSource){progress,message in await MainActor.run{if let index=self.works.firstIndex(where:{$0.id==job.id}){self.works[index].progress=progress;self.works[index].detail=message}}};try Task.checkCancellation();if kind == .worlds{try await beginResourceCommit(game,jobID:job.id)};let name=ResourceInstall.uniqueName(title,root:root);var input:[String:Any]=["command":kind == .worlds ? "installWorld":"import","root":root,"file":file.path,"name":kind == .worlds ? title:name,"runDirectory":game.runDirectory,"source":preferences.downloadSource,"threads":preferences.downloadThreads];input["clientID"]=preferences.microsoftClientID
             if let index=works.firstIndex(where:{$0.id==job.id}){works[index].progress=nil;works[index].detail="正在安装"}
             let result=try await BackendQuery.run(input){event in Task{@MainActor in if let index=self.works.firstIndex(where:{$0.id==job.id}){if let message=event["message"] as? String{self.works[index].detail=message};if let value=event["progress"] as? Double{self.works[index].progress=value}}}}
             if kind == .modpacks{scan();if let id=result["id"] as? String{preferences.selectedGame=id}}else{contentDidChange(game)};if let index=works.firstIndex(where:{$0.id==job.id}){works[index].progress=1;works[index].detail="安装完成"};toast(title+" 已安装");HarborAudio.shared.play(.success)
         }catch{if let index=works.firstIndex(where:{$0.id==job.id}){works[index].error=true;works[index].detail=error is CancellationError ? "已取消":error.localizedDescription};if !(error is CancellationError){errorMessage=error.localizedDescription}};if let index=works.firstIndex(where:{$0.id==job.id}){works[index].active=false};nativeTasks.removeValue(forKey:job.id)};nativeTasks[job.id]=task
+    }
+}
+
+/// Retry complete verified files; never place a partial transfer in an instance.
+enum ResourceDownloadPolicy {
+    static func perform(_ file:AddonFile,to destination:URL,candidates:[String],progress:@escaping @Sendable(Double,String)async->Void,fetch:(AddonFile,URL)async throws->URL)async throws->URL {
+        let urls=Array(NSOrderedSet(array:candidates+[file.url])) as? [String] ?? [file.url]
+        let allowed=urls.filter{URL(string:$0)?.scheme=="https"}
+        guard !allowed.isEmpty else{throw FileTransactions.error("资源下载地址必须使用 HTTPS。")}
+        var failure:Error=FileTransactions.error("没有可用下载源。")
+        for attempt in 0..<3 {
+            for address in allowed {
+                try Task.checkCancellation()
+                if attempt>0{await progress(0,"正在重试第 \(attempt+1) 次："+file.filename)}
+                let candidate=AddonFile(filename:file.filename,url:address,size:file.size,hashes:file.hashes,primary:file.primary)
+                do{let result=try await fetch(candidate,destination);try Task.checkCancellation();guard try await Task.detached(operation:{try AddonService.verify(result,file:file)}).value else{throw FileTransactions.error("文件完整性校验失败。")};return result}
+                catch{try? FileManager.default.removeItem(at:destination);try Task.checkCancellation();failure=error}
+            }
+            if attempt<2{try await HarborDelay.sleep(seconds:Double(attempt+1))}
+        }
+        throw FileTransactions.error("下载失败，已重试并检查可用下载源："+file.filename+"\n"+failure.localizedDescription)
+    }
+}
+@MainActor extension LauncherModel {
+    func resourceDirectoryKey(_ game:GameInstance)->String{URL(fileURLWithPath:game.runDirectory).standardizedFileURL.resolvingSymlinksInPath().path}
+    func resourceIsRunning(_ game:GameInstance)->Bool{running.contains(game.id) || games.contains{running.contains($0.id) && resourceDirectoryKey($0)==resourceDirectoryKey(game)}}
+    func beginResourceCommit(_ game:GameInstance,jobID:UUID)async throws{try await waitForResourceInstall(game,jobID:jobID);resourceInstalling[resourceDirectoryKey(game),default:[]].insert(jobID)}
+    func finishResourceCommit(_ game:GameInstance,jobID:UUID){let key=resourceDirectoryKey(game);resourceInstalling[key]?.remove(jobID);if resourceInstalling[key]?.isEmpty==true{resourceInstalling.removeValue(forKey:key)}}
+    func resourceDownloadNotice(title:String,game:GameInstance){downloadNotice=title+" 已开始下载。"+(resourceIsRunning(game) ? "游戏运行期间可继续下载；完成后会等待此实例退出，再自动安装。":"完成后自动安装到 "+displayName(game)+"。")+"可在下载 → 任务查看进度或取消。"}
+    func waitForResourceInstall(_ game:GameInstance,jobID:UUID)async throws {
+        while resourceIsRunning(game){
+            if let index=works.firstIndex(where:{$0.id==jobID}){works[index].detail="文件已下载，等待此实例退出后安装";works[index].progress=0.98}
+            try await HarborDelay.sleep(seconds:0.5)
+        }
+        try Task.checkCancellation()
     }
 }

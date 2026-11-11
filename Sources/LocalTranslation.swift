@@ -1,6 +1,7 @@
 import CryptoKit
 import Foundation
 import Translation
+import Security
 
 struct PendingLanguageEntry:Decodable,Sendable {
     let resource:String
@@ -31,6 +32,7 @@ enum TranslationText {
     }
 }
 
+@available(macOS 15.0, *)
 enum LocalLanguageTranslation {
     static let source=Locale.Language(identifier:"en")
     static let target=Locale.Language(identifier:"zh-Hans")
@@ -44,5 +46,101 @@ enum LocalLanguageTranslation {
             for response in responses{guard let key=response.clientIdentifier,let index=Int(key),batch.indices.contains(index) else{continue};values[batch[index]]=response.targetText}
         }
         return try zip(entries,parsed).map{entry,parts in ["resource":entry.resource,"entry":entry.id,"source":entry.source,"translation":try TranslationText.restore(parts,values:values)]}
+    }
+}
+
+/// Optional online fallback for macOS 13 and 14, used only after the player consents.
+enum LegacyLanguageTranslation {
+    enum Failure: LocalizedError {
+        case unavailable(String)
+        case unchanged
+        var errorDescription: String? {
+            switch self {
+            case .unavailable(let message): return message
+            case .unchanged: return "翻译服务没有返回可用译文。"
+            }
+        }
+    }
+
+    // MyMemory accepts at most 500 UTF-8 bytes per segment. Preserve whitespace
+    // between segments instead of asking the remote service to recreate it.
+    static func chunks(_ input: String, limit: Int = 400) throws -> [TranslationText.Part] {
+        var rest = input
+        var result: [TranslationText.Part] = []
+        while !rest.isEmpty {
+            var end = rest.startIndex
+            var bytes = 0
+            while end < rest.endIndex {
+                let next = rest.index(after: end)
+                let count = rest[end..<next].utf8.count
+                if bytes + count > limit { break }
+                bytes += count
+                end = next
+            }
+            guard end > rest.startIndex else { throw Failure.unavailable("原文中有无法分段的字符。") }
+            if end < rest.endIndex, let space = rest[..<end].lastIndex(where: { $0.isWhitespace }), space > rest.startIndex { end = space }
+            let part = String(rest[..<end])
+            if !part.isEmpty { result.append(.init(text: part, translate: true)) }
+            rest = String(rest[end...])
+            let whitespace = String(rest.prefix(while: { $0.isWhitespace }))
+            if !whitespace.isEmpty { result.append(.init(text: whitespace, translate: false)); rest.removeFirst(whitespace.count) }
+        }
+        return result
+    }
+
+    static func query(_ text: String) async throws -> String {
+        try await DomesticTranslation.query(text,toChinese:true)
+    }
+
+    static func parseResponse(_ data:Data,source:String)throws->String {
+        guard let response = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let status = response["responseStatus"] as? Int, status == 200,
+              let body = response["responseData"] as? [String: Any],
+              let result = body["translatedText"] as? String else {
+            throw Failure.unavailable("在线翻译暂不可用或已达到服务额度；已完成的译文会保留。")
+        }
+        if result.uppercased().contains("MYMEMORY WARNING") { throw Failure.unavailable("在线翻译服务额度已用完，请稍后重试；已完成的译文会保留。") }
+        guard !result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              result.caseInsensitiveCompare(source) != .orderedSame else { throw Failure.unchanged }
+        return result
+    }
+
+    static func translate(_ entry: PendingLanguageEntry, lookup: (String) async throws -> String = query) async throws -> [String: String] {
+        let parsed = try TranslationText.parts(entry.source).flatMap { part in
+            part.translate ? try chunks(part.text) : [part]
+        }
+        guard parsed.contains(where: \.translate) else { throw Failure.unchanged }
+        var values: [String: String] = [:]
+        for part in parsed where part.translate && values[part.text] == nil {
+            try Task.checkCancellation()
+            values[part.text] = try await lookup(part.text)
+        }
+        return ["resource": entry.resource, "entry": entry.id, "source": entry.source,
+                "translation": try TranslationText.restore(parsed, values: values)]
+    }
+}
+
+/// Official, keyless domestic endpoint. No credentials or player identities are sent.
+enum DomesticTranslation {
+    static var provider:String{get{UserDefaults.standard.string(forKey:"harbor.translationProvider") ?? "bilibili"}set{UserDefaults.standard.set(newValue,forKey:"harbor.translationProvider")}}
+    static var aliEndpoint:String{UserDefaults.standard.string(forKey:"harbor.aliTranslationEndpoint") ?? "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"}
+    private static let keyService="net.morben.harbor.translation.aliyun"
+    static func configureAli(endpoint:String,key:String)throws{guard let url=URL(string:endpoint),url.scheme=="https",url.user==nil,url.password==nil,url.query==nil,url.fragment==nil,url.path.hasSuffix("/chat/completions"),url.host=="dashscope.aliyuncs.com" || (url.host?.hasSuffix(".cn-beijing.maas.aliyuncs.com") ?? false) else{throw FileTransactions.error("请填写阿里云北京地域的官方 HTTPS 接口，不支持任意第三方转发地址。")};if !key.isEmpty{let query=[kSecClass:kSecClassGenericPassword,kSecAttrService:keyService,kSecAttrAccount:"api"] as CFDictionary;let update=SecItemUpdate(query,[kSecValueData:Data(key.utf8)] as CFDictionary);if update==errSecItemNotFound{let result=SecItemAdd([kSecClass:kSecClassGenericPassword,kSecAttrService:keyService,kSecAttrAccount:"api",kSecValueData:Data(key.utf8),kSecAttrAccessible:kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly] as CFDictionary,nil);guard result==errSecSuccess else{throw NSError(domain:NSOSStatusErrorDomain,code:Int(result))}}else if update != errSecSuccess{throw NSError(domain:NSOSStatusErrorDomain,code:Int(update))}};UserDefaults.standard.set(url.absoluteString,forKey:"harbor.aliTranslationEndpoint")}
+    static func removeAliKey(){SecItemDelete([kSecClass:kSecClassGenericPassword,kSecAttrService:keyService,kSecAttrAccount:"api"] as CFDictionary)}
+    private static func aliKey()->String?{var value:CFTypeRef?;guard SecItemCopyMatching([kSecClass:kSecClassGenericPassword,kSecAttrService:keyService,kSecAttrAccount:"api",kSecReturnData:true,kSecMatchLimit:kSecMatchLimitOne] as CFDictionary,&value)==errSecSuccess,let data=value as? Data else{return nil};return String(data:data,encoding:.utf8)}
+    static let endpoint=URL(string:"https://index-translate.bilibili.com/v1/chat/completions")!
+    static func parse(_ data:Data,source:String,toChinese:Bool)throws->String {
+        guard let root=try JSONSerialization.jsonObject(with:data) as? [String:Any],let choices=root["choices"] as? [[String:Any]],let choice=choices.first,choice["finish_reason"] as? String == "stop",let message=choice["message"] as? [String:Any],let raw=message["content"] as? String else{throw LegacyLanguageTranslation.Failure.unavailable("国内翻译服务没有返回完整译文，请稍后重试。")}
+        let value=raw.trimmingCharacters(in:.whitespacesAndNewlines)
+        guard !value.isEmpty,value.caseInsensitiveCompare(source) != .orderedSame,!toChinese || value.range(of:"[\\p{Han}]",options:.regularExpression) != nil else{throw LegacyLanguageTranslation.Failure.unchanged}
+        return value
+    }
+    static func query(_ text:String,toChinese:Bool)async throws->String {
+        var body:[String:Any]=["model":"Index-Translate-35B-A3B","messages":[["role":"user","content":"Translate the following Minecraft text to "+(toChinese ? "Simplified Chinese":"English")+". Return only the translation. Preserve placeholders, formatting codes and identifiers.\n\n"+text]],"stream":false,"max_tokens":2048,"chat_template_kwargs":["enable_thinking":false]]
+        var destination=endpoint;var token:String?
+        if provider=="aliyun"{guard let key=aliKey(),!key.isEmpty,let url=URL(string:aliEndpoint) else{throw FileTransactions.error("请先在设置中保存阿里翻译接口和 API Key。")};destination=url;token=key;body=["model":"qwen-mt-plus","messages":[["role":"user","content":text]],"translation_options":["source_lang":"auto","target_lang":toChinese ? "Chinese":"English"]]}
+        var last:Error=LegacyLanguageTranslation.Failure.unavailable("国内翻译服务暂不可用。")
+        for attempt in 0..<2{try Task.checkCancellation();do{return try parse(await HarborHTTP.data(destination,method:"POST",body:JSONSerialization.data(withJSONObject:body),token:token,limit:160_000),source:text,toChinese:toChinese)}catch{last=error;try Task.checkCancellation();if attempt==0{try await Task.sleep(nanoseconds:1_000_000_000)}}}
+        throw last
     }
 }

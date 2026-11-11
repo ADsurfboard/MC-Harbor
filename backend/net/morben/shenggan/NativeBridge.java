@@ -26,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.time.*;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.*;
 
@@ -63,6 +64,12 @@ public final class NativeBridge {
                 Map<String,Object> profile=command.equals("applySkin")?NativeProfiles.apply(account,Path.of(text("skinFile","")),request.has("slim")&&request.get("slim").getAsBoolean(),data):NativeProfiles.describe(account,data,request.has("refresh")&&request.get("refresh").getAsBoolean());
                 emit(Map.of("event","accountUpdated","data",serialize(account,type)));result(profile);System.exit(0);
             }
+            if(command.equals("downloadCandidates")){
+                URI address=URI.create(text("url",""));if(!"https".equalsIgnoreCase(address.getScheme())||address.getHost()==null)throw new IOException("下载地址必须使用 HTTPS");
+                DownloadProvider original=new MojangDownloadProvider(),domestic=new BMCLAPIDownloadProvider("https://bmclapi2.bangbang93.com");
+                DownloadProvider selected=text("source","auto").equals("official")?new AutoDownloadProvider(original,domestic):new AutoDownloadProvider(domestic,original);
+                List<String> candidates=new ArrayList<>(selected.injectURLWithCandidates(address.toString()).stream().map(URI::toString).distinct().toList());if(!text("source","auto").equals("official")&&Set.of("cdn.modrinth.com","edge.forgecdn.net").contains(address.getHost())){String domesticFile=address.toString().replace("https://"+address.getHost(),"https://mod.mcimirror.top");candidates.remove(domesticFile);candidates.add(0,domesticFile);}result(Map.of("urls",candidates));System.exit(0);
+            }
             Path root=Path.of(text("root","/Applications/.minecraft")).toAbsolutePath().normalize();
             repository=new Repository(root,text("runDirectory",""));repository.refreshVersions();
             DownloadProvider official=new MojangDownloadProvider(),mirror=new BMCLAPIDownloadProvider("https://bmclapi2.bangbang93.com");
@@ -90,9 +97,10 @@ public final class NativeBridge {
     private static int integer(String key,int fallback){return request.has(key)?request.get(key).getAsInt():fallback;}
     private static void stage(String message){emit(Map.of("event","progress","message",message));}
     private static void perform(Task<?> task)throws Exception{
-        TaskExecutor executor=task.executor();
+        TaskExecutor executor=task.executor();java.util.concurrent.atomic.AtomicInteger completed=new java.util.concurrent.atomic.AtomicInteger();
         executor.addTaskListener(new TaskListener(){
             @Override public void onRunning(Task<?> t){String simple=t.getClass().getSimpleName();String label=simple.contains("Asset")?"下载游戏资源":simple.contains("Library")?"检查运行依赖":simple.contains("Modpack")?"处理整合包":simple.contains("JavaDownload")?"下载 Java 运行时":"";long now=System.currentTimeMillis();if(!label.isEmpty()&&now-lastProgress.get()>700 && lastProgress.getAndSet(now)<now-700)stage(label);}
+            @Override public void onFinished(Task<?> t){int count=completed.incrementAndGet();if(text("command","").equals("import") && count%8==0)stage("2 / 4 · 正在处理整合包，已完成 "+count+" 项文件与依赖任务");}
             @Override public void onPropertiesUpdate(Task<?> t){double value=t.progressProperty().get();long now=System.currentTimeMillis();if(t==task&&value>=0&&now-lastProgress.get()>200){lastProgress.set(now);emit(Map.of("event","progress","progress",value));}}
         });
         Runtime.getRuntime().addShutdownHook(new Thread(executor::cancel));
@@ -101,7 +109,7 @@ public final class NativeBridge {
     private static String validName(String name)throws IOException{if(name.isBlank()||name.equals(".")||name.equals("..")||name.contains("/")||name.contains("\\"))throw new IOException("无效的实例名称");return name;}
     private static Map<String,Object> mods()throws Exception{
         String id=validName(text("id",""));var manager=repository.getModManager(id);manager.refresh();List<Map<String,Object>> list=new ArrayList<>();
-        for(var mod:manager.getLocalFiles()){Map<String,Object> item=new LinkedHashMap<>();item.put("path",mod.getFile().toString());item.put("name",Objects.toString(mod.getName(),mod.getFileName()));item.put("version",Objects.toString(mod.getVersion(),""));item.put("authors",Objects.toString(mod.getAuthors(),""));item.put("modId",Objects.toString(mod.getId(),""));item.put("enabled",mod.isActive());item.put("size",Files.size(mod.getFile()));item.put("loader",mod.getModLoaderType().name());item.put("iconPath",NativeResourceFiles.icon(mod.getFile(),mod.getLogoPath(),data));item.put("website",mod.getUrl());list.add(item);}
+        for(var mod:manager.getLocalFiles()){Map<String,Object> item=new LinkedHashMap<>();item.put("path",mod.getFile().toString());item.put("name",Objects.toString(mod.getName(),mod.getFileName()));item.put("version",Objects.toString(mod.getVersion(),""));item.put("description",mod.getDescription()==null?"":mod.getDescription().toStringSingleLine());item.put("authors",Objects.toString(mod.getAuthors(),""));item.put("modId",Objects.toString(mod.getId(),""));item.put("enabled",mod.isActive());item.put("size",Files.size(mod.getFile()));item.put("loader",mod.getModLoaderType().name());item.put("iconPath",NativeResourceFiles.icon(mod.getFile(),mod.getLogoPath(),data));item.put("website",mod.getUrl());list.add(item);}
         return Map.of("mods",list);
     }
     @SuppressWarnings("unchecked") private static Map<String,Object> resources()throws Exception{
@@ -161,11 +169,13 @@ public final class NativeBridge {
         JavaRuntime java=gameJava(version);LaunchOptions options=new LaunchOptions.Builder().setGameDir(repository.getRunDirectory(id)).setJava(java).setVersionName(id).setVersionType("MC Harbor").setProfileName(id).setMaxMemory(Math.max(1024,Math.min(6144,integer("memory",3072)))).setWidth(Math.max(640,Math.min(7680,integer("width",1280)))).setHeight(Math.max(480,Math.min(4320,integer("height",800)))).setFullscreen(request.has("fullscreen")&&request.get("fullscreen").getAsBoolean()).setJavaArguments(StringUtils.tokenize(text("jvmArguments",""))).setDaemon(true).setAllowAutoAgent(true).setQuickPlayOption(text("serverAddress","").isBlank()?null:new org.jackhuang.hmcl.game.QuickPlayOption.MultiPlayer(validServer(text("serverAddress","")))).create();
         Files.createDirectories(data.resolve("logs"));PrintWriter gameLog=new PrintWriter(Files.newBufferedWriter(data.resolve("logs").resolve("game-"+System.currentTimeMillis()+".log"),StandardCharsets.UTF_8));
         ProcessListener listener=new ProcessListener(){@Override public synchronized void onLog(String line,boolean error){gameLog.println(line);gameLog.flush();}@Override public void onExit(int code,ExitType type){gameLog.close();}};
-        stage("启动游戏");ManagedProcess process=new DefaultLauncher(repository,version,authentication,options,listener,true).launch();emit(Map.of("event","launched","pid",process.getProcess().pid()));NativePlayHistory history=null;try{if(request.has("historySessionID"))history=new NativePlayHistory(data,text("historySessionID",""),repository.getRunDirectory(id),process.getProcess().pid());}catch(Exception error){System.err.println("Playtime receipt unavailable");}int exit;try{exit=process.getProcess().waitFor();}finally{if(history!=null)history.close();}return Map.of("id",id,"exitCode",exit);
+        Path stop=NativeGameControl.stopPath(data,text("stopFile",""));
+        stage("启动游戏");ManagedProcess process=new DefaultLauncher(repository,version,authentication,options,listener,true).launch();emit(Map.of("event","launched","pid",process.getProcess().pid()));NativePlayHistory history=null;try{if(request.has("historySessionID"))history=new NativePlayHistory(data,text("historySessionID",""),repository.getRunDirectory(id),process.getProcess().pid());}catch(Exception error){System.err.println("Playtime receipt unavailable");}int exit;try{exit=NativeGameControl.waitFor(process.getProcess(),stop);}finally{if(history!=null)history.close();}return Map.of("id",id,"exitCode",exit);
     }
     private static Map<String,Object> importPack()throws Exception{
         String name=validName(text("name",""));if(Files.exists(repository.getVersionRoot(name)))throw new IOException("实例目录已存在，未覆盖");Path file=Path.of(text("file",""));
-        Modpack pack=ModpackHelper.readModpackManifest(file,StandardCharsets.UTF_8);perform(pack.getInstallTask(dependency,file,name,null));persistIsolation(name);return Map.of("id",name);
+        stage("1 / 4 · 读取整合包清单："+file.getFileName());verifyArchive(file);
+        Modpack pack=ModpackHelper.readModpackManifest(file,StandardCharsets.UTF_8);stage("2 / 4 · 解压实例与配置，准备下载缺失资源");perform(pack.getInstallTask(dependency,file,name,null));stage("3 / 4 · 写入独立游戏目录与实例配置");persistIsolation(name);stage("4 / 4 · 导入完成："+name);return Map.of("id",name);
     }
     private static Map<String,Object> exportPack()throws Exception{
         String id=validName(text("id",""));String game=repository.getGameVersion(id).orElseThrow(()->new IOException("无法读取 Minecraft 版本"));
@@ -174,9 +184,9 @@ public final class NativeBridge {
         if(output.startsWith(repository.getRunDirectory(id)))throw new IOException("请选择实例目录以外的导出位置。");
         Path temporary=Files.createTempFile(output.getParent(),".harbor-export-",".partial");
         MultiMCInstanceConfiguration configuration=new MultiMCInstanceConfiguration("OneSix",id,game,128,"","","","","","",false,1280,800,integer("memory",3072),512,false,true,false,true,false,false,false,false,false,"default");
-        try{stage("导出 MultiMC 整合包");perform(new MultiMCModpackExportTask(repository,id,List.of(),configuration,temporary));verifyArchive(temporary);Files.move(temporary,output);return Map.of("path",output.toString(),"format","MultiMC");}finally{Files.deleteIfExists(temporary);}
+        try{stage("导出 MultiMC 整合包");perform(new MultiMCModpackExportTask(repository,id,List.of(),configuration,temporary));stage("筛选所选导出内容并校验归档");NativeExport.filter(temporary,request);verifyArchive(temporary);Files.move(temporary,output);return Map.of("path",output.toString(),"format","MultiMC");}finally{Files.deleteIfExists(temporary);}
     }
-    private static void verifyArchive(Path file)throws IOException{try(ZipFile zip=new ZipFile(file.toFile())){byte[] buffer=new byte[65536];for(var entries=zip.entries();entries.hasMoreElements();){ZipEntry entry=entries.nextElement();CRC32 crc=new CRC32();try(InputStream stream=zip.getInputStream(entry)){int count;while((count=stream.read(buffer))>=0)crc.update(buffer,0,count);}if(crc.getValue()!=entry.getCrc())throw new IOException("归档校验失败");}}}
+    private static void verifyArchive(Path file)throws IOException{try(ZipFile zip=new ZipFile(file.toFile())){if(zip.size()>250000)throw new IOException("归档文件条目过多");byte[] buffer=new byte[65536];long total=0;for(var entries=zip.entries();entries.hasMoreElements();){ZipEntry entry=entries.nextElement();if(!NativeResourceFiles.safe(entry.getName()))throw new IOException("归档包含不安全路径");CRC32 crc=new CRC32();try(InputStream stream=zip.getInputStream(entry)){int count;while((count=stream.read(buffer))>=0){total+=count;if(total>100_000_000_000L)throw new IOException("归档展开量过大");crc.update(buffer,0,count);}}if(crc.getValue()!=entry.getCrc())throw new IOException("归档校验失败");}}}
     private record FileStamp(long size,long modified,Object key) {}
     private static Map<Path,FileStamp> backupFiles(Path root,String world)throws IOException {
         Path saves=world.isBlank()?root.resolve("saves"):root.resolve("saves").resolve(validName(world));

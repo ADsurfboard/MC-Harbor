@@ -2,23 +2,58 @@ import AppKit
 import SwiftUI
 
 final class HarborAppDelegate:NSObject,NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification:Notification) {
+        NSWindow.allowsAutomaticWindowTabbing=false
+        HarborWindowController.shared.installReopenHandler()
+    }
     func applicationShouldHandleReopen(_ sender:NSApplication,hasVisibleWindows flag:Bool)->Bool {
-        if let window=sender.windows.first(where:{$0.identifier?.rawValue=="MCHarborMainWindow"}) {
-            if window.isMiniaturized{window.deminiaturize(nil)}
-            window.makeKeyAndOrderFront(nil);sender.activate(ignoringOtherApps:true);return true
-        }
-        return true
+        HarborWindowController.shared.showMainWindow()
+        return false
     }
 }
 
-struct WindowConfigurator: NSViewRepresentable {
-    final class Coordinator:NSObject { weak var configuredWindow:NSWindow?
-        @objc func hideMainWindow(_ sender:Any?){configuredWindow?.orderOut(sender)}
+/// SwiftUI's WindowGroup can consume reopen events before the delegate adaptor.
+/// Handle only the standard reopen event, and leave other Apple Events to SwiftUI.
+final class HarborWindowController:NSObject {
+    static let shared=HarborWindowController()
+    private(set) weak var mainWindow:NSWindow?
+    private var closeDelegate:HarborCloseDelegate?
+    func register(_ window:NSWindow) {
+        mainWindow=window
+        if closeDelegate==nil || window.delegate !== closeDelegate{let proxy=HarborCloseDelegate(original:window.delegate);closeDelegate=proxy;window.delegate=proxy}
+        installReopenHandler()
     }
+    func installReopenHandler() {
+        NSAppleEventManager.shared().setEventHandler(self,andSelector:#selector(reopen(_:withReplyEvent:)),forEventClass:AEEventClass(kCoreEventClass),andEventID:AEEventID(kAEReopenApplication))
+
+    }
+    @objc private func reopen(_ event:NSAppleEventDescriptor,withReplyEvent reply:NSAppleEventDescriptor) {showMainWindow()}
+    @objc func showMainWindow() {
+        guard let window=mainWindow else{return}
+        register(window)
+        NSApp.unhide(nil)
+        if window.isMiniaturized{window.deminiaturize(nil)}
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps:true)
+    }
+}
+
+/// Preserve SwiftUI's delegate callbacks while keeping the launcher scene alive.
+private final class HarborCloseDelegate:NSObject,NSWindowDelegate {
+    weak var original:NSWindowDelegate?
+    init(original:NSWindowDelegate?){self.original=original;super.init()}
+    func windowShouldClose(_ sender:NSWindow)->Bool{sender.orderOut(nil);return false}
+    override func responds(to selector:Selector!)->Bool{super.responds(to:selector) || (original?.responds(to:selector) ?? false)}
+    override func forwardingTarget(for selector:Selector!)->Any?{if let original,original.responds(to:selector){return original};return super.forwardingTarget(for:selector)}
+}
+
+struct WindowConfigurator: NSViewRepresentable {
+    final class Coordinator:NSObject {weak var configuredWindow:NSWindow?}
     func makeCoordinator()->Coordinator{Coordinator()}
     func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        DispatchQueue.main.async { configure(view.window,coordinator:context.coordinator) }
+        let view = WindowAttachmentView()
+        let coordinator=context.coordinator
+        view.attached={window in configure(window,coordinator:coordinator)}
         return view
     }
 
@@ -30,9 +65,9 @@ struct WindowConfigurator: NSViewRepresentable {
     private func configure(_ window: NSWindow?,coordinator:Coordinator) {
         guard let window,window !== coordinator.configuredWindow else { return }
         coordinator.configuredWindow=window
-        window.identifier=NSUserInterfaceItemIdentifier("MCHarborMainWindow")
+        // The identifier belongs to SwiftUI's scene lifecycle; do not replace it.
         window.isReleasedWhenClosed=false
-        if let button=window.standardWindowButton(.closeButton){button.target=coordinator;button.action=#selector(Coordinator.hideMainWindow(_:))}
+        window.contentMinSize=NSSize(width:1040,height:700)
         window.isOpaque = false
         window.backgroundColor = .clear
         window.titlebarAppearsTransparent = true
@@ -42,6 +77,7 @@ struct WindowConfigurator: NSViewRepresentable {
         window.toolbarStyle = .unifiedCompact
         window.contentView?.wantsLayer = true
         window.contentView?.layer?.backgroundColor = NSColor.clear.cgColor
+        HarborWindowController.shared.register(window)
 
         if !window.styleMask.contains(.fullScreen),
            let visibleFrame = window.screen?.visibleFrame,
@@ -55,6 +91,11 @@ struct WindowConfigurator: NSViewRepresentable {
             window.center()
         }
     }
+}
+
+private final class WindowAttachmentView:NSView {
+    var attached:((NSWindow)->Void)?
+    override func viewDidMoveToWindow(){super.viewDidMoveToWindow();if let window{attached?(window)}}
 }
 
 struct WindowDragRegion: NSViewRepresentable {
@@ -75,13 +116,14 @@ private final class DragSurfaceView: NSView {
 
 
 struct HarborSectionHeader: View {
+    @Environment(\.harborThemeRuntime) private var customization
     let eyebrow: String
     let title: String
     let detail: String
     let appearance: HarborAppearance
 
     var body: some View {
-        let theme = HarborTheme(appearance: appearance)
+        let theme = HarborTheme(appearance: appearance,style:customization)
         VStack(alignment: .leading, spacing: 5) {
             Text(eyebrow.uppercased())
                 .font(.system(size: 10, weight: .bold, design: .monospaced))
@@ -115,15 +157,16 @@ struct HarborStatusPill: View {
 }
 
 struct HarborEmptyState: View {
+    @Environment(\.harborThemeRuntime) private var customization
     let icon: String
     let title: String
     let detail: String
     let appearance: HarborAppearance
 
     var body: some View {
-        let theme = HarborTheme(appearance: appearance)
+        let theme = HarborTheme(appearance: appearance,style:customization)
         VStack(spacing: 14) {
-            Image(systemName: icon)
+            HarborSymbol(systemName: icon)
                 .font(.system(size: 34, weight: .light))
                 .foregroundStyle(HarborPalette.seaGlass)
             Text(title)
@@ -142,12 +185,13 @@ struct HarborEmptyState: View {
 }
 
 struct HarborActivityOverlay: View {
+    @Environment(\.harborThemeRuntime) private var customization
     let title: String
     let detail: String
     let appearance: HarborAppearance
 
     var body: some View {
-        let theme = HarborTheme(appearance: appearance)
+        let theme = HarborTheme(appearance: appearance,style:customization)
         HStack(spacing: 15) {
             ProgressView()
                 .controlSize(.small)
@@ -168,13 +212,14 @@ struct HarborActivityOverlay: View {
 }
 
 struct HarborToast: View {
+    @Environment(\.harborThemeRuntime) private var customization
     let message: String
     let appearance: HarborAppearance
 
     var body: some View {
-        let theme = HarborTheme(appearance: appearance)
+        let theme = HarborTheme(appearance: appearance,style:customization)
         HStack(spacing: 10) {
-            Image(systemName: "checkmark.circle.fill")
+            HarborSymbol(systemName: "checkmark.circle.fill")
                 .foregroundStyle(HarborPalette.seaGlass)
             Text(message)
                 .font(.system(size: 11, weight: .medium))

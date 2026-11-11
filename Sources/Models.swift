@@ -26,7 +26,7 @@ struct NativePreferences: Codable {
     var frostedGlass = false
     var localizationEditorHeight: Double = 180
     var localizationEditorHidden = false
-    var rainbowCorners = true
+    var themeCustomization = HarborThemeSettings()
     var knownLibraries:[String] = []
     var appearance: HarborAppearance = .ultraClear
     var wallpaper = WallpaperSettings()
@@ -40,6 +40,7 @@ struct NativePreferences: Codable {
     var downloadSource = "auto"
     var downloadThreads = 8
     var completeDependencies = false
+    var translateModDescriptions = true
     var introEnabled = true
     var voiceEnabled = true
     var welcomeVoice:WelcomeVoice = .female
@@ -71,8 +72,8 @@ enum ContentKind: String, CaseIterable, Identifiable {
     var symbol:String { switch self {case .mods:return "puzzlepiece.extension";case .resourcepacks:return "square.stack.3d.up";case .shaderpacks:return "sun.max";case .worlds:return "globe.europe.africa";case .modpacks:return "shippingbox"} }
 }
 enum HarborModal: Identifiable {
-    case install(RemoteGame), offline, externalAccount, addons(GameInstance,ContentKind),worldEditor(GameInstance,LocalContent),wallpapers,skinLibrary
-    var id:String {switch self {case .install(let v):return "install-"+v.id;case .offline:return "offline";case .externalAccount:return "externalAccount";case .addons(let g,let k):return "addons-"+g.id+k.rawValue;case .worldEditor(let g,let w):return "world-"+g.id+w.id;case .wallpapers:return "wallpapers";case .skinLibrary:return "skinLibrary"}}
+    case collection(String),install(RemoteGame), offline, externalAccount, addons(GameInstance,ContentKind),worldEditor(GameInstance,LocalContent),wallpapers,skinLibrary
+    var id:String {switch self {case .collection(let id):return "collection-"+id;case .install(let v):return "install-"+v.id;case .offline:return "offline";case .externalAccount:return "externalAccount";case .addons(let g,let k):return "addons-"+g.id+k.rawValue;case .worldEditor(let g,let w):return "world-"+g.id+w.id;case .wallpapers:return "wallpapers";case .skinLibrary:return "skinLibrary"}}
 }
 struct GameInstance: Identifiable, Hashable, Sendable {
     let id: String
@@ -97,13 +98,13 @@ struct LauncherAccount: Codable, Identifiable {
     var kind: String
     var uuid: String
 }
-struct ModFile: Identifiable { let id: String; let name: String; let path: URL; let enabled: Bool; let size: Int64; var version = ""; var authors = ""; var modID = "";var iconPath:String? = nil }
+struct ModFile: Identifiable { let id: String; let name: String; let path: URL; let enabled: Bool; let size: Int64; var version = ""; var authors = ""; var modID = "";var iconPath:String? = nil;var summary:String="" }
 struct WorkItem: Identifiable { let id=UUID(); var title: String; var detail=""; var progress: Double? = nil; var active=true; var error=false }
 enum NativeSection: String, CaseIterable, Identifiable {
-    case library, downloads, accounts, multiplayer, friends, settings
+    case library, downloads, collections, accounts, multiplayer, friends, settings
     var id: String { rawValue }
-    var title: String { switch self { case .library:return "游戏";case .downloads:return "下载";case .accounts:return "账号";case .multiplayer:return "联机";case .friends:return "好友";case .settings:return "设置" } }
-    var icon: String { switch self { case .library:return "square.stack.3d.up";case .downloads:return "arrow.down.circle";case .accounts:return "person.crop.circle";case .multiplayer:return "network";case .friends:return "person.2";case .settings:return "slider.horizontal.3" } }
+    var title: String { switch self { case .collections:return "模组夹";case .library:return "游戏";case .downloads:return "下载";case .accounts:return "账号";case .multiplayer:return "联机";case .friends:return "好友";case .settings:return "设置" } }
+    var icon: String { switch self { case .collections:return "folder";case .library:return "square.stack.3d.up";case .downloads:return "arrow.down.circle";case .accounts:return "person.crop.circle";case .multiplayer:return "network";case .friends:return "person.2";case .settings:return "slider.horizontal.3" } }
 }
 enum NativePaths {
     static var root: URL {

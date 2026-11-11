@@ -10,6 +10,7 @@ import UniformTypeIdentifiers
         if panel.runModal() == .OK{copyContent(panel.urls,game:game,kind:kind)}
     }
     func copyContent(_ urls:[URL],game:GameInstance,kind:ContentKind){
+        if kind == .mods,urls.allSatisfy({["zip","mrpack"].contains($0.pathExtension.lowercased())}){urls.forEach{importPack($0)};return}
         guard !running.contains(game.id) else{errorMessage="请退出此实例后再修改文件。";return}
         editingContent=true
         let destination=URL(fileURLWithPath:game.runDirectory).appendingPathComponent(kind.rawValue)
@@ -22,8 +23,13 @@ import UniformTypeIdentifiers
         guard !pairs.isEmpty else{return};editingContent=true
         Task{defer{editingContent=false};do{try await Task.detached{try FileTransactions.move(pairs)}.value
             let destinations=Dictionary(uniqueKeysWithValues:pairs.map{($0.0.path,$0.1)})
-            if let cached=modMetadata[game.id]{modMetadata[game.id]=cached.map{mod in guard let path=destinations[mod.path.path] else{return mod};return ModFile(id:mod.id,name:mod.name,path:path,enabled:enabled,size:mod.size,version:mod.version,authors:mod.authors,modID:mod.modID,iconPath:mod.iconPath)}}
+            if let cached=modMetadata[game.id]{modMetadata[game.id]=cached.map{mod in guard let path=destinations[mod.path.path] else{return mod};return ModFile(id:mod.id,name:mod.name,path:path,enabled:enabled,size:mod.size,version:mod.version,authors:mod.authors,modID:mod.modID,iconPath:mod.iconPath,summary:mod.summary)}}
             contentChanged.send()}catch{errorMessage=error.localizedDescription;HarborAudio.shared.play(.error)}}
+    }
+    func setContentsActive(_ files:[LocalContent],active:Bool,game:GameInstance){
+        guard !running.contains(game.id),!editingContent else{errorMessage="请先退出游戏并等待文件操作完成。";return}
+        let pairs=files.filter{$0.active != active}.map{file in (file.url,active ? URL(fileURLWithPath:String(file.url.path.dropLast(9))):URL(fileURLWithPath:file.url.path+".disabled"))};guard !pairs.isEmpty else{return};editingContent=true
+        Task{defer{editingContent=false};do{try await Task.detached{try FileTransactions.move(pairs)}.value;contentDidChange(game)}catch{errorMessage=error.localizedDescription}}
     }
     func setContentActive(_ url:URL,active:Bool,game:GameInstance){
         guard !running.contains(game.id) else{errorMessage="请退出此实例后再修改文件。";return}
@@ -37,9 +43,13 @@ import UniformTypeIdentifiers
     func contentDidChange(_ game:GameInstance){modMetadata.removeValue(forKey:game.id);contentChanged.send();loadMods(game,force:true);loadResourceIndex(game,force:true)}
     func exportPack(_ game:GameInstance){
         let panel=NSSavePanel();panel.allowedContentTypes=[.zip];panel.nameFieldStringValue=displayName(game)+".zip";panel.prompt="导出整合包"
+        let groups=[("mods","模组 Mod 文件夹",true),("config","模组配置 config / defaultconfigs",true),("options","游戏设置",true),("servers","服务器列表（可能含私人地址）",false),("resourcepacks","资源包",true),("shaderpacks","光影包",true),("scripts","KubeJS / 脚本 / 指南",true),("saves","存档（可能含个人游戏数据）",false)]
+        let checks=groups.map{item->NSButton in let b=NSButton(checkboxWithTitle:item.1,target:nil,action:nil);b.state=item.2 ? .on:.off;return b}
+        let accessory=NSStackView(views:checks);accessory.orientation = .vertical;accessory.alignment = .leading;accessory.spacing=8;accessory.frame=NSRect(x:0,y:0,width:370,height:238);panel.accessoryView=accessory
         guard panel.runModal() == .OK,let url=panel.url else{return}
+        let contents=zip(groups,checks).filter{$0.1.state == .on}.map{$0.0.0}
         if FileManager.default.fileExists(atPath:url.path){errorMessage="请使用新的文件名，现有归档不会被覆盖。";return}
-        backend("export",title:"导出 "+displayName(game),arguments:["id":game.id,"runDirectory":game.runDirectory,"output":url.path]){result in self.toast("整合包已导出");HarborAudio.shared.play(.success);if let p=result["path"] as? String{NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath:p)])}}
+        backend("export",title:"导出 "+displayName(game),arguments:["id":game.id,"runDirectory":game.runDirectory,"output":url.path,"contents":contents]){result in self.toast("整合包已导出");HarborAudio.shared.play(.success);if let p=result["path"] as? String{NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath:p)])}}
     }
     func backupWorld(_ world:LocalContent,game:GameInstance){backend("backup",title:"备份 "+world.name,arguments:["runDirectory":game.runDirectory,"world":world.name]){_ in self.toast("存档备份完成");HarborAudio.shared.play(.success)}}
     func importWorld(_ game:GameInstance){

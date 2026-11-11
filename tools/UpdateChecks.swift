@@ -15,6 +15,7 @@ struct FluidField:View{let dark:Bool;let color:Color;let active:Bool;var body:so
         let config=NativeScanner.readJSON(URL(fileURLWithPath:CommandLine.arguments[1]))
         let root=URL(fileURLWithPath:CommandLine.arguments[2]);setenv("SHENGGAN_DATA_DIR",root.path,1);NativePaths.prepare()
         let assets=URL(fileURLWithPath:CommandLine.arguments[3])
+        if config["discovery"] as? Bool==true{do{try await discovery(config,root:root)}catch{print("FAIL discovery: "+error.localizedDescription);exit(1)};return}
         if config["multi"] as? Bool==true{try await multi(config,root:root);return}
         if config["terracotta"] as? Bool==true{try await terracotta(root);return}
         var checks:[String:Bool]=[:];var notes:[String:Any]=[:]
@@ -55,7 +56,8 @@ struct FluidField:View{let dark:Bool;let color:Color;let active:Bool;var body:so
         let long=String(repeating:"Collect one stone and open the quest book. ",count:100);let longParts=TranslationText.parts(long)
         check("translation-long-paragraph-chunks",longParts.filter(\.translate).allSatisfy{$0.text.count<=1200})
         check("translation-long-spacing",try TranslationText.restore(longParts,values:Dictionary(longParts.filter(\.translate).map{($0.text,$0.text)},uniquingKeysWith:{first,_ in first}))==long)
-        await perform("real-on-device-translation") {
+        #if compiler(>=6.2)
+        if #available(macOS 26.0, *) { await perform("real-on-device-translation") {
             let availability=await LanguageAvailability().status(from:LocalLanguageTranslation.source,to:LocalLanguageTranslation.target)
             notes["systemModelStatus"]=String(describing:availability)
             guard availability == .installed else{notes["translationSkipped"]="System language model is not installed; the visible app prepares it on first use.";return}
@@ -66,7 +68,11 @@ struct FluidField:View{let dark:Bool;let color:Color;let active:Bool;var body:so
             let value=translations[1]["translation"] ?? "";check("real-placeholder-preservation",["§a","%1$s","%2$d","{item:minecraft:stone}","\n","[[quest:123]]","${name}","https://example.org/a"].allSatisfy{value.contains($0)})
             check("real-long-quest-translated",(translations[2]["translation"] ?? "").range(of:"[\\p{Han}]",options:.regularExpression) != nil)
             notes["onDeviceSample"]=translations[0]["translation"]
-        }
+        }} else { notes["translationSkipped"]="Direct headless TranslationSession initialization requires macOS 26; the production SwiftUI translation task is available on macOS 15+." }
+        #else
+        notes["translationSkipped"]="This SDK lacks macOS 26's direct headless TranslationSession initializer; the production SwiftUI translation task remains available on macOS 15+."
+        #endif
+        if ProcessInfo.processInfo.environment["HARBOR_SKIP_LIVE_QA"] != "1" {
         await perform("live-LittleSkin") {
             let (entries,pages)=try await LittleSkinService.search("",page:1,sort:"likes");check("LittleSkin-live-list",!entries.isEmpty && pages>0)
             let entry=LittleSkinEntry(id:916947,name:"Public fixture",author:"LittleSkin",type:"alex",hd:false);let file=try await LittleSkinService.skin(entry);try SkinStorage.validate(file);check("LittleSkin-real-standard-skin",FileManager.default.fileExists(atPath:file.path));check("LittleSkin-cached-idempotent",try await LittleSkinService.skin(entry)==file)
@@ -77,6 +83,7 @@ struct FluidField:View{let dark:Bool;let color:Color;let active:Bool;var body:so
             check("Sakura-public-node-flag",SakuraNode(id:1,name:"游戏",host:"example.org",flag:2052).available && SakuraNode(id:1,name:"游戏",host:"example.org",flag:2052).publicGames)
             check("Sakura-offline-filter",!SakuraNode(id:2,name:"多线",host:"example.org",flag:516).available)
         }
+        } else { notes["externalServicesSkipped"]="CI covers loopback clients; LittleSkin and Sakura are checked separately against live services." }
         await perform("social-native-client") {
             let social=HarborSocial(),url=config["url"] as! String,token=config["token"] as! String,id=config["friendID"] as! String;let credential=HarborSocial.credentialID(url);let savedCredential=KeychainStore.read(credential);defer{if let savedCredential{try? KeychainStore.write(savedCredential,id:credential)}else{KeychainStore.remove(credential)}};try social.configure(url);social.restore(token);do{try social.configure("https://other.example.com");check("social-busy-origin-change-refused",false)}catch{check("social-busy-origin-change-refused",true)};try await wait(social)
             notes["socialStatus"]=social.status;check("social-native-login",social.me?.name==(config["expectedName"] as? String ?? "ClientQA"))

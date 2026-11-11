@@ -17,6 +17,11 @@ jobs:
           java-version: '21'
       - name: Verify Apple Silicon runner
         run: test "$(uname -m)" = arm64
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test native window lifecycle
+        run: python3 tools/check-window-lifecycle.py
       - name: Build test bundle
         env:
           HARBOR_TEST_WITHOUT_SFX: '1'
@@ -32,3 +37,31 @@ jobs:
         run: |
           python3 tools/check-instance-deletion.py
           python3 tools/check-external-login.py
+      - name: Inspect Apple bundle
+        env:
+          HARBOR_TEST_WITHOUT_SFX: '1'
+        run: python3 tools/check-apple-bundle.py
+      - name: Test packaged Apple Java backend
+        run: python3 tools/check-apple-backend.py
+      - name: Prepare disposable test keychain
+        shell: bash
+        run: |
+          qa_keychain_password="$(openssl rand -hex 24)"
+          echo "::add-mask::$qa_keychain_password"
+          security create-keychain -p "$qa_keychain_password" "$RUNNER_TEMP/mcharbor-ci.keychain-db"
+          security unlock-keychain -p "$qa_keychain_password" "$RUNNER_TEMP/mcharbor-ci.keychain-db"
+          security list-keychains -d user -s "$RUNNER_TEMP/mcharbor-ci.keychain-db"
+          security default-keychain -d user -s "$RUNNER_TEMP/mcharbor-ci.keychain-db"
+      - name: Build and test native client workflows
+        env:
+          HARBOR_FAST_QA: '1'
+          HARBOR_SKIP_LIVE_QA: '1'
+        run: |
+          python3 tools/build-update-checks.py
+          python3 tools/run-update-checks.py
+          python3 tools/check-discovery.py
+      - name: Test friends and chat services
+        run: |
+          mkdir -p evidence
+          node social-cloud/test-worker.mjs
+          python3 social-server/test_server.py
