@@ -16,7 +16,7 @@ enum BackendQuery {
 enum ResourceService {
     private struct VersionResponse:Decodable{let versions:[AddonVersion]}
     static func decode<T:Decodable>(_ object:[String:Any])throws->T{let decoder=JSONDecoder();decoder.keyDecodingStrategy = .convertFromSnakeCase;return try decoder.decode(T.self,from:JSONSerialization.data(withJSONObject:object))}
-    static func input(_ command:String,game:GameInstance,kind:ContentKind)->[String:Any]{["command":command,"root":URL(fileURLWithPath:game.directory).deletingLastPathComponent().deletingLastPathComponent().path,"version":game.version,"loader":game.loader,"kind":kind.projectType,"source":"auto"]}
+    static func input(_ command:String,game:GameInstance,kind:ContentKind)->[String:Any]{["command":command,"root":URL(fileURLWithPath:game.directory).deletingLastPathComponent().deletingLastPathComponent().path,"version":game.version,"loader":game.loader,"kind":kind.projectType,"source":ResourceMirror.source]}
     static func search(_ query:String,game:GameInstance,kind:ContentKind,source:AddonSource,page:Int=0,section:ModSection = .all)async throws->AddonSearch{
         if source == .modrinth{return try await AddonService.search(query,game:game,kind:kind,offset:page*30,section:section)}
         var request=input("cfSearch",game:game,kind:kind);request["query"]=query;request["page"]=page;return try decode(await BackendQuery.run(request))

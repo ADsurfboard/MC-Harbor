@@ -11,15 +11,17 @@ extension UpdateChecks {
         try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true)
         let game=GameInstance(id:"中文实例 🌱",version:"1.20.1",loader:"Fabric",directory:folder.path,runDirectory:folder.path,iconPath:nil,modified:Date())
         check("Chinese-known-name",await ModTextTranslation.searchQuery(" 钠 ")=="sodium")
+        check("offline-Chinese-index-proper-mod-name",await ModTextTranslation.searchQuery("连锁采集")=="Vein Mining")
+        check("offline-Chinese-index-not-literal",await ModTextTranslation.searchQuery("雕凿工艺")=="Chisels & Bits")
         check("English-query-unchanged",await ModTextTranslation.searchQuery("Sodium")=="Sodium")
         check("Chinese-complex-name",await ModTextTranslation.searchQuery("机械动力")=="Create")
         let mod=ModFile(id:"test",name:"Sodium",path:folder.appendingPathComponent("sodium-0.5.jar"),enabled:true,size:1,modID:"sodium")
         check("installed-recommendation",ModDiscovery.installed(ModDiscovery.catalog[0],mods:[mod]))
         check("uninstalled-recommendation",!ModDiscovery.installed(ModDiscovery.catalog[1],mods:[mod]))
-        let destination=root.appendingPathComponent("中文快捷方式.webloc")
+        let destination=root.appendingPathComponent("中文快捷方式.app")
         try InstanceShortcuts.create(game:game,library:library.path,destination:destination)
-        let plist=try PropertyListSerialization.propertyList(from:Data(contentsOf:destination),format:nil) as! [String:String]
-        let url=URL(string:plist["URL"]!)!,target=try InstanceShortcuts.target(for:url)
+        let plist=try PropertyListSerialization.propertyList(from:Data(contentsOf:destination.appendingPathComponent("Contents/Info.plist")),format:nil) as! [String:Any]
+        let url=URL(string:plist["HarborURL"] as! String)!,target=try InstanceShortcuts.target(for:url)
         check("shortcut-unicode-instance",target.instance==game.id)
         check("shortcut-correct-library",target.library==library.path)
         check("shortcut-no-private-path-in-URL",!url.absoluteString.contains(root.path))
@@ -27,6 +29,27 @@ extension UpdateChecks {
         check("shortcut-private-manifest",(attributes[.posixPermissions] as? Int)==0o600)
         for bad in ["mcharbor://launch/"+UUID().uuidString,url.absoluteString+"?id=other","https://launch/"+url.lastPathComponent]{check("reject-unregistered-or-altered-shortcut",(try? InstanceShortcuts.target(for:URL(string:bad)!))==nil)}
         do{try InstanceShortcuts.create(game:game,library:library.path,destination:root.appendingPathComponent("bad.command"));check("reject-executable-shortcut",false)}catch{check("reject-executable-shortcut",true)}
+        check("shortcut-explicit-app-target",plist["HarborApplication"] as? String == Bundle.main.bundleURL.path)
+        check("shortcut-bundled-executable",FileManager.default.isExecutableFile(atPath:destination.appendingPathComponent("Contents/MacOS/InstanceShortcut").path))
+        let collections=ModCollectionStore(root:root.appendingPathComponent("collections"))
+        let collectionID=try collections.create("优化 模组夹",color:"#ABCDEF")
+        check("collection-create",collections.folders.count==1)
+        try collections.update(collectionID,name:"PVP 配置",color:"#BDCDEF")
+        check("collection-rename-recolor",collections.folders[0].name=="PVP 配置" && collections.folders[0].color=="#BDCDEF")
+        let collectionProject=AddonProject(projectId:"AANobbMI",title:"Sodium",description:"Renderer",author:"QA",iconUrl:nil,downloads:1,pageUrl:nil)
+        try collections.add(collectionProject,source:.modrinth,to:collectionID);try collections.add(collectionProject,source:.modrinth,to:collectionID)
+        check("collection-duplicate-idempotent",collections.folders[0].entries.count==1)
+        let collectionRestored=ModCollectionStore(root:collections.root)
+        check("collection-persists",collectionRestored.folders==collections.folders)
+        try collections.remove(Set(["modrinth:AANobbMI"]),folder:collectionID)
+        check("collection-remove",collections.folders[0].entries.isEmpty)
+        do{try collections.update(collectionID,name:"",color:"#000000");check("collection-reject-empty-name",false)}catch{check("collection-reject-empty-name",true)}
+        do{try collections.update(collectionID,name:"name",color:"invalid");check("collection-reject-invalid-color",false)}catch{check("collection-reject-invalid-color",true)}
+        try collections.delete(collectionID);check("collection-delete",collections.folders.isEmpty)
+        let complete=try JSONSerialization.data(withJSONObject:["choices":[["finish_reason":"stop","message":["content":"优化性能"]]]])
+        check("domestic-translation-parse",try DomesticTranslation.parse(complete,source:"Improve performance",toChinese:true)=="优化性能")
+        let partial=try JSONSerialization.data(withJSONObject:["choices":[["finish_reason":"length","message":["content":"部分译文"]]]])
+        do{_ = try DomesticTranslation.parse(partial,source:"Improve performance",toChinese:true);check("reject-truncated-translation",false)}catch{check("reject-truncated-translation",true)}
         if config["live"] as? Bool==true {
             let hit=try await ResourceService.search(await ModTextTranslation.searchQuery("钠"),game:game,kind:.mods,source:.modrinth)
             check("live-Chinese-search-finds-Sodium",hit.hits.contains{$0.projectId=="AANobbMI"})
@@ -51,8 +74,8 @@ extension UpdateChecks {
             }
         }else{
             let cache=root.appendingPathComponent("cache/mod-text-translations.json");try FileManager.default.createDirectory(at:cache.deletingLastPathComponent(),withIntermediateDirectories:true)
-            var summaries=["en|zh-CN|Public mod summary":"模组公开简介"]
-            for index in 0..<240{summaries["en|zh-CN|QA summary "+String(index)]="汉化简介 "+String(index)}
+            var summaries=[DomesticTranslation.provider+"|en|zh-CN|Public mod summary":"模组公开简介"]
+            for index in 0..<240{summaries[DomesticTranslation.provider+"|en|zh-CN|QA summary "+String(index)]="汉化简介 "+String(index)}
             try JSONEncoder().encode(summaries).write(to:cache)
             check("cached-description-without-network",try await ModTextTranslation.shared.translate("Public mod summary")=="模组公开简介")
         }

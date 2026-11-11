@@ -33,6 +33,8 @@ import UniformTypeIdentifiers
     var resourceIndexed:Set<String>=[]
     let contentChanged=PassthroughSubject<Void,Never>()
     @Published var editingContent=false
+    var localizationPaths:Set<String>=[]
+    var packImporting=false
     var nativeTasks:[UUID:Task<Void,Never>]=[:]
     @Published var migrating=false
     @Published var migrationStatus=""
@@ -44,6 +46,7 @@ import UniformTypeIdentifiers
     @Published var running: Set<String> = []
     @Published var logLines: [String] = []
     private var processes: [UUID:Process] = [:]
+    var gameControls:[String:URL]=[:]
     private var preferenceWork:DispatchWorkItem?
     private let preferenceQueue=DispatchQueue(label:"net.morben.mcharbor.preferences")
     private var toastTask: Task<Void,Never>?
@@ -68,12 +71,14 @@ import UniformTypeIdentifiers
         accounts=(try? JSONDecoder().decode([LauncherAccount].self,from:Data(contentsOf:NativePaths.root.appendingPathComponent("accounts.json")))) ?? []
         for account in accounts{if let profile=SkinStorage.cached(account.id){skinProfiles[account.id]=profile}}
         showIntro=preferences.introEnabled && ProcessInfo.processInfo.environment["SHENGGAN_SKIP_INTRO"] != "1"
+        ResourceMirror.source=preferences.downloadSource
         HarborAudio.shared.configure(enabled:preferences.soundsEnabled,volume:preferences.soundVolume)
         scan()
         if let bytes=try? Data(contentsOf:NativePaths.root.appendingPathComponent("migration.json")),let receipt=try? JSONDecoder().decode(MigrationReceipt.self,from:bytes){migrationStatus="已接入 \(receipt.instances) 个游戏 · \(accounts.count) 个账号"}
         else if ProcessInfo.processInfo.environment["SHENGGAN_DATA_DIR"]==nil{Task{migrateHMCL()}}
     }
     func persist() {
+        ResourceMirror.source=preferences.downloadSource
         HarborAudio.shared.configure(enabled:preferences.soundsEnabled,volume:preferences.soundVolume)
         preferenceWork?.cancel();guard let data=try? JSONEncoder().encode(preferences) else{return}
         let work=DispatchWorkItem{try? data.write(to:NativePaths.root.appendingPathComponent("preferences.json"),options:.atomic)}
@@ -116,12 +121,25 @@ import UniformTypeIdentifiers
         if let originalMemory=original["maxMemory"] as? Int,(original["overrideProperties"] as? [String] ?? []).contains("maxMemory"){args["memory"]=originalMemory}
         if let options {if options.memory>0{args["memory"]=options.memory};if !options.javaPath.isEmpty{args["gameJava"]=options.javaPath;args["javaExplicit"]=true};args["jvmArguments"]=options.jvmArguments;args["fullscreen"]=options.fullscreen;args["width"]=options.width;args["height"]=options.height}
         HarborAudio.shared.play(.launch)
-        if let privateJSON=KeychainStore.read(account.id),let obj=try? JSONSerialization.jsonObject(with:privateJSON){args["account"]=obj}
+        if account.kind != "offline"{guard let privateJSON=KeychainStore.read(account.id),let obj=try? JSONSerialization.jsonObject(with:privateJSON) else{errorMessage="未获得账号凭据。请在系统钥匙串提示中允许访问，或在账号页面重新登录。可在系统弹窗选择“始终允许”，本次运行也会复用已授权的凭据。";return};args["account"]=obj}
+        let control=NativePaths.root.appendingPathComponent("launch-control/"+UUID().uuidString+".stop");gameControls[game.id]=control;args["stopFile"]=control.path
         running.insert(game.id)
         backend("launch",title:"启动 "+game.id,arguments:args){_ in self.running.remove(game.id)}
     }
     func repair(_ game:GameInstance) { backend("repair",title:"校验 "+game.id,arguments:["id":game.id,"runDirectory":game.runDirectory]){_ in self.toast("校验完成") } }
-    func importPack() { let p=NSOpenPanel();p.allowedContentTypes=[.zip,UTType(filenameExtension:"mrpack") ?? .data];if p.runModal() == .OK,let url=p.url {backend("import",title:"导入整合包",arguments:["file":url.path,"name":url.deletingPathExtension().lastPathComponent]){_ in self.scan();self.toast("整合包已导入")}} }
+    func importPack(){let p=NSOpenPanel();p.allowedContentTypes=[.zip,UTType(filenameExtension:"mrpack") ?? .data];if p.runModal() == .OK,let url=p.url{importPack(url)}}
+    func importPack(_ url:URL){
+        guard ["zip","mrpack"].contains(url.pathExtension.lowercased()) else{errorMessage="请拖入 ZIP 或 MRPACK 整合包。";return}
+        guard !packImporting else{errorMessage="已有整合包正在导入，请等待该任务完成后再导入下一个。";return};packImporting=true
+        section = .downloads;downloadCategory="tasks";showIntro=false
+        backend("import",title:"导入 "+url.lastPathComponent,arguments:["file":url.path,"name":ResourceInstall.uniqueName(url.deletingPathExtension().lastPathComponent,root:preferences.gameRoot)]){result in self.scan();if let id=result["id"] as? String{self.preferences.selectedGame=id};self.toast("整合包已导入")}
+    }
+    func stopGame(_ game:GameInstance){
+        guard running.contains(game.id),let control=gameControls[game.id] else{errorMessage="此游戏进程不由当前启动器管理，请在游戏内退出。";return}
+        let alert=NSAlert();alert.messageText="关闭 "+displayName(game)+"？";alert.informativeText="将请求游戏退出。建议先在游戏内保存并退出存档，避免丢失未保存的进度。";alert.addButton(withTitle:"关闭游戏");alert.addButton(withTitle:"取消")
+        guard alert.runModal() == .alertFirstButtonReturn else{return}
+        do{try FileManager.default.createDirectory(at:control.deletingLastPathComponent(),withIntermediateDirectories:true);try Data().write(to:control,options:.atomic);toast("已请求游戏退出，正在等待进程结束")}catch{errorMessage=error.localizedDescription}
+    }
     func backup(_ game:GameInstance) { backend("backup",title:"备份 "+game.id,arguments:["runDirectory":game.runDirectory]){result in self.toast("存档备份完成");if let path=result["path"] as? String{NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath:path)])}} }
     func diagnostics() { backend("diagnostics",title:"检查下载连接",arguments:[:]){result in self.toast("诊断完成");if let report=result["report"] as? String{self.logLines.append(report)}} }
     func addOffline(_ name:String) { guard name.range(of:"^[A-Za-z0-9_]{3,16}$",options:.regularExpression) != nil else{errorMessage="用户名需为 3—16 位英文字母、数字或下划线。";return};let account=LauncherAccount(id:UUID().uuidString,name:name,kind:"offline",uuid:"");accounts.append(account);preferences.selectedAccount=account.id;saveAccounts() }
@@ -159,11 +177,11 @@ import UniformTypeIdentifiers
                 if let value=event["progress"] as? Double,let i=self.works.firstIndex(where:{$0.id==job.id}){self.works[i].progress=value}
                 if let code=event["deviceCode"] as? String{self.deviceCode=code;self.verificationURL=event["url"] as? String}
                 if event["event"] as? String == "launched",let id=arguments["id"] as? String{self.running.insert(id);if let game=self.games.first(where:{$0.id==id}){self.social.begin(game,name:self.displayName(game),id:arguments["historySessionID"] as? String ?? UUID().uuidString)};if let i=self.works.firstIndex(where:{$0.id==job.id}){self.works[i].active=false};self.toast("游戏已启动")}
-            }},completion:{[weak self] result in Task{@MainActor in guard let self else{return};self.processes.removeValue(forKey:job.id);if command=="launch",let id=arguments["id"] as? String{self.social.finish(id)};if command=="migrate"{self.migrating=false};if let i=self.works.firstIndex(where:{$0.id==job.id}){self.works[i].active=false;switch result{case .success:self.works[i].progress=1;case .failure:self.works[i].error=true}}
-                switch result{case .success(let object):done(object);case .failure(let error):self.errorMessage=error.localizedDescription;if let id=arguments["id"] as? String{self.running.remove(id)}}
+            }},completion:{[weak self] result in Task{@MainActor in guard let self else{return};self.processes.removeValue(forKey:job.id);if command=="import"{self.packImporting=false};if command=="launch",let id=arguments["id"] as? String{self.social.finish(id);if let control=self.gameControls.removeValue(forKey:id){try? FileManager.default.removeItem(at:control)}};if command=="migrate"{self.migrating=false};if let i=self.works.firstIndex(where:{$0.id==job.id}){self.works[i].active=false;switch result{case .success:self.works[i].progress=1;case .failure:self.works[i].error=true}}
+                switch result{case .success(let object):done(object);case .failure(let error):self.errorMessage=error.localizedDescription;if command=="launch",let id=arguments["id"] as? String{self.running.remove(id)}}
             }})
             processes[job.id]=process
-        }catch{if command=="migrate"{migrating=false};if let id=arguments["id"] as? String,command=="launch"{running.remove(id)};if let index=works.firstIndex(where:{$0.id==job.id}){works[index].active=false;works[index].error=true};errorMessage=error.localizedDescription}
+        }catch{if command=="import"{packImporting=false};if command=="migrate"{migrating=false};if let id=arguments["id"] as? String,command=="launch"{running.remove(id)};if let index=works.firstIndex(where:{$0.id==job.id}){works[index].active=false;works[index].error=true};errorMessage=error.localizedDescription}
     }
     func loadMods(_ game:GameInstance,force:Bool=false) {
         if modMetadata[game.id] != nil && !force{return}
@@ -176,9 +194,25 @@ import UniformTypeIdentifiers
 
 enum KeychainStore {
     static let service="net.morben.shenggan.accounts"
-    static func write(_ data:Data,id:String)throws {let query=[kSecClass:kSecClassGenericPassword,kSecAttrService:service,kSecAttrAccount:id] as CFDictionary;let update=SecItemUpdate(query,[kSecValueData:data] as CFDictionary);if update==errSecSuccess{return};guard update==errSecItemNotFound else{throw NSError(domain:NSOSStatusErrorDomain,code:Int(update))};let result=SecItemAdd([kSecClass:kSecClassGenericPassword,kSecAttrService:service,kSecAttrAccount:id,kSecValueData:data,kSecAttrAccessible:kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly] as CFDictionary,nil);guard result==errSecSuccess else{throw NSError(domain:NSOSStatusErrorDomain,code:Int(result))}}
-    static func read(_ id:String)->Data? {var value:CFTypeRef?;let result=SecItemCopyMatching([kSecClass:kSecClassGenericPassword,kSecAttrService:service,kSecAttrAccount:id,kSecReturnData:true,kSecMatchLimit:kSecMatchLimitOne] as CFDictionary,&value);return result==errSecSuccess ? value as? Data:nil}
-    static func remove(_ id:String){SecItemDelete([kSecClass:kSecClassGenericPassword,kSecAttrService:service,kSecAttrAccount:id] as CFDictionary)}
+    private static let lock=NSRecursiveLock()
+    private static var cache:[String:Data]=[:]
+    static var remembersSession:Bool{UserDefaults.standard.object(forKey:"harbor.rememberCredentials") as? Bool ?? true}
+    static func clearSession(){lock.lock();defer{lock.unlock()};cache.removeAll()}
+    static func write(_ data:Data,id:String)throws {
+        lock.lock();defer{lock.unlock()}
+        let query=[kSecClass:kSecClassGenericPassword,kSecAttrService:service,kSecAttrAccount:id] as CFDictionary
+        let update=SecItemUpdate(query,[kSecValueData:data] as CFDictionary)
+        if update==errSecSuccess{if remembersSession{cache[id]=data};return}
+        guard update==errSecItemNotFound else{throw NSError(domain:NSOSStatusErrorDomain,code:Int(update))}
+        let result=SecItemAdd([kSecClass:kSecClassGenericPassword,kSecAttrService:service,kSecAttrAccount:id,kSecValueData:data,kSecAttrAccessible:kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly] as CFDictionary,nil)
+        guard result==errSecSuccess else{throw NSError(domain:NSOSStatusErrorDomain,code:Int(result))};if remembersSession{cache[id]=data}
+    }
+    static func read(_ id:String)->Data? {
+        lock.lock();defer{lock.unlock()};if remembersSession,let saved=cache[id]{return saved}
+        var value:CFTypeRef?;let result=SecItemCopyMatching([kSecClass:kSecClassGenericPassword,kSecAttrService:service,kSecAttrAccount:id,kSecReturnData:true,kSecMatchLimit:kSecMatchLimitOne] as CFDictionary,&value)
+        guard result==errSecSuccess,let data=value as? Data else{return nil};if remembersSession{cache[id]=data};return data
+    }
+    static func remove(_ id:String){lock.lock();defer{lock.unlock()};cache.removeValue(forKey:id);SecItemDelete([kSecClass:kSecClassGenericPassword,kSecAttrService:service,kSecAttrAccount:id] as CFDictionary)}
 }
 
 enum JavaBridge {

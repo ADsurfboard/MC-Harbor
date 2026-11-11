@@ -7,6 +7,7 @@ struct HarborModalHost:View {
     let available:CGSize
     var body:some View{
         Group{switch modal{
+        case .collection(let id):ModCollectionPanel(model:model,folderID:id).frame(width:min(850,available.width-70),height:min(710,available.height-96))
         case .install(let version):InstallSheet(model:model,version:version).frame(width:min(480,available.width-70))
         case .offline:OfflineAccountPanel(model:model).frame(width:min(410,available.width-70))
         case .externalAccount:ExternalAccountPanel(model:model).frame(width:min(480,available.width-70))

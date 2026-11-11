@@ -52,3 +52,7 @@ GitHub Actions 配置了 `macos-15-intel` 原生 x86_64 运行器，用于重新
 最终关闭策略使用转发原委托回调的 NSWindowDelegate 代理拦截 windowShouldClose；红色按钮与 performClose 都只隐藏，保留 SwiftUI 场景。独立检查显式完成 NSApplication 启动并等待 AppKit 事件，覆盖空委托注册、原委托 resize 回调转发与快捷关闭，共 25 项本地通过。
 
 独立窗口检查使用 NSApplication.run 主循环和主线程异步等待，让原生标题栏动作在正常 AppKit 事件分派下执行；不再靠嵌套 RunLoop 模拟应用运行。全部 25 项断言保留。
+
+## 1.6.0 验证记录
+
+隔离后端检查包含内容白名单导出、未知分类拒绝、归档私有数据排除，以及仅停止指定 Process、不停止旁路进程。中文搜索加载 HMCL 同款内置名称库，简介支持 MCIM 现成译文及国内翻译。新增模组夹持久化、去重、改名改色和快捷应用检查。锁屏期间无法完成鼠标操作验收，原生离屏渲染只用于检查布局，不能视为真实磨砂材质目视验收。最终 Actions 与发行包哈希见 Release。

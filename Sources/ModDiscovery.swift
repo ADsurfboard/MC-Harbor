@@ -34,7 +34,7 @@ enum ModDiscovery {
         "钠":"sodium","锂":"lithium","铁氧体磁芯":"ferritecore","现代化修复":"ModernFix",
         "物品管理器":"JEI","jei物品管理器":"JEI","配方查询":"JEI","苹果皮":"AppleSkin","玉":"Jade",
         "模组菜单":"Mod Menu","鼠标手势":"Mouse Tweaks","按键冲突":"Controlling","高清修复":"OptiFine",
-        "机械动力":"Create","暮色森林":"Twilight Forest","匠魂":"Tinkers Construct","植物魔法":"Botania",
+        "凿子与比特":"Chisels & Bits","机械动力":"Create","暮色森林":"Twilight Forest","匠魂":"Tinkers Construct","植物魔法":"Botania",
         "应用能源":"Applied Energistics","精妙背包":"Sophisticated Backpacks","旅行地图":"JourneyMap",
         "小地图":"minimap","光影":"shader","动态帧率":"Dynamic FPS","实体渲染":"Entity Culling",
         "布料":"Fabric API","布料接口":"Fabric API","樱花":"Sakura","农夫乐事":"Farmers Delight"
@@ -95,7 +95,7 @@ actor ModTextTranslation {
     func translate(_ text:String,toChinese:Bool=true)async throws->String {
         if ModDiscovery.identifierOnly(text){return text}
         if !loaded{loaded=true;cache=(try? JSONDecoder().decode([String:String].self,from:Data(contentsOf:file))) ?? [:]}
-        let pair=toChinese ? "en|zh-CN":"zh-CN|en",key=pair+"|"+text
+        let pair=toChinese ? "en|zh-CN":"zh-CN|en",key=DomesticTranslation.provider+"|"+pair+"|"+text
         if let saved=cache[key]{return saved}
         // Limit simultaneous visible-row translations and check the cache again
         // after waiting, so duplicate summaries do not consume remote quota.
@@ -120,6 +120,7 @@ actor ModTextTranslation {
     static func searchQuery(_ original:String)async->String {
         guard original.range(of:"[\\p{Han}]",options:.regularExpression) != nil else{return original}
         if let known=ModDiscovery.knownQuery(original){return known}
+        if let indexed=await ModNameIndex.shared.query(original){return indexed}
         return (try? await shared.translate(original,toChinese:false)) ?? original
     }
 }
@@ -135,17 +136,7 @@ actor PublicModTranslation {
         return result
     }
     func translate(_ text:String,toChinese:Bool)async throws->String {
-        if Date()>=primaryRetryAfter {
-            do {
-                var url=URLComponents(string:"https://api.mymemory.translated.net/get")!
-                url.queryItems=[.init(name:"q",value:text),.init(name:"langpair",value:toChinese ? "en|zh-CN":"zh-CN|en")]
-                return try LegacyLanguageTranslation.parseResponse(await HarborHTTP.data(url.url!,limit:100_000),source:text)
-            }catch{try Task.checkCancellation();primaryRetryAfter=Date().addingTimeInterval(600)}
-        }
-        // The Googletrans project documents this public web endpoint. It has no SLA.
-        var url=URLComponents(string:"https://translate.googleapis.com/translate_a/single")!
-        url.queryItems=[.init(name:"client",value:"gtx"),.init(name:"sl",value:toChinese ? "en":"zh-CN"),.init(name:"tl",value:toChinese ? "zh-CN":"en"),.init(name:"dt",value:"t"),.init(name:"q",value:text)]
-        return try Self.parseBackup(await HarborHTTP.data(url.url!,limit:100_000),source:text)
+        try await DomesticTranslation.query(text,toChinese:toChinese)
     }
 }
 

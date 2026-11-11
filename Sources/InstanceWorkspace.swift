@@ -19,6 +19,7 @@ struct InstanceWorkspace:View {
                 VStack(alignment:.leading,spacing:5){Text(model.displayName(game)).font(.system(size:27,weight:.semibold)).lineLimit(1);Text(game.version+" · "+game.loader).font(.system(size:11)).harborSecondaryText()}
                 Spacer()
                 Button{model.launch(game)}label:{Label(model.running.contains(game.id) ? "运行中":"启动",systemImage:"play.fill")}.buttonStyle(HarborButtonStyle(prominent:true)).disabled(model.running.contains(game.id))
+                if model.running.contains(game.id){Button{model.stopGame(game)}label:{Label("关闭游戏",systemImage:"stop.fill")}.buttonStyle(HarborButtonStyle())}
                 Menu{Button("打开实例目录"){model.open(game.runDirectory)};Button("校验与修复"){model.repair(game)};Button("备份存档"){model.backup(game)};Button("导出整合包…"){model.exportPack(game)};Button("创建实例快捷方式…"){model.createInstanceShortcut(game)};Divider();Button(model.preferences.favorites.contains(game.id) ? "取消收藏":"收藏"){model.favorite(game)};Divider();Button("删除实例…",role:.destructive){model.deleteInstance(game)}.disabled(model.running.contains(game.id))}label:{HarborSymbol(systemName:"ellipsis").frame(width:34,height:34).contentShape(Circle())}.menuStyle(.borderlessButton).frame(width:34)
                 Button{model.inspectedGame=nil}label:{HarborSymbol(systemName:"xmark").frame(width:16,height:18)}.buttonStyle(HarborButtonStyle()).help("关闭实例管理")
             }.padding(.horizontal,28).padding(.top,26).padding(.bottom,22)
@@ -39,6 +40,7 @@ struct InstanceWorkspace:View {
 
         .clipShape(RoundedRectangle(cornerRadius:28))
         .onExitCommand{model.inspectedGame=nil}
+        .onReceive(NotificationCenter.default.publisher(for:Notification.Name("HarborOpenLocalization"))){_ in tab = .localization}
         .task(id:game.id){tab = game.loader == "Minecraft" ? .worlds:.mods;model.loadMods(game);model.loadResourceIndex(game)}
     }
 }
@@ -50,30 +52,24 @@ private struct ModWorkspace:View {
     @State private var filter="all"
     @State private var selection:Set<String>=[]
     @State private var translate=true
-    @State private var sortOrder=[KeyPathComparator(\ModFile.name,order:.forward)]
     private var mods:[ModFile]{model.modMetadata[game.id] ?? NativeScanner.mods(game)}
-    private var filtered:[ModFile]{mods.filter{(filter=="all" || $0.enabled == (filter=="enabled")) && (query.isEmpty || ($0.name+" "+$0.version+" "+$0.authors+" "+$0.modID+" "+ModDiscovery.chineseName($0)+" "+$0.path.lastPathComponent).localizedCaseInsensitiveContains(query))}.sorted(using:sortOrder)}
+    private var filtered:[ModFile]{mods.filter{(filter=="all" || $0.enabled == (filter=="enabled")) && (query.isEmpty || ($0.name+" "+$0.version+" "+$0.authors+" "+$0.modID+" "+ModDiscovery.chineseName($0)+" "+$0.path.lastPathComponent).localizedCaseInsensitiveContains(query))}.sorted{$0.name.localizedStandardCompare($1.name) == .orderedAscending}}
     private var selected:[ModFile]{mods.filter{selection.contains($0.id)}}
-    var body:some View {
-        VStack(spacing:0){
-            HStack(spacing:12){SearchBox(prompt:"搜索中英文名称、作者或模组 ID",query:$query);Toggle("汉化",isOn:$translate).toggleStyle(.switch).controlSize(.mini);Picker("状态",selection:$filter){Text("全部").tag("all");Text("已启用").tag("enabled");Text("已停用").tag("disabled")}.labelsHidden().frame(width:100);Button{model.modal = .addons(game,.mods)}label:{Label("下载模组",systemImage:"arrow.down.circle")}.buttonStyle(HarborButtonStyle(prominent:true));Button{model.importContent(game,kind:.mods)}label:{HarborSymbol(systemName:"plus")}.buttonStyle(HarborButtonStyle()).help("导入本地模组")}.padding(20)
-            Table(filtered,selection:$selection,sortOrder:$sortOrder){
-                TableColumn("模组",value:\.name){mod in HStack(spacing:11){ResourceArtwork(iconPath:model.resourceRecords[mod.path.path]?.iconPath ?? mod.iconPath,fallback:"puzzlepiece.extension.fill").frame(width:28,height:28).opacity(mod.enabled ? 1:0.45);VStack(alignment:.leading,spacing:3){Text(translate && !ModDiscovery.chineseName(mod).isEmpty ? ModDiscovery.chineseName(mod):mod.name).font(.system(size:12,weight:.medium)).lineLimit(1);Text(mod.name+" · "+(mod.modID.isEmpty ? mod.path.lastPathComponent:mod.modID)).font(.system(size:10)).harborSecondaryText().lineLimit(1)}}.padding(.vertical,5)}.width(min:200,ideal:300)
-                TableColumn("版本",value:\.version){mod in Text(mod.version).font(.system(size:11,design:.monospaced)).lineLimit(1)}.width(min:80,ideal:125,max:190)
-                TableColumn("作者",value:\.authors){mod in Text(mod.authors).font(.system(size:11)).harborSecondaryText().lineLimit(1)}.width(min:80,ideal:145,max:200)
-                TableColumn("大小",value:\.size){mod in Text(ByteCountFormatter.string(fromByteCount:mod.size,countStyle:.file)).font(.system(size:10,design:.monospaced)).harborSecondaryText()}.width(75)
-                TableColumn("来源"){mod in ResourceSourceButton(model:model,path:mod.path.path)}.width(42)
-                TableColumn("启用"){mod in Toggle("启用 "+mod.name,isOn:Binding(get:{mod.enabled},set:{enabled in model.setMods([mod],enabled:enabled,game:game)})).labelsHidden().toggleStyle(.switch).controlSize(.mini).disabled(model.running.contains(game.id))}.width(52)
-            }
-            .tableStyle(.inset(alternatesRowBackgrounds:true)).harborHideScrollBackground().background(TableChromeAnchor(minimumRowHeight:56))
-            .harborSelectionMenu(selection:selection){ids in let files=mods.filter{ids.contains($0.id)};if !files.isEmpty{Button("启用"){model.setMods(files,enabled:true,game:game)};Button("停用"){model.setMods(files,enabled:false,game:game)};Button("在 Finder 中显示"){NSWorkspace.shared.activateFileViewerSelecting(files.map(\.path))};Divider();Button("移到废纸篓",role:.destructive){model.trashContent(files.map(\.path),game:game)}}}
-            .overlay{if filtered.isEmpty{HarborEmptyView(query.isEmpty ? "暂无模组":"没有匹配的模组",systemImage:"puzzlepiece.extension")}}
-            .harborDropFiles{urls in model.copyContent(urls,game:game,kind:.mods)}
-            if let mod=selected.first,translate{InstalledModTranslation(model:model,mod:mod).padding(.horizontal,22).padding(.vertical,10).frame(maxWidth:.infinity,alignment:.leading)}
-            Divider().opacity(0.35)
-            HStack(spacing:13){Text(selection.isEmpty ? "\(mods.count) 个模组 · \(mods.filter(\.enabled).count) 个启用":"已选择 \(selection.count) 个").font(.system(size:11)).harborSecondaryText();Spacer();if !selection.isEmpty{Button("启用"){model.setMods(selected,enabled:true,game:game)};Button("停用"){model.setMods(selected,enabled:false,game:game)};Button{model.trashContent(selected.map(\.path),game:game);selection=[]}label:{HarborSymbol(systemName:"trash")}.help("移到废纸篓")};Button{model.loadMods(game,force:true)}label:{HarborSymbol(systemName:"arrow.clockwise")}.help("重新读取")}.buttonStyle(HarborBareButtonStyle()).padding(.horizontal,22).frame(height:43)
-        }
-    }
+    var body:some View{VStack(spacing:0){
+        HStack(spacing:12){SearchBox(prompt:"搜索中英文名称、作者或 ID",query:$query);Toggle("简介汉化",isOn:$translate).toggleStyle(.switch).controlSize(.mini);Picker("状态",selection:$filter){Text("全部").tag("all");Text("已启用").tag("enabled");Text("已停用").tag("disabled")}.labelsHidden().frame(width:100);Button{model.modal = .addons(game,.mods)}label:{Label("下载",systemImage:"arrow.down.circle")}.buttonStyle(HarborButtonStyle(prominent:true));Button{model.importContent(game,kind:.mods)}label:{Image(systemName:"plus").frame(width:22,height:22)}.buttonStyle(HarborButtonStyle())}.padding(20)
+        ScrollView{LazyVStack(spacing:10){ForEach(filtered){mod in row(mod)}}.padding(.horizontal,20).padding(.bottom,16)}.frame(maxHeight:.infinity).overlay{if filtered.isEmpty{HarborEmptyView("没有匹配的模组",systemImage:"puzzlepiece.extension")}}.harborDropFiles{model.copyContent($0,game:game,kind:.mods)}
+        if translate,let mod=selected.first{ScrollView{InstalledModTranslation(model:model,mod:mod).frame(maxWidth:.infinity,alignment:.leading).padding(16)}.frame(maxHeight:92)}
+        Divider().opacity(0.3)
+        HStack(spacing:12){Button(selection.count==filtered.count && !filtered.isEmpty ? "取消全选":"全选"){selection=selection.count==filtered.count ? []:Set(filtered.map(\.id))};Text("已选 \(selection.count) / \(mods.count)").font(.system(size:11)).harborSecondaryText();Spacer();if !selection.isEmpty{Button("语言汉化"){model.localizationPaths=Set(selected.map{$0.path.path});NotificationCenter.default.post(name:Notification.Name("HarborOpenLocalization"),object:nil)};Menu("收藏到模组夹"){ForEach(ModCollectionStore.shared.folders){folder in Button(folder.name){model.collectMods(selected,folder:folder.id)}};Button("新建模组夹…"){do{if let id=try ModCollectionStore.shared.promptCreate(){model.collectMods(selected,folder:id)}}catch{model.errorMessage=error.localizedDescription}}};Button("启用"){model.setMods(selected,enabled:true,game:game)};Button("停用"){model.setMods(selected,enabled:false,game:game)};Button("移到废纸篓",role:.destructive){model.trashContent(selected.map(\.path),game:game);selection=[]}};Button{model.loadMods(game,force:true)}label:{Image(systemName:"arrow.clockwise").frame(width:22,height:22)}}.buttonStyle(HarborButtonStyle()).padding(.horizontal,20).frame(height:56)
+    }}
+    private func row(_ mod:ModFile)->some View{HStack(spacing:14){
+        Toggle("选择 "+mod.name,isOn:Binding(get:{selection.contains(mod.id)},set:{if $0{selection.insert(mod.id)}else{selection.remove(mod.id)}})).labelsHidden().toggleStyle(.checkbox)
+        ResourceArtwork(iconPath:model.resourceRecords[mod.path.path]?.iconPath ?? mod.iconPath,fallback:"puzzlepiece.extension.fill").frame(width:42,height:42).clipped().opacity(mod.enabled ? 1:0.45)
+        VStack(alignment:.leading,spacing:6){Text(translate && !ModDiscovery.chineseName(mod).isEmpty ? ModDiscovery.chineseName(mod)+" · "+mod.name:mod.name).font(.system(size:13,weight:.semibold)).lineLimit(1);Text([mod.modID,mod.version,mod.authors].filter{!$0.isEmpty}.joined(separator:" · ")).font(.system(size:11)).harborSecondaryText().lineLimit(1);Text(mod.path.lastPathComponent).font(.system(size:10,design:.monospaced)).harborSecondaryText().lineLimit(1)}.frame(maxWidth:.infinity,alignment:.leading).clipped()
+        Text(ByteCountFormatter.string(fromByteCount:mod.size,countStyle:.file)).font(.system(size:10)).harborSecondaryText().frame(width:66,alignment:.trailing)
+        ResourceSourceButton(model:model,path:mod.path.path)
+        Toggle("启用 "+mod.name,isOn:Binding(get:{mod.enabled},set:{model.setMods([mod],enabled:$0,game:game)})).labelsHidden().toggleStyle(.switch).controlSize(.mini).disabled(model.running.contains(game.id)).frame(width:38)
+    }.padding(.horizontal,16).frame(height:92).background(selection.contains(mod.id) ? model.controlTint.opacity(0.1):Color.primary.opacity(0.035),in:RoundedRectangle(cornerRadius:16)).overlay(RoundedRectangle(cornerRadius:16).stroke(selection.contains(mod.id) ? model.controlTint.opacity(0.5):Color.clear,lineWidth:0.7)).contentShape(RoundedRectangle(cornerRadius:16)).onTapGesture{if selection.contains(mod.id){selection.remove(mod.id)}else{selection.insert(mod.id)}}.contextMenu{Button("在 Finder 中显示"){NSWorkspace.shared.activateFileViewerSelecting([mod.path])};Button("移到废纸篓",role:.destructive){model.trashContent([mod.path],game:game)}}}
 }
 
 struct SearchBox:View {
@@ -98,22 +94,19 @@ struct LocalContent:Identifiable,Sendable {
 
 private struct ContentWorkspace:View {
     @ObservedObject var model:LauncherModel
-    let game:GameInstance
-    let kind:ContentKind
+    let game:GameInstance;let kind:ContentKind
     @State private var query=""
     @State private var files:[LocalContent]=[]
     @State private var selection:Set<String>=[]
     private var directory:URL{URL(fileURLWithPath:game.runDirectory).appendingPathComponent(kind.rawValue)}
     private var filtered:[LocalContent]{files.filter{query.isEmpty || $0.name.localizedCaseInsensitiveContains(query)}}
+    private var selected:[LocalContent]{files.filter{selection.contains($0.id)}}
     var body:some View{VStack(spacing:0){
-        HStack(spacing:12){SearchBox(prompt:"搜索"+kind.title,query:$query);Button{model.modal = .addons(game,kind)}label:{Label("下载"+kind.title,systemImage:"arrow.down.circle")}.buttonStyle(HarborButtonStyle(prominent:true));Button{model.importContent(game,kind:kind)}label:{HarborSymbol(systemName:"plus")}.buttonStyle(HarborButtonStyle()).help("导入本地"+kind.title)}.padding(20)
-        Table(filtered,selection:$selection){TableColumn(kind.title){file in HStack(spacing:12){ResourceArtwork(iconPath:model.resourceRecords[file.url.path]?.iconPath,fallback:kind.symbol).frame(width:32,height:32);VStack(alignment:.leading,spacing:4){Text(file.name.replacingOccurrences(of:".disabled",with:"")).font(.system(size:13,weight:.medium));Text(file.isDirectory ? "文件夹":file.url.pathExtension.uppercased()).font(.system(size:10)).harborSecondaryText()}}.padding(.vertical,8)}.width(min:250,ideal:500);TableColumn("大小"){file in Text(file.isDirectory ? "—":ByteCountFormatter.string(fromByteCount:file.bytes,countStyle:.file)).font(.system(size:11)).harborSecondaryText()}.width(95);TableColumn("来源"){file in ResourceSourceButton(model:model,path:file.url.path)}.width(42);TableColumn("可用"){file in Toggle(file.name,isOn:Binding(get:{file.active},set:{on in model.setContentActive(file.url,active:on,game:game)})).labelsHidden().toggleStyle(.switch).controlSize(.mini)}.width(55)}.tableStyle(.inset(alternatesRowBackgrounds:true)).harborHideScrollBackground().background(TableChromeAnchor(minimumRowHeight:62))
-            .harborSelectionMenu(selection:selection){ids in let urls=files.filter{ids.contains($0.id)}.map(\.url);if !urls.isEmpty{Button("在 Finder 中显示"){NSWorkspace.shared.activateFileViewerSelecting(urls)};Button("移到废纸篓",role:.destructive){model.trashContent(urls,game:game)}}}
-            .overlay{if filtered.isEmpty{HarborEmptyView("暂无"+kind.title,systemImage:kind.symbol)}}
-            .harborDropFiles{urls in model.copyContent(urls,game:game,kind:kind)}
-        Divider().opacity(0.35);HStack{Text("\(files.count) 个"+kind.title).harborSecondaryText();Spacer();if !selection.isEmpty{Button("在 Finder 中显示"){NSWorkspace.shared.activateFileViewerSelecting(files.filter{selection.contains($0.id)}.map(\.url))};Button("移到废纸篓",role:.destructive){model.trashContent(files.filter{selection.contains($0.id)}.map(\.url),game:game);selection=[]}};Button{refresh()}label:{HarborSymbol(systemName:"arrow.clockwise")}}.font(.system(size:11)).buttonStyle(HarborBareButtonStyle()).padding(.horizontal,22).frame(height:43)
+        HStack{SearchBox(prompt:"搜索"+kind.title,query:$query);Button{model.modal = .addons(game,kind)}label:{Label("下载"+kind.title,systemImage:"arrow.down.circle")}.buttonStyle(HarborButtonStyle(prominent:true));Button{model.importContent(game,kind:kind)}label:{Image(systemName:"plus").frame(width:22,height:22)}.buttonStyle(HarborButtonStyle())}.padding(20)
+        ScrollView{LazyVStack(spacing:10){ForEach(filtered){file in HStack(spacing:14){Toggle("选择 "+file.name,isOn:Binding(get:{selection.contains(file.id)},set:{if $0{selection.insert(file.id)}else{selection.remove(file.id)}})).labelsHidden().toggleStyle(.checkbox);ResourceArtwork(iconPath:model.resourceRecords[file.url.path]?.iconPath,fallback:kind.symbol).frame(width:44,height:44).clipped();VStack(alignment:.leading,spacing:7){Text(file.name.replacingOccurrences(of:".disabled",with:"")).font(.system(size:13,weight:.medium)).lineLimit(2);Text(file.isDirectory ? "文件夹":ByteCountFormatter.string(fromByteCount:file.bytes,countStyle:.file)).font(.system(size:11)).harborSecondaryText()}.frame(maxWidth:.infinity,alignment:.leading).clipped();ResourceSourceButton(model:model,path:file.url.path);Toggle("启用 "+file.name,isOn:Binding(get:{file.active},set:{model.setContentActive(file.url,active:$0,game:game)})).labelsHidden().toggleStyle(.switch).controlSize(.mini).disabled(model.running.contains(game.id))}.padding(.horizontal,16).frame(height:88).background(selection.contains(file.id) ? model.controlTint.opacity(0.1):Color.primary.opacity(0.035),in:RoundedRectangle(cornerRadius:16)).contentShape(RoundedRectangle(cornerRadius:16)).onTapGesture{if selection.contains(file.id){selection.remove(file.id)}else{selection.insert(file.id)}}}}.padding(.horizontal,20).padding(.bottom,16)}.frame(maxHeight:.infinity).overlay{if filtered.isEmpty{HarborEmptyView("暂无"+kind.title,systemImage:kind.symbol)}}.harborDropFiles{model.copyContent($0,game:game,kind:kind)}
+        Divider().opacity(0.3);HStack(spacing:12){Button(selection.count==filtered.count && !filtered.isEmpty ? "取消全选":"全选"){selection=selection.count==filtered.count ? []:Set(filtered.map(\.id))};Text("已选 \(selection.count) / \(files.count)").font(.system(size:11)).harborSecondaryText();Spacer();if !selection.isEmpty{Button("启用"){model.setContentsActive(selected,active:true,game:game)};Button("停用"){model.setContentsActive(selected,active:false,game:game)};Button("在 Finder 中显示"){NSWorkspace.shared.activateFileViewerSelecting(selected.map(\.url))};Button("移到废纸篓",role:.destructive){model.trashContent(selected.map(\.url),game:game);selection=[]}};Button{refresh()}label:{Image(systemName:"arrow.clockwise").frame(width:22,height:22)}}.buttonStyle(HarborButtonStyle()).padding(.horizontal,20).frame(height:56)
     }.task(id:kind){refresh()}.onReceive(model.contentChanged){_ in refresh()}}
-    private func refresh(){let dir=directory;Task{files=await Task.detached{LocalContent.read(dir)}.value}}
+    private func refresh(){let dir=directory;Task{files=await Task.detached{LocalContent.read(dir)}.value;selection.formIntersection(Set(files.map(\.id)))}}
 }
 
 private struct WorldWorkspace:View {

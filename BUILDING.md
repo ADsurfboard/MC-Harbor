@@ -14,6 +14,6 @@ python3 tools/check-intel-backend.py
 
 输出 `build/MC Harbor.app`，采用临时签名，未 Apple 公证。源码中的 `vendor/HMCLCore.jar` 与 `upstream/HMCL-3.16.4-source.tar.gz` 对应原 HMCL GPL 内核，`backend/corepatch` 是无窗口桥接补丁。游戏本身需要的 Java 仍按实例版本处理，老显卡、模组和认证服务可能有额外要求。
 
-macOS 15 及以上使用 Apple Translation；macOS 12—14 在用户确认后可用 MyMemory 免费在线补全，匿名额度为每天 5000 字符，未完成内容保留并可手动翻译 / 提取给 AI。发送内容、额度和第三方边界在应用中说明。好友服务默认已内置；Sakura、陶瓦及服务额度见 [docs/SERVICES.md](docs/SERVICES.md)。
+macOS 15 及以上使用 Apple Translation；各版本可在用户确认后选择国内 B站 Index-Translate 在线补全，或配置自己的阿里云 Qwen-MT 密钥，未完成内容保留并可手动翻译 / 提取给 AI。发送内容、额度和第三方边界在应用中说明。好友服务默认已内置；Sakura、陶瓦及服务额度见 [docs/SERVICES.md](docs/SERVICES.md)。
 
 测试使用新建隔离夹具，严禁用真实存档或真实身份测试。目标系统、实际运行环境、未覆盖部分见 [docs/QA-INTEL.md](docs/QA-INTEL.md)。`tools/package-delivery.py` 在提交干净后生成安装包、对应源码 ZIP、介绍 PDF 和 SHA256 清单，不包含玩家数据、凭据或原始音效。

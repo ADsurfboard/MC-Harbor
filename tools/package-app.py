@@ -1,6 +1,6 @@
 """Package the native app with its own headless Java runtime; never copies player data."""
 from pathlib import Path
-import os, plistlib, shutil, subprocess
+import os, plistlib, shutil, subprocess, zipfile
 
 root=Path(__file__).resolve().parent.parent
 build=root/'build'
@@ -9,13 +9,17 @@ if app.exists():shutil.rmtree(app)
 contents=app/'Contents';resources=contents/'Resources';macos=contents/'MacOS'
 for directory in [resources,macos]:directory.mkdir(parents=True,exist_ok=True)
 shutil.copy2(build/'MCHarbor',macos/'MCHarbor')
+subprocess.run(['swiftc','-O','-target','x86_64-apple-macos12.0',str(root/'tools/InstanceShortcut.swift'),'-o',str(resources/'InstanceShortcut')],check=True)
+subprocess.run(['/usr/bin/codesign','--force','--sign','-',str(resources/'InstanceShortcut')],check=True)
 with (contents/'Info.plist').open('wb') as file:
-    plistlib.dump({'CFBundleName':'MC Harbor','CFBundleDisplayName':'MC Harbor','CFBundleExecutable':'MCHarbor','CFBundleIdentifier':'net.morben.shenggan.launcher','CFBundlePackageType':'APPL','CFBundleVersion':'153','CFBundleShortVersionString':'1.5.3','CFBundleIconFile':'HarborMark.icns','LSMinimumSystemVersion':'12.0','LSArchitecturePriority':['x86_64'],'NSHighResolutionCapable':True,'NSPrincipalClass':'NSApplication','CFBundleURLTypes':[{'CFBundleURLName':'MC Harbor Instance Shortcut','CFBundleURLSchemes':['mcharbor'],'CFBundleTypeRole':'Viewer'}],'NSHumanReadableCopyright':'HMCL © huangyuhui and contributors. Native interface adapted from WinHarbor. GPL-3.0-or-later.'},file)
+    plistlib.dump({'CFBundleName':'MC Harbor','CFBundleDisplayName':'MC Harbor','CFBundleExecutable':'MCHarbor','CFBundleIdentifier':'net.morben.shenggan.launcher','CFBundlePackageType':'APPL','CFBundleVersion':'160','CFBundleShortVersionString':'1.6.0','CFBundleIconFile':'HarborMark.icns','LSMinimumSystemVersion':'12.0','LSArchitecturePriority':['x86_64'],'NSHighResolutionCapable':True,'NSPrincipalClass':'NSApplication','CFBundleURLTypes':[{'CFBundleURLName':'MC Harbor Instance Shortcut','CFBundleURLSchemes':['mcharbor'],'CFBundleTypeRole':'Viewer'}],'NSHumanReadableCopyright':'HMCL © huangyuhui and contributors. Native interface adapted from WinHarbor. GPL-3.0-or-later.'},file)
 shutil.copy2(build/'Backend.jar',resources/'Backend.jar')
 core=Path(os.environ.get('HMCL_CORE_JAR',str(root/'vendor/HMCLCore.jar' if (root/'vendor/HMCLCore.jar').exists() else Path('/Applications/稳定版我的世界启动器.jar'))))
 shutil.copy2(core,resources/'HMCLCore.jar')
 for name in ['Loaders','Brand','SkinViewer','Skins','Localization','Contributors']:
     shutil.copytree(root/'Assets'/name,resources/name,dirs_exist_ok=True)
+with zipfile.ZipFile(core) as upstream:
+    (resources/'Localization/mod_data.txt').write_bytes(upstream.read('assets/mod_data.txt'))
 for name in ['welcome.mp3','welcome-male.mp3','welcome-female2.mp3','welcome-male2.mp3']:
     shutil.copy2(root/'Assets/Voice'/name,resources/name)
 shutil.copy2(root/'Assets/Services.json',resources/'Services.json')

@@ -29,27 +29,16 @@ struct AddonPlanItem:Identifiable,Sendable{let version:AddonVersion;let file:Add
 private struct AddonReceipt:Codable{let projectId:String;let versionId:String;let filename:String;let kind:String}
 
 enum AddonService {
-    static let session:URLSession={let c=URLSessionConfiguration.ephemeral;c.timeoutIntervalForRequest=20;c.timeoutIntervalForResource=180;c.httpAdditionalHeaders=["User-Agent":"MC-harbor/1.0 (native macOS launcher; local personal build)"];return URLSession(configuration:c)}()
+    static let session:URLSession={let c=URLSessionConfiguration.ephemeral;c.timeoutIntervalForRequest=20;c.timeoutIntervalForResource=180;c.httpAdditionalHeaders=["User-Agent":"MC-Harbor/1.6.0 (+https://github.com/ADsurfboard/MC-Harbor)"];return URLSession(configuration:c)}()
     private static let decoder:JSONDecoder={let d=JSONDecoder();d.keyDecodingStrategy = .convertFromSnakeCase;return d}()
     static func loader(_ game:GameInstance)->String{game.loader == "Legacy Fabric" ? "fabric":game.loader == "Cleanroom" ? "forge":game.loader.lowercased()}
     static func request<T:Decodable>(_ path:String,query:[URLQueryItem]=[])async throws->T{
-        var components=URLComponents(string:"https://api.modrinth.com/v2"+path)!;components.queryItems=query
-        for attempt in 0..<3 {
-            do {
-                try Task.checkCancellation()
-                let (data,response)=try await session.data(from:components.url!)
-                let status=(response as? HTTPURLResponse)?.statusCode ?? 0
-                if status==429 || status>=500{throw URLError(.resourceUnavailable)}
-                guard status==200 else{throw FileTransactions.error("Modrinth 暂不可用（HTTP \(status)）。")}
-                guard data.count<24_000_000 else{throw FileTransactions.error("服务返回的数据过大。")}
-                return try decoder.decode(T.self,from:data)
-            }catch {
-                try Task.checkCancellation()
-                guard attempt<2,error is URLError else{throw error}
-                try await HarborDelay.sleep(seconds:Double(attempt+1))
-            }
+        var last:Error=FileTransactions.error("资源来源暂不可用。")
+        for base in ResourceMirror.metadataBases {
+            var components=URLComponents(string:base+path)!;components.queryItems=query
+            do{try Task.checkCancellation();let (data,response)=try await session.data(from:components.url!);let status=(response as? HTTPURLResponse)?.statusCode ?? 0;guard status==200,data.count<24_000_000 else{throw FileTransactions.error("资源来源返回 HTTP \(status)。")};return try decoder.decode(T.self,from:data)}catch{last=error;try Task.checkCancellation()}
         }
-        throw FileTransactions.error("Modrinth 多次请求失败，请检查网络后重试。")
+        throw last
     }
 
     static func search(_ query:String,game:GameInstance,kind:ContentKind,offset:Int=0,section:ModSection = .all)async throws->AddonSearch{
@@ -112,9 +101,16 @@ enum AddonService {
             try Task.checkCancellation();await progress(Double(index)/Double(max(plan.count,1)),item.file.filename)
             let target=destination.appendingPathComponent(item.file.filename)
             if fm.fileExists(atPath:target.path),try await Task.detached(operation:{try verify(target,file:item.file)}).value{continue}
-            guard let url=URL(string:item.file.url),url.scheme=="https" else{throw FileTransactions.error("下载地址无效。")}
+            guard let url=URL(string:item.file.url) else{throw FileTransactions.error("资源地址无效。")}
             let local=stagedFiles.appendingPathComponent(item.file.filename)
-            _ = try await ResourceTransfer.download(item.file,to:local,source:source){fraction,message in await progress((Double(index)+fraction)/Double(max(plan.count,1)),message)}
+            if url.isFileURL {
+                let allowed=NativePaths.root.appendingPathComponent("mod-collections/files").standardizedFileURL.resolvingSymlinksInPath().path+"/"
+                guard url.standardizedFileURL.resolvingSymlinksInPath().path.hasPrefix(allowed),(try url.resourceValues(forKeys:[.isSymbolicLinkKey])).isSymbolicLink != true else{throw FileTransactions.error("本地收藏不属于此启动器的模组夹。")}
+                try await Task.detached{try fm.copyItem(at:url,to:local)}.value
+            }else{
+                guard url.scheme=="https" else{throw FileTransactions.error("下载地址无效。")}
+                _ = try await ResourceTransfer.download(item.file,to:local,source:source){fraction,message in await progress((Double(index)+fraction)/Double(max(plan.count,1)),message)}
+            }
             guard try await Task.detached(operation:{try verify(local,file:item.file)}).value else{throw FileTransactions.error("文件完整性校验失败："+item.file.filename)}
             toCommit.append(item)
         }
@@ -128,7 +124,9 @@ enum AddonService {
         for item in toCommit{for old in receipts where old.projectId==item.version.projectId && old.kind==kind.rawValue{let url=destination.appendingPathComponent(old.filename);if fm.fileExists(atPath:url.path){replacementPaths.insert(url)}}}
         if kind == .mods,!toCommit.isEmpty{
             let incoming=try await modIndex(stage,game:game)
-            let ids=Set(incoming.compactMap{$0["modId"] as? String}.filter{!$0.isEmpty})
+            let incomingIDs=incoming.compactMap{$0["modId"] as? String}.filter{!$0.isEmpty}
+            guard Set(incomingIDs).count==incomingIDs.count else{throw FileTransactions.error("所选模组中包含同一模组的多个版本，请先移除重复项。")}
+            let ids=Set(incomingIDs)
             let existing=try await modIndex(run,game:game)
             for file in existing{if let id=file["modId"] as? String,ids.contains(id),let path=file["path"] as? String{replacementPaths.insert(URL(fileURLWithPath:path))}}
         }
@@ -250,7 +248,7 @@ struct AddonBrowser:View {
             HStack(alignment:.top,spacing:12){AddonIcon(url:project.iconUrl).frame(width:43,height:43);VStack(alignment:.leading,spacing:5){
                 HStack{Text(suggestion?.chinese ?? project.title).font(.system(size:13,weight:.medium)).lineLimit(1);if let suggestion,ModDiscovery.installed(suggestion,mods:installedMods){Text("已安装").font(.system(size:9)).foregroundStyle(model.accentTextColor)}}
                 Text(suggestion == nil ? project.author:project.title).font(.system(size:10)).harborSecondaryText()
-                if let suggestion{Text(suggestion.reason).font(.system(size:11)).harborSecondaryText().lineLimit(2)}else{ModSummaryText(text:project.description,enabled:model.preferences.translateModDescriptions,compact:true)}
+                if let suggestion{Text(suggestion.reason).font(.system(size:11)).harborSecondaryText().lineLimit(2)}else{ModSummaryText(text:project.description,enabled:model.preferences.translateModDescriptions,compact:true,projectID:project.id,source:source)}
             };Spacer(minLength:0)}.padding(12).frame(maxWidth:.infinity,alignment:.leading).background(model.controlTint.opacity(selected?.id==project.id ? 0.11:0.025),in:RoundedRectangle(cornerRadius:16)).contentShape(RoundedRectangle(cornerRadius:16))
         }.buttonStyle(HarborBareButtonStyle())
     }
@@ -258,9 +256,9 @@ struct AddonBrowser:View {
         if let project=selected{ScrollView{VStack(alignment:.leading,spacing:20){
             AddonIcon(url:project.iconUrl).frame(width:72,height:72)
             Text(project.title).font(.system(size:28,weight:.semibold))
-            if kind == .mods{remarkEditor(project)}
+            if kind == .mods{remarkEditor(project);Menu("收藏到模组夹"){ForEach(ModCollectionStore.shared.folders){folder in Button(folder.name){do{try ModCollectionStore.shared.add(project,source:source,to:folder.id);model.toast("已收藏")}catch{failure=error.localizedDescription}}};Button("新建模组夹…"){do{if let id=try ModCollectionStore.shared.promptCreate(){try ModCollectionStore.shared.add(project,source:source,to:id)}}catch{failure=error.localizedDescription}}}.buttonStyle(HarborButtonStyle())}
             if let suggestion=selectedSuggestion{Text(suggestion.chinese+" · "+suggestion.reason).font(.system(size:13)).foregroundStyle(model.accentTextColor)}
-            ModSummaryText(text:project.description,enabled:model.preferences.translateModDescriptions,compact:false)
+            ModSummaryText(text:project.description,enabled:model.preferences.translateModDescriptions,compact:false,projectID:project.id,source:source)
             HStack{Text(project.author);Spacer();Text(project.downloads,format:.number.notation(.compactName));HarborSymbol(systemName:"arrow.down")}.font(.system(size:11)).foregroundStyle(.secondary)
             if preparing{ProgressView().controlSize(.small)}
             if !versions.isEmpty{Picker("版本",selection:$versionID){ForEach(versions){Text($0.versionNumber).tag($0.id)}}}
@@ -281,6 +279,8 @@ struct AddonBrowser:View {
 }
 struct ModSummaryText:View {
     let text:String;let enabled:Bool;let compact:Bool
+    var projectID:String?=nil
+    var source:AddonSource = .modrinth
     @State private var translated:String?
     @State private var original=false
     @State private var failed=false
@@ -290,12 +290,12 @@ struct ModSummaryText:View {
         VStack(alignment:.leading,spacing:6){Text(enabled && !original ? translated ?? text:text).font(.system(size:compact ? 11:12)).harborSecondaryText().lineLimit(compact ? 2:nil)
             if failed && needsTranslation{Button("翻译未完成 · 重试"){retry+=1}.font(.system(size:10)).buttonStyle(HarborBareButtonStyle())}
             if !compact && needsTranslation{HStack{if translated != nil{Button(original ? "查看中文译文":"查看原文"){original.toggle()}.buttonStyle(HarborBareButtonStyle())};Text(failed ? "翻译暂不可用，显示原文":translated == nil ? "正在翻译简介…":"在线机器翻译").foregroundStyle(.tertiary)}.font(.system(size:10))}
-        }.task(id:text+String(enabled)+String(retry)){translated=nil;original=false;failed=false;guard enabled,!ModDiscovery.identifierOnly(text),!text.isEmpty,text.range(of:"[A-Za-z]",options:.regularExpression) != nil,text.range(of:"[\\p{Han}]",options:.regularExpression)==nil else{return};do{let value=try await ModTextTranslation.shared.translate(text);try Task.checkCancellation();translated=value}catch{if !Task.isCancelled{failed=true}}}
+        }.task(id:text+String(enabled)+String(retry)){translated=nil;original=false;failed=false;guard enabled,!ModDiscovery.identifierOnly(text),!text.isEmpty,text.range(of:"[A-Za-z]",options:.regularExpression) != nil,text.range(of:"[\\p{Han}]",options:.regularExpression)==nil else{return};do{let mirror=await MCIMSummaryStore.shared.translation(project:projectID,source:source,original:text);let value:String;if let mirror{value=mirror}else{value=try await ModTextTranslation.shared.translate(text)};try Task.checkCancellation();translated=value}catch{if !Task.isCancelled{failed=true}}}
     }
 }
 private struct AddonIcon:View {
     let url:String?
-    var body:some View{AsyncImage(url:URL(string:url ?? "")){image in image.resizable().scaledToFit()}placeholder:{RoundedRectangle(cornerRadius:12).fill(Color.primary.opacity(0.045)).overlay(Image(systemName:"shippingbox").foregroundStyle(.secondary))}.clipShape(RoundedRectangle(cornerRadius:12))}
+    var body:some View{AsyncImage(url:ResourceMirror.artworkURL(url ?? "")){image in image.resizable().scaledToFit()}placeholder:{RoundedRectangle(cornerRadius:12).fill(Color.primary.opacity(0.045)).overlay(Image(systemName:"shippingbox").foregroundStyle(.secondary))}.clipShape(RoundedRectangle(cornerRadius:12))}
 }
 
 private actor ResourceCommitGate {

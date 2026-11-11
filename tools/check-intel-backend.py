@@ -8,7 +8,7 @@ java=resources/'Runtime/bin/java'
 jdk=Path(os.environ.get('JAVA_HOME') or subprocess.check_output(['/usr/libexec/java_home','-v','21'],text=True).strip())
 fx=sorted((resources/'javafx').glob('javafx-*-21.0.8-mac.jar'))
 assert len(fx)==3 and java.is_file()
-classpath=os.pathsep.join(map(str,[resources/'Backend.jar',resources/'HMCLCore.jar',*fx]))
+classpath=os.pathsep.join(map(str,[Path(os.environ.get('HARBOR_QA_BACKEND_JAR',str(resources/'Backend.jar'))),resources/'HMCLCore.jar',*fx]))
 with tempfile.TemporaryDirectory(prefix='mc-harbor-intel-qa-',dir=root/'build') as temporary:
     path=Path(temporary);classes=path/'classes';classes.mkdir()
     subprocess.run([str(jdk/'bin/javac'),'--release','17','-encoding','UTF-8','-cp',classpath,'-d',str(classes),str(root/'tools/UpdateBackendChecks.java')],check=True)
