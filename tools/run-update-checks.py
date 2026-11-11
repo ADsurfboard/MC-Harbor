@@ -1,9 +1,10 @@
 """Run real production clients against an isolated friends service and live public asset APIs."""
 from pathlib import Path
-import ast,base64,json,os,subprocess,sys,time,urllib.request,uuid
+import ast,base64,json,os,shutil,subprocess,sys,tempfile,time,urllib.request,uuid
 
 root=Path(__file__).resolve().parent.parent
-data=root/'evidence/update-1.5-fixture';data.mkdir(parents=True,exist_ok=True)
+evidence=root/'evidence';evidence.mkdir(parents=True,exist_ok=True)
+data=Path(tempfile.mkdtemp(prefix='apple-update-',dir=evidence))
 server_data=data/'server';server_data.mkdir(exist_ok=True)
 environment=os.environ.copy();environment.update(HARBOR_SOCIAL_DATA=str(server_data),PORT='0')
 remote=os.environ.get('HARBOR_SOCIAL_TEST_URL','')
@@ -27,11 +28,13 @@ try:
     call('me',b,{'sharing':True,'skin':base64.b64encode(skin).decode(),'skinModel':'default'},'PUT')
     call('history',b,{'id':str(uuid.uuid4()),'instance':'QA Pack','version':'1.20.1','loader':'Forge','world':'TestWorld','started':time.time()-600,'seconds':600,'friends':[alice['id']]},'PUT')
     video=data/'test-wallpaper.mp4'
-    subprocess.run(['ffmpeg','-v','error','-y','-f','lavfi','-i','color=c=green:s=320x180:r=1','-t','1','-an','-c:v','libx264','-pix_fmt','yuv420p',str(video)],check=True)
+    shutil.copy2(root/'tests/fixtures/wallpaper.mp4',video)
     config=data/'client-test.json';config.write_text(json.dumps({'url':url,'token':a,'friendID':bob['id'],'peerToken':b,'video':str(video)}));config.chmod(0o600)
     client=data/('client-'+str(time.time_ns()));client.mkdir()
     environment=os.environ.copy();environment['SHENGGAN_BACKEND_RESOURCES']=str(root/'build/MC Harbor.app/Contents/Resources')
     result=subprocess.run([str(root/'build/update-checks'),str(config),str(client),str(root/'Assets')],env=environment,timeout=300)
+    report=data/'update-1.5-report.json'
+    if report.exists():shutil.copy2(report,evidence/'apple-native-report.json')
     raise SystemExit(result.returncode)
 finally:
     if remote:
@@ -42,3 +45,4 @@ finally:
         server.terminate()
         try:server.wait(timeout=5)
         except subprocess.TimeoutExpired:server.kill();server.wait()
+    shutil.rmtree(data,ignore_errors=True)
