@@ -37,8 +37,9 @@ struct ModCollection:Codable,Identifiable,Equatable {let id:String;var name:Stri
 
 struct CollectionArtwork:View {
     let entry:ModCollectionEntry?
+    private static let landscape=NSImage(contentsOf:NativePaths.resources.appendingPathComponent("Brand/CollectionLandscape.png"))
     var body:some View{Group{if let icon=entry?.icon,icon.hasPrefix("https://"){AsyncImage(url:ResourceMirror.artworkURL(icon)){phase in if let image=phase.image{image.resizable().scaledToFill()}else{fallback}}}else if let icon=entry?.icon,let image=NSImage(contentsOfFile:icon){Image(nsImage:image).resizable().scaledToFit()}else{fallback}}.clipped()}
-    private var fallback:some View{Group{if let image=NSImage(contentsOf:NativePaths.resources.appendingPathComponent("Brand/CollectionLandscape.png")){Image(nsImage:image).resizable().scaledToFill()}else{Color.gray.opacity(0.2).overlay(Image(systemName:"photo"))}}}
+    private var fallback:some View{Group{if let image=Self.landscape{Image(nsImage:image).resizable().scaledToFill()}else{Color.gray.opacity(0.2).overlay(Image(systemName:"photo"))}}}
 }
 private struct CollectionFolderShape:Shape {
     func path(in rect:CGRect)->Path{var p=Path();let w=rect.width,h=rect.height;p.move(to:.init(x:14,y:h));p.addQuadCurve(to:.init(x:0,y:h-14),control:.init(x:0,y:h));p.addLine(to:.init(x:0,y:14));p.addQuadCurve(to:.init(x:14,y:0),control:.zero);p.addLine(to:.init(x:w*0.36,y:0));p.addCurve(to:.init(x:w*0.56,y:12),control1:.init(x:w*0.44,y:0),control2:.init(x:w*0.47,y:12));p.addLine(to:.init(x:w-14,y:12));p.addQuadCurve(to:.init(x:w,y:26),control:.init(x:w,y:12));p.addLine(to:.init(x:w,y:h-14));p.addQuadCurve(to:.init(x:w-14,y:h),control:.init(x:w,y:h));p.addLine(to:.init(x:14,y:h));p.closeSubpath();return p}
@@ -100,7 +101,7 @@ struct ModCollectionPanel:View {
     }
 }
 @MainActor extension LauncherModel {
-    func collectMods(_ mods:[ModFile],folder:String){Task{do{try await ModCollectionStore.shared.addLocal(mods,to:folder);toast("已收藏到模组夹")}catch{errorMessage=error.localizedDescription}}}
+    func collectMods(_ mods:[ModFile],folder:String){let resolved=mods.map{mod->ModFile in var item=mod;item.iconPath=resourceRecords[mod.path.path]?.iconPath ?? mod.iconPath;return item};Task{do{try await ModCollectionStore.shared.addLocal(resolved,to:folder);toast("已收藏到模组夹")}catch{errorMessage=error.localizedDescription}}}
     func importCollectionFiles(_ entries:[ModCollectionEntry],game:GameInstance)async throws{
         guard !running.contains(game.id),!editingContent else{throw FileTransactions.error("请先退出目标游戏并等待文件操作完成。")};editingContent=true;defer{editingContent=false}
         let destination=URL(fileURLWithPath:game.runDirectory).appendingPathComponent("mods")
