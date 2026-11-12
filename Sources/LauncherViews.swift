@@ -95,7 +95,7 @@ struct NativeSidebar:View {
             }
             Spacer()
             Button{model.inspectedGame=nil;model.section = .accounts}label:{HStack(spacing:11){Group{if let account=model.selectedAccount{MinecraftAvatar(model:model,account:account).frame(width:28,height:28)}else{HarborSymbol(systemName:"person.crop.circle").font(.system(size:24,weight:.ultraLight))}};VStack(alignment:.leading,spacing:3){Text(model.selectedAccount?.name ?? model.preferences.username).font(.system(size:12,weight:.medium));Text(model.selectedAccount == nil ? "未选择游戏账号":model.selectedAccount?.kind == "microsoft" ? "Microsoft":model.selectedAccount?.kind == "authlibInjector" ? "第三方认证":"离线账号").font(.system(size:10)).foregroundStyle(theme.secondaryText)};Spacer()}.padding(13).harborGlass(appearance:model.appearance,radius:18,interactive:true)}.buttonStyle(HarborPressButtonStyle(pressedScale:0.97,pressedOffset:0))
-        }.padding(16).frame(width:210).background{if model.preferences.frostedGlass{HarborMaterial(shape:Rectangle(),appearance:model.appearance)}else{theme.sidebarTint.opacity(0.6)}}
+        }.padding(16).frame(width:210).background{Group{if model.preferences.frostedGlass{HarborMaterial(shape:Rectangle(),appearance:model.appearance)}else{theme.sidebarTint.opacity(0.6)}}.ignoresSafeArea(.container,edges:.top)}
     }
 }
 struct NativeLibraryView:View {

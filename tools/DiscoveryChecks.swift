@@ -30,9 +30,14 @@ extension UpdateChecks {
         check("all-search-title-slug-exact",await ModNameIndex.shared.chinese(title:"Just Enough Items (JEI)",slug:"jei")=="JEI物品管理器")
         check("all-search-title-index-beyond-recommendations",await ModNameIndex.shared.chinese(title:"Chisels & Bits")=="雕凿工艺")
         check("different-project-never-matched-by-prefix",await ModNameIndex.shared.chinese(title:"Create: Unrelated QA Addon")==nil)
-        let indexStart=Date()
-        for _ in 0..<1000{_ = await ModNameIndex.shared.chinese(title:"Sodium")}
-        check("indexed-name-lookup-not-rescanned",Date().timeIntervalSince(indexStart)<2)
+        let fixtureIndexFile=root.appendingPathComponent("name-index.txt")
+        try "sodium;;sodium;钠;Sodium\n".write(to:fixtureIndexFile,atomically:true,encoding:.utf8)
+        let fixtureIndex=ModNameIndex(file:fixtureIndexFile)
+        check("index-first-read",await fixtureIndex.chinese(title:"Sodium")=="钠")
+        try FileManager.default.removeItem(at:fixtureIndexFile)
+        var indexed=true
+        for _ in 0..<100{if await fixtureIndex.chinese(title:"Sodium") != "钠"{indexed=false}}
+        check("indexed-name-lookup-not-rescanned-after-source-removed",indexed)
         let probe=TranslationProbe(),cache=ModTextTranslation(file:root.appendingPathComponent("cache/probe.json")){try await probe.query($0,$1,$2)}
         let duplicateValues=try await withThrowingTaskGroup(of:String.self,returning:[String].self){group in
             for _ in 0..<30{group.addTask{try await cache.translate("Same summary",provider:"bilibili")}}
@@ -141,6 +146,26 @@ extension UpdateChecks {
         let collectionProject=AddonProject(projectId:"AANobbMI",title:"Sodium",description:"Renderer",author:"QA",iconUrl:nil,downloads:1,pageUrl:nil)
         try collections.add(collectionProject,source:.modrinth,to:collectionID);try collections.add(collectionProject,source:.modrinth,to:collectionID)
         check("collection-duplicate-idempotent",collections.folders[0].entries.count==1)
+        let recorded=collections.folders[0].entries[0]
+        check("collection-records-time-summary-author",recorded.collectedAt != nil && recorded.summary=="Renderer" && recorded.authors=="QA")
+        let legacyData=Data("{\"id\":\"legacy\",\"title\":\"Original name\"}".utf8)
+        let legacyEntry=try JSONDecoder().decode(ModCollectionEntry.self,from:legacyData)
+        check("collection-old-record-survives-new-optional-metadata",legacyEntry.title=="Original name" && legacyEntry.collectedAt==nil && legacyEntry.modVersion==nil)
+        let batchID=try collections.create("全实例收藏")
+        let files=(0..<3).map{n in folder.appendingPathComponent("mod-\(n).jar")}
+        for (n,file) in files.enumerated(){try Data("unchanged-mod-\(n)".utf8).write(to:file)}
+        let batchMods=files.enumerated().map{n,file in ModFile(id:file.path,name:"模组 \(n)",path:file,enabled:true,size:15,version:"1.2.\(n)",authors:"QA",summary:"Description")}
+        check("collection-batch-all-mods-added",try await collections.addLocal(batchMods,to:batchID,game:game)==3)
+        check("collection-batch-repeated-skips-duplicates",try await collections.addLocal(batchMods,to:batchID,game:game)==0)
+        let batchFolder=collections.folders.first{$0.id==batchID}!
+        check("collection-batch-keeps-versions-loader-time",batchFolder.entries.count==3 && batchFolder.entries.allSatisfy{$0.loaders==["Fabric"] && $0.gameVersions==["1.20.1"] && $0.modVersion?.hasPrefix("1.2.")==true && $0.collectedAt != nil})
+        check("collection-batch-original-files-unchanged",try files.enumerated().allSatisfy{n,file in try Data(contentsOf:file)==Data("unchanged-mod-\(n)".utf8)})
+        let minimal=CollectionDisplaySettings(icon:false,loader:false,modVersion:false,gameVersion:false,collectedAt:false,summary:false,authors:false)
+        check("collection-name-only-settings-persist",try JSONDecoder().decode(CollectionDisplaySettings.self,from:JSONEncoder().encode(minimal)).isNameOnly)
+        check("settings-search-finds-multi-keyword-mod-folder",HarborSettingsIndex.search("模组夹 图标").map(\.anchor)==["模组夹信息显示"])
+        check("settings-search-finds-domestic-download-setting",HarborSettingsIndex.search("国内 下载").contains{$0.anchor=="下载"})
+        check("settings-search-no-unrelated-placeholder",HarborSettingsIndex.search("不存在的QA设置").isEmpty)
+        try collections.delete(batchID)
         let collectionRestored=ModCollectionStore(root:collections.root)
         check("collection-persists",collectionRestored.folders==collections.folders)
         try collections.remove(Set(["modrinth:AANobbMI"]),folder:collectionID)

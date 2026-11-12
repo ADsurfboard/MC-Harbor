@@ -27,6 +27,7 @@ struct NativePreferences: Codable {
     var localizationEditorHeight: Double = 180
     var localizationEditorHidden = false
     var themeCustomization = HarborThemeSettings()
+    var collectionDisplay = CollectionDisplaySettings()
     var knownLibraries:[String] = []
     var appearance: HarborAppearance = .ultraClear
     var wallpaper = WallpaperSettings()
