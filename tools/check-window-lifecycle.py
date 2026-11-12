@@ -16,6 +16,8 @@ final class QAWindowDelegate:NSObject,NSWindowDelegate{var resizes=0;func window
   var failed=0
   func check(_ name:String,_ value:Bool){print((value ? "PASS ":"FAIL ")+name);if !value{failed+=1};fflush(stdout)}
   func settle() async{try? await Task<Never,Never>.sleep(nanoseconds:300_000_000)}
+  // Test the completed OS transition, not the duration of the user's Dock animation.
+  func waitUntil(_ ready:()->Bool) async->Bool{for _ in 0..<100{if ready(){return true};try? await Task<Never,Never>.sleep(nanoseconds:20_000_000)};return ready()}
   let window=NSWindow(contentRect:NSRect(x:0,y:0,width:1040,height:700),styleMask:[.titled,.closable,.miniaturizable,.resizable],backing:.buffered,defer:false)
   window.identifier=NSUserInterfaceItemIdentifier("QA-SwiftUI-scene-identifier")
   let host=NSHostingView(rootView:Text("Window lifecycle QA").background(WindowConfigurator()))
@@ -36,7 +38,7 @@ final class QAWindowDelegate:NSObject,NSWindowDelegate{var resizes=0;func window
   check("original-delegate-resize-forwarded",original.resizes>0)
   let delegate=HarborAppDelegate()
   for attempt in 1...3{
-   window.miniaturize(nil);await settle();check("miniaturized-\\(attempt)",window.isMiniaturized)
+   window.miniaturize(nil);_ = await waitUntil{window.isMiniaturized};check("miniaturized-\\(attempt)",window.isMiniaturized)
    let handled=delegate.applicationShouldHandleReopen(NSApp,hasVisibleWindows:true);await settle()
    check("reopen-restores-minimized-\\(attempt)",!window.isMiniaturized && window.isVisible)
    check("reopen-suppresses-default-new-window-\\(attempt)",!handled)
