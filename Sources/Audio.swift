@@ -43,6 +43,7 @@ struct HarborButtonStyle:ButtonStyle {
     @Environment(\.harborAppearance) private var appearance
     @Environment(\.harborFrosted) private var frosted
     @Environment(\.harborReduceMotion) private var reduceMotion
+    @Environment(\.harborPerformanceMode) private var performance
     @Environment(\.isEnabled) private var enabled
     func makeBody(configuration:Configuration)->some View {
         configuration.label
@@ -54,10 +55,10 @@ struct HarborButtonStyle:ButtonStyle {
             .contentShape(.interaction,Capsule())
             .overlay(Capsule().stroke(customization.border ?? .white.opacity(prominent ? 0.25:0.12),lineWidth:0.6))
 
-            .scaleEffect(configuration.isPressed ? (reduceMotion ? 0.98:0.94):1)
+            .scaleEffect(configuration.isPressed && !performance ? (reduceMotion ? 0.98:0.94):1)
             .offset(y:configuration.isPressed && !reduceMotion ? 1:0)
             .opacity(enabled ? 1:0.42)
-            .animation(reduceMotion ? .linear(duration:0.1):.spring(response:0.32,dampingFraction:0.68),value:configuration.isPressed)
+            .animation(performance ? nil:(reduceMotion ? .linear(duration:0.1):.spring(response:0.32,dampingFraction:0.68)),value:configuration.isPressed)
             .harborOnChange(of:configuration.isPressed){_,pressed in if pressed && enabled{HarborAudio.shared.play(.select)}}
             .onHover{inside in if inside && enabled{HarborAudio.shared.play(.focus)}}
     }

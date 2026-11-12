@@ -210,10 +210,10 @@ struct AddonBrowser:View {
             HStack(spacing:0){
                 VStack(spacing:8){
                     if canRecommend && showingRecommendations && remarkListFilter.isEmpty{
-                        if recommending{ProgressView().controlSize(.small)}
+                        if recommending{HarborActivityIndicator().controlSize(.small)}
                         ScrollView{LazyVStack(spacing:7){ForEach(recommendations){item in projectButton(item.project,suggestion:item.suggestion)};if !recommending && recommendations.isEmpty{Text("此版本暂未找到适配推荐，可搜索全部模组。").font(.system(size:12)).harborSecondaryText().padding()}}}.harborHideScrollIndicators()
                     }else{
-                        if loading{ProgressView().controlSize(.small)}
+                        if loading{HarborActivityIndicator().controlSize(.small)}
                         ScrollView{LazyVStack(spacing:5){
                             if kind == .mods && !localRemarks.isEmpty{Text("我的备注").font(.system(size:11,weight:.semibold)).frame(maxWidth:.infinity,alignment:.leading);ForEach(localRemarks){remark in remarkButton(remark)};Divider()}
                             if remarkListFilter.isEmpty{ForEach(result?.hits ?? []){project in projectButton(project)}}else if localRemarks.isEmpty{Text("此列表暂无匹配备注。选择模组后可保存到这里。").font(.system(size:11)).harborSecondaryText().padding()}
@@ -276,7 +276,7 @@ struct AddonBrowser:View {
             if let suggestion=selectedSuggestion{Text(suggestion.chinese+" · "+suggestion.reason).font(.system(size:13)).foregroundStyle(model.accentTextColor)}
             ModSummaryText(text:project.description,enabled:model.preferences.translateModDescriptions,compact:false,projectID:project.id,source:source)
             HStack{Text(project.author);Spacer();Text(project.downloads,format:.number.notation(.compactName));HarborSymbol(systemName:"arrow.down")}.font(.system(size:11)).foregroundStyle(.secondary)
-            if preparing{ProgressView().controlSize(.small)}
+            if preparing{HarborActivityIndicator().controlSize(.small)}
             if !versions.isEmpty{Picker("版本",selection:$versionID){ForEach(versions){Text($0.versionNumber).tag($0.id)}}}
             if !plan.isEmpty{Divider().opacity(0.35);ForEach(plan){item in HStack(alignment:.top){Image(systemName:item.version.id==versionID ? "shippingbox":"link").foregroundStyle(model.accentTextColor);VStack(alignment:.leading,spacing:4){Text(item.version.name).font(.system(size:12));Text(item.file.filename).font(.system(size:9,design:.monospaced)).harborSecondaryText().lineLimit(2)};Spacer();Text(ByteCountFormatter.string(fromByteCount:item.file.size,countStyle:.file)).font(.system(size:10)).harborSecondaryText()}};Button{model.installAddon(plan,game:game,kind:kind,title:project.title);if !embedded{model.modal=nil}}label:{Label("安装到 "+model.displayName(game),systemImage:"arrow.down.circle.fill").frame(maxWidth:.infinity)}.buttonStyle(HarborButtonStyle(prominent:true)).disabled(preparing)}
             if !failure.isEmpty{Text(failure).font(.system(size:12)).harborSecondaryText()}
@@ -340,7 +340,7 @@ struct ModSummaryText:View {
         VStack(alignment:.leading,spacing:6){
             switch presentation {
             case .original(let value),.translated(let value):Text(value).font(.system(size:compact ? 11:12)).harborSecondaryText().lineLimit(compact ? 2:nil)
-            case .loading:HStack(spacing:6){ProgressView().controlSize(.mini);Text("加载中…").font(.system(size:compact ? 11:12)).harborSecondaryText()}.frame(minHeight:compact ? 28:38,alignment:.leading).accessibilityLabel("中文简介加载中")
+            case .loading:HStack(spacing:6){HarborActivityIndicator().controlSize(.mini);Text("加载中…").font(.system(size:compact ? 11:12)).harborSecondaryText()}.frame(minHeight:compact ? 28:38,alignment:.leading).accessibilityLabel("中文简介加载中")
             case .failed:Button("简介汉化未完成 · 点击重试"){retry+=1}.font(.system(size:11)).buttonStyle(HarborBareButtonStyle())
             }
             if !compact && needsTranslation,completedKey==key,translated != nil{

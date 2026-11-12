@@ -65,17 +65,18 @@ struct FolderFlowBackdrop:View {
     }
     private func canvas(time:Double)->some View {
         Canvas(opaque:false,rendersAsynchronously:true){context,size in
-            let cell=CGSize(width:size.width/9,height:size.height/7)
             context.opacity=0.62
             context.addFilter(.blur(radius:max(7,min(size.width,size.height)*0.11)))
             context.drawLayer{layer in
-                // Overscan keeps the blurred perimeter continuous. Every pixel is a blend of the two sampled colours.
-                for row in -2..<9{for column in -2..<11{
-                    let x=Double(column)/9,y=Double(row)/7
-                    let blend=FolderFlowField.sample(x:x,y:y,time:time)
-                    let color=colors.first.mixed(with:colors.second,amount:blend).color
-                    layer.fill(Path(CGRect(x:CGFloat(column)*cell.width,y:CGFloat(row)*cell.height,width:cell.width+0.5,height:cell.height+0.5)),with:.color(color))
-                }}
+                layer.fill(Path(CGRect(origin:.zero,size:size).insetBy(dx:-30,dy:-30)),with:.color(colors.first.mixed(with:colors.second,amount:0.5).color))
+                // Four broad source-colour lobes replace 143 tiny cells without reducing frame cadence.
+                for index in 0..<4{
+                    let phase=time*0.24+Double(index)*1.83
+                    let center=CGPoint(x:size.width*CGFloat(0.5+0.52*sin(phase+sin(phase*0.37))),y:size.height*CGFloat(0.5+0.5*cos(phase*0.79+Double(index))))
+                    let radius=max(size.width,size.height)*CGFloat(0.53+0.24*FolderFlowField.sample(x:Double(index)*0.29,y:0.65,time:time))
+                    let color=(index%2==0 ? colors.first:colors.second).color
+                    layer.fill(Path(ellipseIn:CGRect(x:center.x-radius,y:center.y-radius,width:radius*2,height:radius*2)),with:.radialGradient(Gradient(stops:[.init(color:color.opacity(0.95),location:0),.init(color:color.opacity(0.6),location:0.45),.init(color:color.opacity(0),location:1)]),center:center,startRadius:0,endRadius:radius))
+                }
             }
         }.allowsHitTesting(false).accessibilityHidden(true)
     }

@@ -58,11 +58,12 @@ struct MinecraftAvatar:View {
     var body:some View{Group{if let image=MinecraftHeads.image(model.skinProfiles[account.id]?.skinPath ?? SkinStorage.defaultSkin.path){Image(nsImage:image).resizable().interpolation(.none).scaledToFit()}}.clipShape(RoundedRectangle(cornerRadius:7)).accessibilityLabel(account.name+" 的 Minecraft 头像").task(id:account.id+String(model.showIntro)){if !model.showIntro{model.loadSkin(account)}}}
 }
 struct MinecraftSkinPreview:NSViewRepresentable {
+    @Environment(\.harborPerformanceMode) private var performance
     let skinPath:String;let capePath:String?;let model:String;let motion:String;let active:Bool
     var onError:(String)->Void={_ in}
     func makeCoordinator()->Coordinator{Coordinator()}
     func makeNSView(context:Context)->WKWebView{let configuration=WKWebViewConfiguration();configuration.userContentController.add(context.coordinator,name:"harborSkin");let web=WKWebView(frame:.zero,configuration:configuration);web.setValue(false,forKey:"drawsBackground");web.underPageBackgroundColor = .clear;web.navigationDelegate=context.coordinator;context.coordinator.web=web;let folder=NativePaths.resources.appendingPathComponent("SkinViewer");web.loadFileURL(folder.appendingPathComponent("index.html"),allowingReadAccessTo:folder);return web}
-    func updateNSView(_ web:WKWebView,context:Context){context.coordinator.onError=onError;context.coordinator.skin=skinPath;context.coordinator.cape=capePath;context.coordinator.model=model;context.coordinator.motion=motion;context.coordinator.active=active;context.coordinator.update()}
+    func updateNSView(_ web:WKWebView,context:Context){context.coordinator.onError=onError;context.coordinator.skin=skinPath;context.coordinator.cape=capePath;context.coordinator.model=model;context.coordinator.motion=performance ? "none":motion;context.coordinator.active=active && !performance;context.coordinator.update()}
     static func dismantleNSView(_ view:WKWebView,coordinator:Coordinator){view.evaluateJavaScript("window.harborDispose?.()");view.stopLoading();view.configuration.userContentController.removeScriptMessageHandler(forName:"harborSkin");view.navigationDelegate=nil}
     final class Coordinator:NSObject,WKNavigationDelegate,WKScriptMessageHandler {
         weak var web:WKWebView?;var ready=false;var skin="";var cape:String?;var model="default";var motion="none";var active=true;var last="";var lastMotion="";var onError:(String)->Void={_ in}

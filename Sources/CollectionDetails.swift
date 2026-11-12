@@ -40,3 +40,20 @@ struct CollectInstanceModsMenu:View {
     @ObservedObject var model:LauncherModel;let game:GameInstance
     var body:some View{Menu("收藏全部"){ForEach(ModCollectionStore.shared.folders){folder in Button(folder.name){model.collectInstanceMods(game,folder:folder.id)}};Button("新建模组夹…"){do{if let id=try ModCollectionStore.shared.promptCreate(){model.collectInstanceMods(game,folder:id)}}catch{model.errorMessage=error.localizedDescription}}}.buttonStyle(HarborButtonStyle()).help("复制此实例的全部模组到模组夹，重复项自动跳过；不改动原实例")}
 }
+
+/// The circular trigger and every popover action use the whole visible surface as their hit region.
+struct InstanceActionsButton:View {
+    @ObservedObject var model:LauncherModel;let game:GameInstance
+    @State private var presented=false
+    var body:some View{Button{presented.toggle()}label:{Image(systemName:"ellipsis").font(.system(size:17,weight:.semibold)).frame(width:42,height:42).background(Color.primary.opacity(0.07),in:Circle()).contentShape(Circle())}.buttonStyle(HarborBareButtonStyle()).help("更多实例操作").popover(isPresented:$presented,arrowEdge:.bottom){VStack(alignment:.leading,spacing:4){
+        action("打开实例目录"){model.open(game.runDirectory)}
+        action("校验与修复"){model.repair(game)}
+        action("备份存档"){model.backup(game)}
+        action("导出整合包…"){model.exportPack(game)}
+        CollectInstanceModsMenu(model:model,game:game).frame(maxWidth:.infinity,minHeight:34)
+        action("创建实例快捷方式…"){model.createInstanceShortcut(game)}
+        Divider();action(model.preferences.favorites.contains(game.id) ? "取消收藏":"收藏"){model.favorite(game)}
+        Divider();Button(role:.destructive){presented=false;model.deleteInstance(game)}label:{Text("删除实例…").frame(maxWidth:.infinity,minHeight:34,alignment:.leading).padding(.horizontal,10).contentShape(Rectangle())}.buttonStyle(HarborBareButtonStyle()).disabled(model.running.contains(game.id))
+    }.padding(10).frame(width:240)}}
+    private func action(_ name:String,_ operation:@escaping()->Void)->some View{Button{presented=false;operation()}label:{Text(name).font(.system(size:12)).frame(maxWidth:.infinity,minHeight:34,alignment:.leading).padding(.horizontal,10).contentShape(Rectangle())}.buttonStyle(HarborBareButtonStyle())}
+}

@@ -16,7 +16,7 @@ pdfmetrics.registerFont(TTFont('CJK','/System/Library/Fonts/Supplemental/Arial U
 W,H=595.276,841.89
 INK=HexColor('#10271E');GREEN=HexColor('#29825B');MUTED=HexColor('#5C6E65');PALE=HexColor('#EDF4EE');LINE=HexColor('#D9E5DD')
 DOC=canvas.Canvas(str(OUT),pagesize=(W,H),pageCompression=1)
-DOC.setTitle('MC Harbor | 启动器介绍');DOC.setAuthor('morben 墨尔本');DOC.setSubject('1.6.1 双架构版：原生 macOS Minecraft 启动器、功能与汉化')
+DOC.setTitle('MC Harbor | 启动器介绍');DOC.setAuthor('ADsurfboard');DOC.setSubject('1.6.1 双架构版：原生 macOS Minecraft 启动器、功能与汉化')
 README=['# MC Harbor','1.6.1 · Apple Silicon / Intel 双版本','[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/tag/v1.6.1) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.6.1/MC-Harbor-Introduction-1.6.1.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)','以下正文与随包 PDF 同版。']
 STYLE=ParagraphStyle('body',fontName='CJK',fontSize=10.4,leading=17.4,textColor=INK,wordWrap='CJK',spaceAfter=0)
 
@@ -68,7 +68,7 @@ DOC.setStrokeColor(HexColor('#375448'));DOC.line(48,269,W-48,269)
 for x,big,small in [(48,'SwiftUI','原生界面'),(218,'HMCL','稳定内核'),(388,'Frosted','原生磨砂')]:
     txt(big,x,231,17,HexColor('#F4F8F4'));txt(small,x,207,10,HexColor('#A9C7B4'))
 para('1.6.1 · Apple Silicon / Intel 双版本\nApple Silicon：macOS 26 起；Intel：macOS 12 起',48,132,W-96,10,HexColor('#ADC4B5'),17)
-txt('Apple Silicon + Intel / 2026.11.12',48,51,9,HexColor('#A9C7B4'));txt('01 / 13',W-91,51,9,HexColor('#A9C7B4'));DOC.showPage()
+txt('ADsurfboard / Apple Silicon + Intel / 2026.11.12',48,51,9,HexColor('#A9C7B4'));txt('01 / 13',W-91,51,9,HexColor('#A9C7B4'));DOC.showPage()
 
 # 02 - Features
 y=page(2,'DAILY USE','日常操作，一处完成。','以实例为中心。默认加载器图标高清重绘，保留实例资源原图标、可视化资源管理与明确的下载目标。')
@@ -79,7 +79,7 @@ y-=147
 card('下载中心','中英文搜索、简介汉化、模组推荐、备注搜索和优化 / PVP 等分区。下载开始有提示；游戏运行时先下载，退出后再安装。',46,y,col,151)
 card('账号与角色','导入原 HMCL 账号；支持 Microsoft、离线及自定义 authlib-injector API 外置登录。真实皮肤头像与 3D 预览。',58+col,y,col,151)
 y-=165
-card('外观与声音','主题作用范围、反色与自定义配色；图片 / 视频背景、三层叠片和深浅毛玻璃。保留弹层过渡、欢迎动画、四种播报与界面音效；已移除彩虹角。',46,y,col,151)
+card('外观与声音','主题与反色、图片 / 视频背景、三层叠片和毛玻璃。默认保留动画、四种播报与音效；可选“独家优化”冻结动态并取消过渡。已移除彩虹角。',46,y,col,151)
 card('存档与前置补全','原生编辑模式、天数、经验和生命等状态。可选前置补全在启动前检测并补齐必需模组；另有存档备份与便携模式。',58+col,y,col,151)
 y-=183
 para('操作细节：实例更多按钮扩大为 38pt 圆形；按钮命中覆盖完整外形与内边距。下载搜索结果按整个圆角矩形选择，空白部分也可点击。',46,y,W-92,10,MUTED)
@@ -179,7 +179,7 @@ y=section('首次授权与本次运行复用','账号会话保存在 macOS 钥�
 finish(11)
 # 12 - Collections
 y=page(12,'MOD COLLECTIONS','模组夹，收好下一套配置。','模组夹由项目作者提出。它保存可反复使用的模组集合，不只是一次下载任务。')
-y=section('命名与轻染色玻璃','创建多个模组夹，分别命名和调整颜色。改色只叠加轻薄色调，保持磨砂薄壳、卡片透色和局部袋口高光；前壳、后壳与卡片各自呈现深度和展开动态，去掉整圈描边。开启减少动态效果后保留静态层次。卡片读取模组原图，缺图使用 Minecraft 风景。PNG 透明区域与比例留白透出半透明流体：分别提取每张模组图的两种核心颜色，动态混合并做高斯模糊，原图边缘柔和衔接。空模组夹只有空壳。',y)
+y=section('命名与轻染色玻璃','创建多个模组夹，分别命名和调整颜色；可选无颜色的中性半透明材质。降低通透并略加高斯模糊，改色保持磨砂薄壳、卡片透色和局部袋口高光；前壳、后壳与卡片各自呈现深度和展开动态，去掉整圈描边。开启减少动态效果后保留静态层次。卡片读取模组原图，缺图使用 Minecraft 风景。PNG 透明区域与比例留白透出半透明流体：分别提取每张模组图的两种核心颜色，动态混合并做高斯模糊，原图边缘柔和衔接。空模组夹只有空壳。',y)
 y=section('打开前景窗口，继续按列表操作','文件夹卡片在悬停和选择时展开预览；点击打开统一的前景窗口，以列表展示收藏项。可搜索、勾选、全选、移出、改名、改色或删除。详情显示已记录的加载器、Minecraft / 模组版本、收藏时间、作者和简介；信息显示可逐项关闭，名称始终保留，旧收藏缺失资料明确注明；设置页按类分组并支持搜索后跳转到对应条目。移出收藏和删除模组夹不会移除任何实例中的文件。',y)
 y=section('在线项目与本地收藏','下载详情可将项目收藏到指定模组夹；实例模组页与更多菜单提供“收藏全部”，一次复制所有模组到指定或新建模组夹，重复项自动跳过；也可只收藏所选。本地文件使用独立副本和内容哈希保存，不因删除原实例而失效。在线收藏保留原平台项目，导入时重新寻找适配目标 Minecraft 版本与加载器的文件及前置。',y)
 y=section('批量导入与冲突处理','选择目标实例及所需收藏后，先检查在线版本与依赖，再建立安装任务。下载文件校验哈希，重复模组或冲突依赖会明确提示；已有版本经事务处理保留备份，失败回滚。本地收藏不承诺自动跨 Minecraft 或加载器版本适配，请自行确认兼容性。',y)
