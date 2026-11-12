@@ -1,7 +1,7 @@
 import Foundation
 
 public enum ControlAction: String, Codable, CaseIterable, Sendable {
-    case jump, sneak, sprint, attack, use, inventory, chat, pause, drop, swapHands, perspective, playerList
+    case jump, sneak, sprint, attack, use, middleClick, inventory, chat, pause, drop, swapHands, perspective, playerList
     case hotbar1, hotbar2, hotbar3, hotbar4, hotbar5, hotbar6, hotbar7, hotbar8, hotbar9
     public var chineseName: String {
         switch self {
@@ -10,6 +10,7 @@ public enum ControlAction: String, Codable, CaseIterable, Sendable {
         case .sprint: "疾跑"
         case .attack: "攻击 / 挖掘"
         case .use: "使用 / 放置"
+        case .middleClick: "鼠标中键"
         case .inventory: "背包"
         case .chat: "聊天"
         case .pause: "暂停"
@@ -39,14 +40,27 @@ public struct TouchButton: Codable, Identifiable, Equatable, Sendable {
     public var opacity: Double
     public var visible: Bool
     public var toggle: Bool
+    public var customKey: Int? = nil
+    public var customLabel: String? = nil
     public init(id: UUID = UUID(), action: ControlAction, x: Double, y: Double, diameter: Double = 58, opacity: Double = 0.65, visible: Bool = true, toggle: Bool = false) {
         self.id = id; self.action = action; center = .init(x: x, y: y)
         self.diameter = diameter; self.opacity = opacity; self.visible = visible; self.toggle = toggle
     }
-    public mutating func sanitize() {
+    public var displayName: String {
+        if let label = customLabel?.trimmingCharacters(in: .whitespacesAndNewlines), !label.isEmpty { return String(label.prefix(24)) }
+        if let customKey { return "按键 " + (customKey >= 65 && customKey <= 90 ? String(UnicodeScalar(customKey)!) : String(customKey)) }
+        return action.chineseName
+    }
+    public mutating func sanitize() throws {
+        if let key = customKey, !Self.validKeyboardKey(key) { throw TouchLayoutError.invalidKeyBinding(key) }
+        if let label = customLabel { customLabel = String(label.prefix(24)) }
         center = .init(x: center.x, y: center.y)
         diameter = diameter.isFinite ? min(160, max(44, diameter)) : 58
         opacity = opacity.isFinite ? min(1, max(0.1, opacity)) : 0.65
+    }
+    public static func validKeyboardKey(_ key: Int) -> Bool {
+        (32...96).contains(key) || (161...162).contains(key) || (256...269).contains(key) ||
+        (280...284).contains(key) || (290...314).contains(key) || (320...336).contains(key) || (340...348).contains(key)
     }
 }
 
@@ -111,7 +125,7 @@ public struct TouchLayout: Codable, Equatable, Identifiable, Sendable {
         name = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80))
         if name.isEmpty { name = "我的触控布局" }
         settings.sanitize()
-        for index in buttons.indices { buttons[index].sanitize() }
+        for index in buttons.indices { try buttons[index].sanitize() }
         if !buttons.contains(where: { $0.action == .pause && $0.visible }) {
             guard buttons.count < 96 else { throw TouchLayoutError.tooManyButtons }
             buttons.append(.init(action: .pause, x: 0.92, y: 0.12, diameter: 44))
@@ -130,7 +144,7 @@ public struct TouchLayout: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
-public enum TouchLayoutError: Error, Equatable { case unsupportedVersion(Int), tooManyButtons, duplicateIdentifiers, tooLarge }
+public enum TouchLayoutError: Error, Equatable { case unsupportedVersion(Int), tooManyButtons, duplicateIdentifiers, tooLarge, invalidKeyBinding(Int) }
 
 public struct ControlFrame: Equatable, Sendable {
     public let x: Double, y: Double, width: Double, height: Double

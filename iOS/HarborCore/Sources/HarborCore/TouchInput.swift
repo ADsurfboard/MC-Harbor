@@ -29,6 +29,10 @@ public struct TouchInputRouter: Sendable {
         return events
     }
     public mutating func release(owner: UUID) -> [GameInputEvent] { replace(owner: owner, inputs: []) }
+    public mutating func cancel(buttonID: UUID) -> [GameInputEvent] {
+        guard let owner = toggledButtons.removeValue(forKey: buttonID) else { return [] }
+        return release(owner: owner)
+    }
     public mutating func releaseAll() -> [GameInputEvent] {
         let events = held.keys.sorted(by: Self.ordered).map { GameInputEvent.release($0) }
         held.removeAll(keepingCapacity: true); ownerInputs.removeAll(keepingCapacity: true); toggledButtons.removeAll()
@@ -39,9 +43,9 @@ public struct TouchInputRouter: Sendable {
         if button.toggle {
             if let owner = toggledButtons.removeValue(forKey: button.id) { return release(owner: owner) }
             let owner = UUID(); toggledButtons[button.id] = owner
-            return replace(owner: owner, inputs: [Self.binding(button.action)])
+            return replace(owner: owner, inputs: [Self.binding(button)])
         }
-        return replace(owner: touch, inputs: [Self.binding(button.action)])
+        return replace(owner: touch, inputs: [Self.binding(button)])
     }
     public mutating func moveJoystick(owner: UUID, x: Double, y: Double, settings raw: TouchSettings) -> [GameInputEvent] {
         var settings = raw; settings.sanitize()
@@ -73,6 +77,7 @@ public struct TouchInputRouter: Sendable {
         case .sprint: .key(341)
         case .attack: .mouseButton(0)
         case .use: .mouseButton(1)
+        case .middleClick: .mouseButton(2)
         case .inventory: .key(69)
         case .chat: .key(84)
         case .pause: .key(256)
@@ -82,6 +87,10 @@ public struct TouchInputRouter: Sendable {
         case .playerList: .key(258)
         default: .key(48 + (Int(action.rawValue.suffix(1)) ?? 1))
         }
+    }
+    public static func binding(_ button: TouchButton) -> GameInput {
+        if let key = button.customKey, TouchButton.validKeyboardKey(key) { return .key(key) }
+        return binding(button.action)
     }
     private static func ordered(_ lhs: GameInput, _ rhs: GameInput) -> Bool {
         func value(_ input: GameInput) -> Int { switch input { case .key(let code): code; case .mouseButton(let button): 10000 + button } }

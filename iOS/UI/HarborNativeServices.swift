@@ -25,6 +25,21 @@ import CryptoKit
         return home.appendingPathComponent("harbor-touch", isDirectory: true)
             .appendingPathComponent(component + ".json")
     }
+    @objc public static func controlConfigurationData(home: URL, profile: String?) -> Data {
+        for candidate in [controlConfigurationURL(home: home, profile: profile), controlConfigurationURL(home: home, profile: nil)] {
+            if let size = try? candidate.resourceValues(forKeys: [.fileSizeKey]).fileSize, size <= 128 * 1024,
+               let data = try? Data(contentsOf: candidate), let layout = try? TouchLayout.decode(data),
+               let valid = try? JSONEncoder().encode(layout) { return valid }
+        }
+        return (try? JSONEncoder().encode(TouchLayout.standard())) ?? Data()
+    }
+    @objc public static func installGameControls(on view: UIView, services: HarborNativeServices, profile: String?) -> HarborGameTouchOverlay {
+        let configuration = (try? TouchLayout.decode(controlConfigurationData(home: services.harborHomeURL, profile: profile))) ?? .standard()
+        let overlay = HarborGameTouchOverlay(frame: view.bounds, configuration: configuration, services: services)
+        overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(overlay); overlay.updateGrabState(services.isPointerGrabbed())
+        return overlay
+    }
 }
 
 struct PhoneInstance: Decodable, Identifiable {

@@ -20,15 +20,16 @@ struct TouchLayoutEditor: View {
                 Section {
                     GeometryReader { geometry in
                         let size = geometry.size
+                        let width = Double(size.width), height = Double(size.height)
                         ZStack {
                             RoundedRectangle(cornerRadius: 24).fill(.linearGradient(colors: [Color(red: 0.07, green: 0.17, blue: 0.14), Color(red: 0.16, green: 0.25, blue: 0.22)], startPoint: .topLeading, endPoint: .bottomTrailing))
                             Image(systemName: "plus").font(.title2).foregroundStyle(.white.opacity(0.4))
                             Circle().fill(.white.opacity(0.12))
                                 .frame(width: layout.settings.joystickDiameter * 0.6, height: layout.settings.joystickDiameter * 0.6)
                                 .overlay(Image(systemName: "arrow.up.and.down.and.arrow.left.and.right").foregroundStyle(.white))
-                                .position(x: layout.settings.joystickCenter.x * size.width, y: layout.settings.joystickCenter.y * size.height)
+                                .position(x: CGFloat(layout.settings.joystickCenter.x * width), y: CGFloat(layout.settings.joystickCenter.y * height))
                                 .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .named("touchCanvas")).onChanged { value in
-                                    layout.settings.joystickCenter = .init(x: value.location.x / max(1,size.width), y: value.location.y / max(1,size.height))
+                                    layout.settings.joystickCenter = .init(x: Double(value.location.x) / max(1,width), y: Double(value.location.y) / max(1,height))
                                 })
                             ForEach(layout.buttons.filter(\.visible)) { button in
                                 Text(shortName(button.action)).font(.system(size: 11, weight: .semibold)).foregroundStyle(.white)
@@ -36,15 +37,17 @@ struct TouchLayoutEditor: View {
                                     .background(.white.opacity(button.id == selected ? 0.42 : button.opacity * 0.35), in: Circle())
                                     .frame(minWidth: 44, minHeight: 44)
                                     .contentShape(Circle())
-                                    .position(x: button.center.x * size.width, y: button.center.y * size.height)
+                                    .position(x: CGFloat(button.center.x * width), y: CGFloat(button.center.y * height))
                                     .onTapGesture { selected = button.id }
                                     .gesture(DragGesture().onChanged { value in
                                         selected = button.id
                                         if dragOrigins[button.id] == nil { dragOrigins[button.id] = button.center }
                                         guard let original = dragOrigins[button.id], let index = layout.buttons.firstIndex(where: { $0.id == button.id }) else { return }
-                                        layout.buttons[index].center = .init(x: original.x + value.translation.width / max(1,size.width), y: original.y + value.translation.height / max(1,size.height))
+                                        let x = original.x + Double(value.translation.width) / max(1,width)
+                                        let y = original.y + Double(value.translation.height) / max(1,height)
+                                        layout.buttons[index].center = NormalizedPoint(x: x, y: y)
                                     }.onEnded { _ in dragOrigins.removeValue(forKey: button.id) })
-                                    .accessibilityLabel(button.action.chineseName)
+                                    .accessibilityLabel(button.displayName)
                             }
                         }.coordinateSpace(name: "touchCanvas")
                     }.aspectRatio(2, contentMode: .fit)
@@ -72,7 +75,7 @@ struct TouchLayoutEditor: View {
                 Section("按键") {
                     ForEach(layout.buttons) { button in
                         Button { selected = button.id } label: {
-                            HStack { Text(button.action.chineseName); Spacer(); Text(button.visible ? "显示" : "隐藏").foregroundStyle(.secondary); if selected == button.id { Image(systemName: "checkmark.circle.fill") } }
+                            HStack { Text(button.displayName); Spacer(); Text(button.visible ? "显示" : "隐藏").foregroundStyle(.secondary); if selected == button.id { Image(systemName: "checkmark.circle.fill") } }
                                 .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
                         }
                     }
@@ -87,7 +90,15 @@ struct TouchLayoutEditor: View {
                     } label: { Label("添加按键", systemImage: "plus").frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle()) }
                 }
                 if let index = layout.buttons.firstIndex(where: { $0.id == selected }) {
-                    Section(layout.buttons[index].action.chineseName) {
+                    Section(layout.buttons[index].displayName) {
+                        TextField("自定义名称", text: Binding(get: { layout.buttons[index].customLabel ?? "" }, set: { layout.buttons[index].customLabel = $0.isEmpty ? nil : $0 }))
+                        Picker("键盘映射", selection: $layout.buttons[index].customKey) {
+                            Text("使用默认动作").tag(Optional<Int>.none)
+                            ForEach(65...90, id: \.self) { key in Text(String(UnicodeScalar(key)!)).tag(Optional(key)) }
+                            ForEach(290...301, id: \.self) { key in Text("F\(key-289)").tag(Optional(key)) }
+                            Text("空格").tag(Optional(32)); Text("Tab").tag(Optional(258)); Text("Shift").tag(Optional(340))
+                            Text("Ctrl").tag(Optional(341)); Text("Alt").tag(Optional(342))
+                        }
                         Toggle("显示按键", isOn: $layout.buttons[index].visible)
                             .disabled(layout.buttons[index].action == .pause)
                         Toggle("点按切换保持状态", isOn: $layout.buttons[index].toggle)

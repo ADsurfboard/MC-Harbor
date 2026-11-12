@@ -69,4 +69,20 @@ final class TouchInputTests: XCTestCase {
         XCTAssertEqual(TouchInputRouter.look(dx: .nan, dy: 0, settings: settings), [])
         XCTAssertEqual(TouchInputRouter.look(dx: 10_000, dy: 0, settings: settings), [.look(1200,0)])
     }
+    func testCustomModKeyAndCancelledToggleAreReleased() throws {
+        var button = TouchButton(action: .jump, x: 0.8, y: 0.7, toggle: true)
+        button.customKey = 82; button.customLabel = "整理背包"; try button.sanitize()
+        XCTAssertEqual(button.displayName, "整理背包")
+        var router = TouchInputRouter()
+        XCTAssertEqual(router.press(button: button, touch: UUID()), [.press(.key(82))])
+        XCTAssertEqual(router.cancel(buttonID: button.id), [.release(.key(82))])
+        XCTAssertTrue(router.heldInputs.isEmpty)
+        XCTAssertEqual(router.press(button: button, touch: UUID()), [.press(.key(82))])
+    }
+    func testImportedKeyCodesCannotOverflowTheNativeBridge() {
+        for key in [Int.max, Int.min, -1, 0, 349, 5000] {
+            var button = TouchButton(action: .jump, x: 0.5, y: 0.5); button.customKey = key
+            XCTAssertThrowsError(try button.sanitize()) { XCTAssertEqual($0 as? TouchLayoutError, .invalidKeyBinding(key)) }
+        }
+    }
 }
