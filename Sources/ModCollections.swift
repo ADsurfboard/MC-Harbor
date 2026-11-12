@@ -5,7 +5,8 @@ import Combine
 
 struct ModCollectionEntry:Codable,Identifiable,Equatable {
     let id:String;var title:String;var icon:String?;var file:String?;var project:AddonProject?;var source:AddonSource?
-    static func ==(a:Self,b:Self)->Bool{a.id==b.id && a.title==b.title && a.file==b.file && a.icon==b.icon}
+    var collectedAt:Date?=nil;var loaders:[String]?=nil;var gameVersions:[String]?=nil;var modVersion:String?=nil;var summary:String?=nil;var authors:String?=nil
+    static func ==(a:Self,b:Self)->Bool{a.id==b.id && a.title==b.title && a.file==b.file && a.icon==b.icon && a.collectedAt==b.collectedAt && a.loaders==b.loaders && a.gameVersions==b.gameVersions && a.modVersion==b.modVersion && a.summary==b.summary && a.authors==b.authors}
 }
 struct ModCollection:Codable,Identifiable,Equatable {let id:String;var name:String;var color:String;var entries:[ModCollectionEntry]}
 @MainActor final class ModCollectionStore:ObservableObject {
@@ -18,8 +19,8 @@ struct ModCollection:Codable,Identifiable,Equatable {let id:String;var name:Stri
     func update(_ id:String,name:String,color:String)throws{let title=name.trimmingCharacters(in:.whitespacesAndNewlines);guard !title.isEmpty,title.count<=60,color.range(of:"^#[A-Fa-f0-9]{6}$",options:.regularExpression) != nil else{throw FileTransactions.error("请填写有效的名称与颜色。")};var value=folders;guard let i=value.firstIndex(where:{$0.id==id}) else{return};value[i].name=title;value[i].color=color;try save(value)}
     func delete(_ id:String)throws{try save(folders.filter{$0.id != id})} // Cached files retained for recovery / other folders.
     func remove(_ ids:Set<String>,folder:String)throws{var value=folders;guard let i=value.firstIndex(where:{$0.id==folder}) else{return};value[i].entries.removeAll{ids.contains($0.id)};try save(value)}
-    func add(_ project:AddonProject,source:AddonSource,to folder:String)throws{var value=folders;guard let i=value.firstIndex(where:{$0.id==folder}) else{throw FileTransactions.error("模组夹已不存在。")};let id=source.rawValue+":"+project.id;guard !value[i].entries.contains(where:{$0.id==id}) else{return};value[i].entries.append(.init(id:id,title:project.title,icon:project.iconUrl,file:nil,project:project,source:source));try save(value)}
-    func addLocal(_ mods:[ModFile],to folder:String)async throws{
+    func add(_ project:AddonProject,source:AddonSource,to folder:String,version:AddonVersion?=nil)throws{var value=folders;guard let i=value.firstIndex(where:{$0.id==folder}) else{throw FileTransactions.error("模组夹已不存在。")};let id=source.rawValue+":"+project.id;guard !value[i].entries.contains(where:{$0.id==id}) else{return};value[i].entries.append(.init(id:id,title:project.title,icon:project.iconUrl,file:nil,project:project,source:source,collectedAt:Date(),loaders:version?.loaders,gameVersions:version?.gameVersions,modVersion:version?.versionNumber,summary:project.description,authors:project.author));try save(value)}
+    @discardableResult func addLocal(_ mods:[ModFile],to folder:String,game:GameInstance?=nil)async throws->Int{
         let directory=root.appendingPathComponent("files");let icons=root.appendingPathComponent("icons")
         let added=try await Task.detached(priority:.userInitiated){()->[ModCollectionEntry] in
             let fm=FileManager.default;try fm.createDirectory(at:directory,withIntermediateDirectories:true);try fm.createDirectory(at:icons,withIntermediateDirectories:true)
@@ -27,10 +28,13 @@ struct ModCollection:Codable,Identifiable,Equatable {let id:String;var name:Stri
                 let values=try mod.path.resourceValues(forKeys:[.isSymbolicLinkKey,.fileSizeKey]);guard values.isSymbolicLink != true,(values.fileSize ?? 0)<1_000_000_000 else{throw FileTransactions.error("不能收藏符号链接或过大的模组。")}
                 let bytes=try Data(contentsOf:mod.path,options:.mappedIfSafe);let key=SHA256.hash(data:bytes).map{String(format:"%02x",$0)}.joined();let destination=directory.appendingPathComponent(key+".jar");if !fm.fileExists(atPath:destination.path){try bytes.write(to:destination,options:.atomic)}
                 var icon:String?;if let path=mod.iconPath,let data=try? Data(contentsOf:URL(fileURLWithPath:path)),data.count<8_000_000{let target=icons.appendingPathComponent(key+".png");try data.write(to:target,options:.atomic);icon=target.path}
-                return .init(id:key,title:mod.name,icon:icon,file:destination.path,project:nil,source:nil)
+                return .init(id:key,title:mod.name,icon:icon,file:destination.path,project:nil,source:nil,collectedAt:Date(),loaders:game.map{[$0.loader]},gameVersions:game.map{[$0.version]},modVersion:mod.version,summary:mod.summary,authors:mod.authors)
             }
         }.value
-        var value=folders;guard let i=value.firstIndex(where:{$0.id==folder}) else{throw FileTransactions.error("模组夹已不存在。")};for item in added where !value[i].entries.contains(where:{$0.id==item.id}){value[i].entries.append(item)};try save(value)
+        var value=folders;guard let i=value.firstIndex(where:{$0.id==folder}) else{throw FileTransactions.error("目标模组夹已不存在，原实例未改动。")}
+        var count=0
+        for item in added where !value[i].entries.contains(where:{$0.id==item.id}){value[i].entries.append(item);count+=1}
+        try save(value);return count
     }
     func promptCreate()throws->String?{let alert=NSAlert();alert.messageText="新建模组夹";let input=NSTextField(string:"我的模组夹");input.frame=NSRect(x:0,y:0,width:300,height:26);alert.accessoryView=input;alert.addButton(withTitle:"创建");alert.addButton(withTitle:"取消");guard alert.runModal() == .alertFirstButtonReturn else{return nil};return try create(input.stringValue)}
 }
@@ -124,8 +128,6 @@ struct ModFolderCard:View {
                 .frame(width:200,height:141).offset(y:-9)
                 .scaleEffect(x:1,y:open ? 1.015:1,anchor:.bottom)
             documents(time:time)
-            // Contact shadow at the pocket opening separates the shell from its contents.
-            Ellipse().fill(.black.opacity(dark ? 0.16:0.055)).frame(width:166,height:7).blur(radius:3).offset(y:-92)
             shell(time:time)
         }.frame(width:238,height:203)
             .background(alignment:.bottom){Ellipse().fill(.black.opacity(dark ? 0.14:0.07)).frame(width:180,height:13).blur(radius:open ? 13:8).offset(y:8)}
@@ -150,14 +152,16 @@ struct ModCollectionPanel:View {
     @State private var status=""
     @State private var selection:Set<String>=[]
     @State private var busy=false
+    @State private var detailEntry:ModCollectionEntry?
     private var folder:ModCollection?{store.folders.first{$0.id==folderID}}
     private var filtered:[ModCollectionEntry]{folder?.entries.filter{query.isEmpty || $0.title.localizedCaseInsensitiveContains(query)} ?? []}
-    var body:some View{VStack(spacing:18){HStack{Text("模组夹").font(.system(size:25,weight:.semibold));Spacer();Button{model.modal=nil}label:{Image(systemName:"xmark").frame(width:22,height:22)}.buttonStyle(HarborButtonStyle())};HStack{TextField("名称",text:$name).textFieldStyle(.roundedBorder);ColorPicker("颜色",selection:Binding(get:{Color(hexString:color)},set:{color=$0.hexString}),supportsOpacity:false).frame(width:95);Button("保存"){do{try store.update(folderID,name:name,color:color)}catch{model.errorMessage=error.localizedDescription}}.buttonStyle(HarborButtonStyle())};SearchBox(prompt:"搜索模组夹内的模组",query:$query)
-        ScrollView{LazyVStack(spacing:9){ForEach(filtered){entry in HStack(spacing:14){Toggle("选择 "+entry.title,isOn:Binding(get:{selection.contains(entry.id)},set:{if $0{selection.insert(entry.id)}else{selection.remove(entry.id)}})).labelsHidden().toggleStyle(.checkbox);CollectionArtwork(entry:entry).frame(width:48,height:48).clipShape(RoundedRectangle(cornerRadius:10));VStack(alignment:.leading,spacing:5){Group{if let project=entry.project{ModProjectName(project:project)}else{ModProjectName(project:AddonProject(projectId:entry.id,title:entry.title,description:"",author:"",iconUrl:nil,downloads:0,pageUrl:nil))}}.font(.system(size:14,weight:.medium)).lineLimit(2);Text(entry.file == nil ? entry.source?.title ?? "在线项目":"本地收藏 · 不依赖原实例文件").font(.system(size:11)).harborSecondaryText()};Spacer()}.padding(14).frame(maxWidth:.infinity,minHeight:80,alignment:.leading).background(Color.primary.opacity(0.035),in:RoundedRectangle(cornerRadius:16)).contentShape(RoundedRectangle(cornerRadius:16)).onTapGesture{if selection.contains(entry.id){selection.remove(entry.id)}else{selection.insert(entry.id)}}}}}.frame(minHeight:200,maxHeight:.infinity)
+    var body:some View{VStack(spacing:18){HStack{Text("模组夹").font(.system(size:25,weight:.semibold));Spacer();Button{model.modal=nil}label:{Image(systemName:"xmark").frame(width:22,height:22)}.buttonStyle(HarborButtonStyle())};HStack{TextField("名称",text:$name).textFieldStyle(.roundedBorder);ColorPicker("颜色",selection:Binding(get:{Color(hexString:color)},set:{color=$0.hexString}),supportsOpacity:false).frame(width:95);Button("保存"){do{try store.update(folderID,name:name,color:color)}catch{model.errorMessage=error.localizedDescription}}.buttonStyle(HarborButtonStyle())};HStack{SearchBox(prompt:"搜索模组夹内的模组",query:$query);Menu("显示信息"){CollectionDisplayOptions(settings:$model.preferences.collectionDisplay)}.buttonStyle(HarborButtonStyle())}
+        ScrollView{LazyVStack(spacing:9){ForEach(filtered){entry in CollectionEntryRow(entry:entry,settings:model.preferences.collectionDisplay,selected:selection.contains(entry.id),toggle:{if selection.contains(entry.id){selection.remove(entry.id)}else{selection.insert(entry.id)}},details:{detailEntry=entry})}}}.frame(minHeight:200,maxHeight:.infinity)
+
         HStack{Button(selection.count==filtered.count ? "取消全选":"全选"){selection=selection.count==filtered.count ? []:Set(filtered.map(\.id))};Button("移出所选",role:.destructive){do{try store.remove(selection,folder:folderID);selection=[]}catch{model.errorMessage=error.localizedDescription}}.disabled(selection.isEmpty || busy);Spacer();Text(status).font(.system(size:11)).harborSecondaryText().lineLimit(2)}.buttonStyle(HarborButtonStyle())
         HStack{Picker("目标实例",selection:$target){Text("选择实例").tag("");ForEach(model.games){Text(model.displayName($0)+" · "+$0.version+" / "+$0.loader).tag($0.id)}};Button(busy ? "正在检查兼容性…":"导入所选到实例"){install()}.buttonStyle(HarborButtonStyle(prominent:true)).disabled(busy || selection.isEmpty || target.isEmpty)}
         HStack{Button("删除模组夹",role:.destructive){let alert=NSAlert();alert.messageText="删除此模组夹？";alert.informativeText="不会删除任何实例里的模组。";alert.addButton(withTitle:"删除");alert.addButton(withTitle:"取消");if alert.runModal() == .alertFirstButtonReturn{do{try store.delete(folderID);model.modal=nil}catch{model.errorMessage=error.localizedDescription}}}.buttonStyle(HarborBareButtonStyle());Spacer();Text("在线收藏会重新匹配 Minecraft 版本、加载器及前置。本地 JAR 请自行确认兼容性。").font(.system(size:10)).harborSecondaryText()}
-    }.padding(26).task{if let folder{name=folder.name;color=folder.color};target=model.selected?.id ?? ""}}
+    }.padding(26).sheet(item:$detailEntry){entry in CollectionEntryDetails(entry:entry,translate:model.preferences.translateModDescriptions)}.task{if let folder{name=folder.name;color=folder.color};target=model.selected?.id ?? ""}}
     private func install(){guard let game=model.games.first(where:{$0.id==target}),let folder else{return};guard !model.running.contains(game.id) else{model.errorMessage="请先退出目标实例，再批量导入模组。";return};let entries=folder.entries.filter{selection.contains($0.id)};busy=true
         Task{defer{busy=false};do{
             var plan:[AddonPlanItem]=[];var versions:[String:String]=[:]
@@ -175,7 +179,20 @@ struct ModCollectionPanel:View {
     }
 }
 @MainActor extension LauncherModel {
-    func collectMods(_ mods:[ModFile],folder:String){let resolved=mods.map{mod->ModFile in var item=mod;item.iconPath=resourceRecords[mod.path.path]?.iconPath ?? mod.iconPath;return item};Task{do{try await ModCollectionStore.shared.addLocal(resolved,to:folder);toast("已收藏到模组夹")}catch{errorMessage=error.localizedDescription}}}
+    func collectMods(_ mods:[ModFile],folder:String,game:GameInstance?=nil){
+        let resolved=mods.map{mod->ModFile in var item=mod;item.iconPath=resourceRecords[mod.path.path]?.iconPath ?? mod.iconPath;return item}
+        guard !resolved.isEmpty else{toast("此实例没有可收藏的模组");return}
+        Task{do{let count=try await ModCollectionStore.shared.addLocal(resolved,to:folder,game:game);toast("新增 \(count) 个模组到模组夹，重复项已跳过")}catch{errorMessage=error.localizedDescription}}
+    }
+    func collectInstanceMods(_ game:GameInstance,folder:String){
+        backend("mods",title:"读取全部模组",arguments:["id":game.id,"runDirectory":game.runDirectory]){result in
+            let mods=(result["mods"] as? [[String:Any]] ?? []).compactMap{m->ModFile? in
+                guard let path=m["path"] as? String else{return nil}
+                return ModFile(id:path,name:m["name"] as? String ?? URL(fileURLWithPath:path).lastPathComponent,path:URL(fileURLWithPath:path),enabled:m["enabled"] as? Bool ?? true,size:(m["size"] as? NSNumber)?.int64Value ?? 0,version:m["version"] as? String ?? "",authors:m["authors"] as? String ?? "",modID:m["modId"] as? String ?? "",iconPath:m["iconPath"] as? String,summary:m["description"] as? String ?? "")
+            }
+            self.collectMods(mods,folder:folder,game:game)
+        }
+    }
     func importCollectionFiles(_ entries:[ModCollectionEntry],game:GameInstance)async throws{
         guard !running.contains(game.id),!editingContent else{throw FileTransactions.error("请先退出目标游戏并等待文件操作完成。")};editingContent=true;defer{editingContent=false}
         let destination=URL(fileURLWithPath:game.runDirectory).appendingPathComponent("mods")

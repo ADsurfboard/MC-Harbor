@@ -195,6 +195,7 @@ struct AddonBrowser:View {
     @State private var remarkName=""
     @State private var newListName=""
     @State private var creatingList=false
+    @State private var editingRemark=false
     @State private var pendingRemark:ModRemark?
     private var localRemarks:[ModRemark]{remarks.matches(query,listID:remarkListFilter)}
     private var canRecommend:Bool{kind == .mods && source == .modrinth}
@@ -204,17 +205,11 @@ struct AddonBrowser:View {
     var body:some View{
         VStack(spacing:0){
             if !embedded{HStack{VStack(alignment:.leading,spacing:5){Text("下载"+kind.title).font(.system(size:25,weight:.semibold));Text(game.version+" · "+game.loader).font(.system(size:11)).harborSecondaryText()};Spacer();Button{model.modal=nil}label:{HarborSymbol(systemName:"xmark")}.buttonStyle(HarborButtonStyle())}.padding(25)}
+            browserToolbar
+            Divider().opacity(0.25)
             HStack(spacing:0){
-                VStack(spacing:12){
-                    Picker("来源",selection:$source){Text("Modrinth").tag(AddonSource.modrinth).disabled(kind == .worlds);Text("CurseForge").tag(AddonSource.curseforge)}.pickerStyle(.segmented).labelsHidden()
-                    if canRecommend{Picker("浏览方式",selection:$showingRecommendations){Text("精选推荐").tag(true);Text("搜索全部").tag(false)}.pickerStyle(.segmented).labelsHidden()}
-                    if kind == .mods{Picker("分区",selection:$section){ForEach(ModSection.allCases){Text($0.title).tag($0)}}.labelsHidden()}
-                    SearchBox(prompt:remarkListFilter.isEmpty ? "中英文名称、关键词或备注":"搜索此列表的备注或模组",query:$query).onSubmit{showingRecommendations=false;search()}.harborOnChange(of:query){_,_ in if !query.isEmpty{showingRecommendations=false};search(debounce:true)}
-                    if queryUsed != query && !queryUsed.isEmpty{Text("搜索："+queryUsed).font(.system(size:10)).harborSecondaryText().frame(maxWidth:.infinity,alignment:.leading)}
-                    HStack{Toggle("简介自动汉化",isOn:$model.preferences.translateModDescriptions).toggleStyle(.switch).controlSize(.mini);Spacer()}.font(.system(size:10)).help("开启后只显示已完成的中文简介；等待时显示加载中，失败可重试。")
-                    if kind == .mods{remarkLists}
+                VStack(spacing:8){
                     if canRecommend && showingRecommendations && remarkListFilter.isEmpty{
-                        Text("适配 \(game.version) · \(game.loader)。请按需要选装，类似功能的模组可择一使用。").font(.system(size:10)).harborSecondaryText()
                         if recommending{ProgressView().controlSize(.small)}
                         ScrollView{LazyVStack(spacing:7){ForEach(recommendations){item in projectButton(item.project,suggestion:item.suggestion)};if !recommending && recommendations.isEmpty{Text("此版本暂未找到适配推荐，可搜索全部模组。").font(.system(size:12)).harborSecondaryText().padding()}}}.harborHideScrollIndicators()
                     }else{
@@ -225,7 +220,7 @@ struct AddonBrowser:View {
                         }}.harborHideScrollIndicators()
                         if let result,remarkListFilter.isEmpty{HStack{Text("平台 \(result.totalHits) 个结果");Spacer();Button{page=max(0,page-1);search()}label:{HarborSymbol(systemName:"chevron.left").frame(width:28,height:28)}.disabled(page==0);Text("\(page+1)");Button{page+=1;search()}label:{HarborSymbol(systemName:"chevron.right").frame(width:28,height:28)}.disabled((page+1)*30>=result.totalHits)}.buttonStyle(HarborBareButtonStyle()).font(.system(size:10)).foregroundStyle(.secondary)}
                     }
-                }.padding(18).frame(minWidth:310,maxWidth:420)
+                }.padding(12).frame(minWidth:310,maxWidth:400)
                 Divider().opacity(0.35)
                 detail.frame(maxWidth:.infinity,maxHeight:.infinity)
             }.frame(maxHeight:.infinity)
@@ -238,6 +233,21 @@ struct AddonBrowser:View {
         .task(id:source.rawValue+":"+(selected?.id ?? "")){await loadVersions()}.task(id:versionID){await prepare()}
         .onReceive(model.contentChanged){_ in if kind == .mods{model.loadMods(game,force:true)}}
         .onDisappear{searchTask?.cancel()}
+    }
+    private var browserToolbar:some View {
+        VStack(spacing:9){
+            HStack(spacing:12){
+                Picker("来源",selection:$source){Text("Modrinth").tag(AddonSource.modrinth).disabled(kind == .worlds);Text("CurseForge").tag(AddonSource.curseforge)}.pickerStyle(.segmented).labelsHidden().frame(width:200)
+                if canRecommend{Picker("浏览方式",selection:$showingRecommendations){Text("精选推荐").tag(true);Text("搜索全部").tag(false)}.pickerStyle(.segmented).labelsHidden().frame(width:160)}
+                if kind == .mods{Picker("分区",selection:$section){ForEach(ModSection.allCases){Text($0.title).tag($0)}}.labelsHidden().frame(width:100)}
+                Spacer(minLength:0)
+                Toggle("简介汉化",isOn:$model.preferences.translateModDescriptions).toggleStyle(.switch).controlSize(.mini).font(.system(size:11)).fixedSize().help("开启后只显示完成的中文简介；等待时加载中，失败可重试。")
+            }
+            HStack(spacing:12){
+                SearchBox(prompt:remarkListFilter.isEmpty ? "中英文名称、关键词或备注":"搜索此列表的备注或模组",query:$query).onSubmit{showingRecommendations=false;search()}.harborOnChange(of:query){_,_ in if !query.isEmpty{showingRecommendations=false};search(debounce:true)}.help(queryUsed != query && !queryUsed.isEmpty ? "平台搜索词："+queryUsed:"中英文名称与自定义备注均可搜索")
+                if kind == .mods{remarkLists.frame(width:240)}
+            }
+        }.padding(.horizontal,16).padding(.vertical,12)
     }
     private var remarkLists:some View{
         VStack(spacing:8){HStack{Picker("备注列表",selection:$remarkListFilter){Text("全部列表").tag("");ForEach(remarks.lists){Text($0.name).tag($0.id)}}.labelsHidden();Button{creatingList.toggle()}label:{HarborSymbol(systemName:"plus").frame(width:25,height:25)}.buttonStyle(HarborBareButtonStyle()).help("新建备注列表")}
@@ -261,9 +271,8 @@ struct AddonBrowser:View {
     }
     @ViewBuilder private var detail:some View{
         if let project=selected{ScrollView{VStack(alignment:.leading,spacing:20){
-            AddonIcon(url:project.iconUrl).frame(width:72,height:72)
-            ModProjectName(project:project,enabled:kind == .mods).font(.system(size:28,weight:.semibold))
-            if kind == .mods{remarkEditor(project);Menu("收藏到模组夹"){ForEach(ModCollectionStore.shared.folders){folder in Button(folder.name){do{try ModCollectionStore.shared.add(project,source:source,to:folder.id);model.toast("已收藏")}catch{failure=error.localizedDescription}}};Button("新建模组夹…"){do{if let id=try ModCollectionStore.shared.promptCreate(){try ModCollectionStore.shared.add(project,source:source,to:id)}}catch{failure=error.localizedDescription}}}.buttonStyle(HarborButtonStyle())}
+            HStack(spacing:16){AddonIcon(url:project.iconUrl).frame(width:56,height:56);ModProjectName(project:project,enabled:kind == .mods).font(.system(size:26,weight:.semibold));Spacer(minLength:0)}
+            if kind == .mods{HStack{Button("备注…"){editingRemark=true}.buttonStyle(HarborButtonStyle()).popover(isPresented:$editingRemark){remarkEditor(project).frame(width:360).padding(12)};Menu("收藏到模组夹"){ForEach(ModCollectionStore.shared.folders){folder in Button(folder.name){do{try ModCollectionStore.shared.add(project,source:source,to:folder.id,version:selectedVersion);model.toast("已收藏")}catch{failure=error.localizedDescription}}};Button("新建模组夹…"){do{if let id=try ModCollectionStore.shared.promptCreate(){try ModCollectionStore.shared.add(project,source:source,to:id,version:selectedVersion)}}catch{failure=error.localizedDescription}}}.buttonStyle(HarborButtonStyle())}}
             if let suggestion=selectedSuggestion{Text(suggestion.chinese+" · "+suggestion.reason).font(.system(size:13)).foregroundStyle(model.accentTextColor)}
             ModSummaryText(text:project.description,enabled:model.preferences.translateModDescriptions,compact:false,projectID:project.id,source:source)
             HStack{Text(project.author);Spacer();Text(project.downloads,format:.number.notation(.compactName));HarborSymbol(systemName:"arrow.down")}.font(.system(size:11)).foregroundStyle(.secondary)

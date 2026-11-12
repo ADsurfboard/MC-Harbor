@@ -8,12 +8,14 @@ actor ModNameIndex {
         var search:[(String,String)]=[]
     }
     private var loading:Task<Index,Never>?
+    private let file:URL
+    init(file:URL=NativePaths.resources.appendingPathComponent("Localization/mod_data.txt")){self.file=file}
     private static func normalize(_ text:String)->String {
         text.folding(options:[.caseInsensitive,.diacriticInsensitive],locale:Locale(identifier:"en_US_POSIX")).filter{$0.isLetter || $0.isNumber}
     }
     private func index()async->Index {
         if let loading{return await loading.value}
-        let file=NativePaths.resources.appendingPathComponent("Localization/mod_data.txt")
+        let file=file
         let task=Task.detached(priority:.userInitiated){()->Index in
             guard let text=try? String(contentsOf:file,encoding:.utf8) else{return Index()}
             var result=Index()

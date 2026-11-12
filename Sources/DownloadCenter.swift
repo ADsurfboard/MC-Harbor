@@ -15,18 +15,7 @@ struct NativeDownloadsView:View {
             } else if model.downloadCategory == "tasks" {
                 DownloadJobs(model:model)
             } else if let kind {
-                VStack(spacing:14) {
-                    HStack {
-                        Text(kind.title).font(.system(size:34,weight:.semibold))
-                        Spacer()
-                        if kind != .modpacks {
-                            Picker("安装到",selection:$targetID) {
-                                ForEach(model.games) { game in
-                                    Text(model.displayName(game)+" · "+game.version).tag(game.id)
-                                }
-                            }.frame(maxWidth:300)
-                        }
-                    }.padding(.horizontal,28).padding(.top,15)
+                VStack(spacing:0) {
                     if let chosen = kind == .modpacks ? catalog:target {
                         AddonBrowser(model:model,game:chosen,kind:kind,embedded:true)
                             .id(kind.rawValue+chosen.id)
@@ -62,8 +51,11 @@ struct NativeDownloadsView:View {
                     }
                 }.buttonStyle(HarborBareButtonStyle())
             }
-            Spacer(minLength:0)
-        }.padding(.horizontal,28).padding(.vertical,12)
+            Spacer(minLength:8)
+            if let kind,kind != .modpacks {
+                Picker("安装到",selection:$targetID){ForEach(model.games){game in Text(model.displayName(game)+" · "+game.version).tag(game.id)}}.frame(maxWidth:260)
+            }
+        }.padding(.horizontal,24).padding(.vertical,9)
     }
 }
 
