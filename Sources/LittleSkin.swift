@@ -8,10 +8,11 @@ private final class CredentialOriginGuard:NSObject,URLSessionTaskDelegate {
     func urlSession(_ session:URLSession,task:URLSessionTask,willPerformHTTPRedirection response:HTTPURLResponse,newRequest request:URLRequest,completionHandler:@escaping(URLRequest?)->Void){guard let url=request.url,url.scheme==origin.scheme,url.host==origin.host,url.port==origin.port else{completionHandler(nil);return};completionHandler(request)}
 }
 enum HarborHTTP {
+    private static let publicSession:URLSession={let config=URLSessionConfiguration.ephemeral;config.timeoutIntervalForRequest=25;config.timeoutIntervalForResource=60;config.httpMaximumConnectionsPerHost=6;return URLSession(configuration:config)}()
     static func data(_ url:URL,method:String="GET",body:Data?=nil,token:String?=nil,limit:Int=4_000_000)async throws->Data {
         guard url.scheme=="https" || (url.scheme=="http" && ["127.0.0.1","localhost","::1"].contains(url.host ?? "")) else{throw FileTransactions.error("连接必须使用 HTTPS。")}
         let config=URLSessionConfiguration.ephemeral;config.timeoutIntervalForRequest=25;config.timeoutIntervalForResource=60
-        let session=URLSession(configuration:config,delegate:token==nil ? nil:CredentialOriginGuard(url),delegateQueue:nil);defer{session.invalidateAndCancel()}
+        let session=token==nil ? publicSession:URLSession(configuration:config,delegate:CredentialOriginGuard(url),delegateQueue:nil);defer{if token != nil{session.invalidateAndCancel()}}
         var request=URLRequest(url:url);request.httpMethod=method;request.httpBody=body;request.setValue("MC-Harbor/1.5 (+https://github.com/ADsurfboard/MC-Harbor)",forHTTPHeaderField:"User-Agent")
         if body != nil{request.setValue("application/json",forHTTPHeaderField:"Content-Type")};if let token{request.setValue("Bearer "+token,forHTTPHeaderField:"Authorization")}
         let (bytes,response)=try await session.bytes(for:request)

@@ -18,7 +18,9 @@ final class QAWindowDelegate:NSObject,NSWindowDelegate{var resizes=0;func window
   func settle() async{try? await Task<Never,Never>.sleep(nanoseconds:300_000_000)}
   let window=NSWindow(contentRect:NSRect(x:0,y:0,width:1040,height:700),styleMask:[.titled,.closable,.miniaturizable,.resizable],backing:.buffered,defer:false)
   window.identifier=NSUserInterfaceItemIdentifier("QA-SwiftUI-scene-identifier")
-  window.contentView=NSHostingView(rootView:Text("Window lifecycle QA").background(WindowConfigurator()))
+  let host=NSHostingView(rootView:Text("Window lifecycle QA").background(WindowConfigurator()))
+  if #available(macOS 13.0, *){host.sizingOptions=[]}
+  window.contentView=host
   window.makeKeyAndOrderFront(nil);await settle()
   check("attached-window-registered",HarborWindowController.shared.mainWindow===window)
   check("scene-identifier-preserved",window.identifier?.rawValue=="QA-SwiftUI-scene-identifier")

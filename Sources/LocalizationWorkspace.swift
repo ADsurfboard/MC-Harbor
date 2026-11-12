@@ -34,6 +34,8 @@ struct LocalizationWorkspace:View {
     @State private var machineGeneration=UUID()
     @State private var communityFilled=0
     @State private var offerOnline=false
+    @AppStorage("harbor.packTranslationMode") private var translationMode="online"
+    @State private var diagnostics:[String]=[]
     private var row:LanguageEntry?{rows.first{$0.id==chosen}}
     private var hasTextSelection:Bool{project?.sources.contains{selected.contains($0.id) && ["ftbquests","datapacks"].contains($0.kind)} ?? false}
     private var editCount:Int{edits.values.reduce(0){$0+$1.count}}
@@ -44,7 +46,7 @@ struct LocalizationWorkspace:View {
             toolbar
             Divider().opacity(0.25)
             HStack(spacing:0) {
-                resourceList.frame(width:232)
+                resourceList.frame(width:232).disabled(busy)
                 Divider().opacity(0.25)
                 VStack(spacing:0) {
                     HStack(spacing:10){SearchBox(prompt:"搜索语言键、原文或译文",query:$query);Picker("条目",selection:$filter){Text("全部").tag("all");Text("待翻译").tag("pending");Text("格式问题").tag("issues")}.labelsHidden().frame(width:100);Button{model.preferences.localizationEditorHidden.toggle()}label:{Label(model.preferences.localizationEditorHidden ? "显示对照":"隐藏对照",systemImage:"rectangle.bottomthird.inset.filled")}.buttonStyle(HarborButtonStyle()).help("记住对照编辑区的显示状态")}.padding(16)
@@ -62,13 +64,13 @@ struct LocalizationWorkspace:View {
                 }
             }
             Divider().opacity(0.25)
-            HStack(spacing:12){if busy{ProgressView().controlSize(.mini)};Text(failure.isEmpty ? status:failure).font(.system(size:11)).foregroundStyle(failure.isEmpty ? Color.secondary:Color.orange).lineLimit(2).textSelection(.enabled).help(project?.warnings.joined(separator:"\n") ?? "");Spacer();if editCount>0{Text("\(editCount) 条草稿").font(.system(size:10)).harborSecondaryText();Button("保存译文"){run{try await commitEdits()}}.buttonStyle(HarborButtonStyle(prominent:true)).keyboardShortcut(.return,modifiers:.command).disabled(busy)}}.padding(.horizontal,20).frame(height:48)
+            HStack(spacing:12){if busy{ProgressView().controlSize(.mini)};Text(failure.isEmpty ? status:failure).font(.system(size:11)).foregroundStyle(failure.isEmpty ? Color.secondary:Color.orange).lineLimit(2).textSelection(.enabled).help(project?.warnings.joined(separator:"\n") ?? "");Spacer();if !diagnostics.isEmpty{Button("查看处理记录"){let alert=NSAlert();alert.messageText="汉化处理记录";alert.informativeText=diagnostics.suffix(50).joined(separator:"\n");alert.addButton(withTitle:"关闭");alert.runModal()}.buttonStyle(HarborButtonStyle())};if editCount>0{Text("\(editCount) 条草稿").font(.system(size:10)).harborSecondaryText();Button("保存译文"){run{try await commitEdits()}}.buttonStyle(HarborButtonStyle(prominent:true)).keyboardShortcut(.return,modifiers:.command).disabled(busy)}}.padding(.horizontal,20).frame(height:48)
         }
         .task(id:game.id){scan()}
         .task(id:current){await readEntries()}
         .harborOnChange(of:edits){_,_ in scheduleDraftWrite()}
         .background {
-            if #available(macOS 15.0, *) {
+            if #available(macOS 15.0, *),translationMode=="system" {
                 HarborSystemTranslationDriver(request:machineRequested ? machineGeneration:nil){session in await machineTranslate(session)}
             }
         }
@@ -78,7 +80,8 @@ struct LocalizationWorkspace:View {
         VStack(spacing:14) {
             HStack(spacing:10){Text("实例资源汉化").font(.system(size:20,weight:.semibold));Spacer();if busy{Button("停止"){operation?.cancel();machineRequested=false;machineGeneration=UUID();busy=false;status="已停止，已完成译文保留"}.buttonStyle(HarborButtonStyle())};if offerOnline && !busy{Button("在线补全…"){onlineTranslate()}.buttonStyle(HarborButtonStyle()).disabled(selected.isEmpty)};Button{scan()}label:{HarborSymbol(systemName:"arrow.clockwise")}.buttonStyle(HarborButtonStyle()).help("读取语言文件、FTB Quests 任务文本与存档数据包").disabled(busy);Button("导入译文…"){importTranslations()}.buttonStyle(HarborButtonStyle()).disabled(busy || project==nil);Button("一键汉化"){translate()}.buttonStyle(HarborButtonStyle(prominent:true)).disabled(busy || selected.isEmpty)}
             HStack(spacing:10){TextField("资源包名称",text:$packName).textFieldStyle(.roundedBorder).frame(maxWidth:.infinity);Text("格式").font(.system(size:11)).harborSecondaryText();TextField("格式号",text:$packFormat).textFieldStyle(.roundedBorder).frame(width:62);Button("导出汉化包…"){export(sourceOnly:false)}.buttonStyle(HarborButtonStyle()).disabled(busy || selected.isEmpty);Button("提取给 AI…"){export(sourceOnly:true)}.buttonStyle(HarborButtonStyle()).disabled(busy || selected.isEmpty)}
-            HStack(spacing:10){Text("lang · KubeJS · FTB 任务 · 存档数据包").font(.system(size:11)).harborSecondaryText();Spacer();Button("应用任务 / 数据包…"){applyTextAssets()}.buttonStyle(HarborButtonStyle()).disabled(busy || !hasTextSelection).help("备份后应用所选任务和数据包的已有译文，不改变任务关系、奖励条件或其他文件")}
+            HStack(spacing:10){Picker("补全方式",selection:$translationMode){Text("在线：所选翻译服务").tag("online");if #available(macOS 15.0, *){Text("本机：Apple 翻译").tag("system")}}.frame(maxWidth:300).disabled(busy);Spacer();Button("应用任务 / 数据包…"){applyTextAssets()}.buttonStyle(HarborButtonStyle()).disabled(busy || !hasTextSelection).help("备份后应用所选任务和数据包的已有译文，不改变任务关系、奖励条件或其他文件")}
+            Text("lang · KubeJS · FTB 任务 · 存档数据包。译文保存在工作区；完成后导出汉化包，任务与数据包可备份后应用。").font(.system(size:10)).harborSecondaryText()
         }.padding(20)
     }
     private var resourceList:some View {
@@ -102,20 +105,20 @@ struct LocalizationWorkspace:View {
     private func readEntries()async{guard let project,!current.isEmpty else{rows=[];return};let resource=current;var input=base("langRead");input["project"]=project.project;input["resource"]=resource;do{let payload=try await BackendQuery.run(input);let result:LanguageEntries=try await Task.detached(priority:.userInitiated){try ResourceService.decode(payload)}.value;guard !Task.isCancelled,resource==current else{return};let previous=chosen;rows=result.entries;chosen=rows.contains(where:{$0.id==previous}) ? previous:rows.first?.id}catch{if !(error is CancellationError){failure=error.localizedDescription;model.errorMessage=error.localizedDescription}}}
     private func commitEdits()async throws{guard editCount>0 else{return};let snapshot=edits;var input=base("langSave");input["changes"]=snapshot.flatMap{resource,values in values.map{["resource":resource,"entry":$0.key,"translation":$0.value]}};let result=try await BackendQuery.run(input);if let updated=result["project"] as? [String:Any]{project=try ResourceService.decode(updated)};edits=[:];persistDrafts();await readEntries();status="译文已保存"}
     private func approveOnlineTranslation()->Bool {
-        let alert=NSAlert();alert.messageText="使用在线翻译补全？";alert.informativeText="继续会将所选未译文本通过 HTTPS 发送至设置中选择的国内 B站 Index-Translate 或阿里云 Qwen-MT。服务可用性与额度以提供方为准；阿里云使用你自己的密钥，可能产生其套餐费用。已有译文会保留，剩余内容可手动翻译或提取给 AI。";alert.addButton(withTitle:"继续在线翻译");alert.addButton(withTitle:"取消")
+        let alert=NSAlert();alert.messageText="使用在线翻译补全？";alert.informativeText="继续会将所选未译文本通过 HTTPS 发送至：\(DomesticTranslation.providerTitle)。服务可用性与额度以提供方为准；阿里云使用你自己的密钥，可能产生其套餐费用。已有译文会保留，剩余内容可手动翻译或提取给 AI。";alert.addButton(withTitle:"继续在线翻译");alert.addButton(withTitle:"取消")
         return alert.runModal() == .alertFirstButtonReturn
     }
-    private func onlineTranslate(){guard approveOnlineTranslation() else{return};run{try await commitEdits();machineRequested=true;machineGeneration=UUID();try await legacyMachineTranslate()}}
+    private func onlineTranslate(){guard approveOnlineTranslation() else{return};translationMode="online";run{try await commitEdits();machineRequested=true;machineGeneration=UUID();try await legacyMachineTranslate()}}
     private func translate(){run{
         try await commitEdits();var input=base("langTranslate");input["selected"]=Array(selected);status="正在读取社区译库…"
-        communityFilled=0;offerOnline=false
-        do{let result=try await BackendQuery.run(input);try Task.checkCancellation();if let updated=result["project"] as? [String:Any]{project=try ResourceService.decode(updated)};communityFilled=result["filled"] as? Int ?? 0}
-        catch{try Task.checkCancellation();status="社区源暂不可用，继续补全译文。"}
+        communityFilled=0;offerOnline=false;diagnostics=["所选资源：\(selected.count) 个；在线服务：\(DomesticTranslation.providerTitle)"]
+        do{let result=try await BackendQuery.run(input);try Task.checkCancellation();if let updated=result["project"] as? [String:Any]{project=try ResourceService.decode(updated)};communityFilled=result["filled"] as? Int ?? 0;diagnostics += result["warnings"] as? [String] ?? []}
+        catch{try Task.checkCancellation();status="社区源暂不可用，继续补全译文。";diagnostics.append("社区译库："+error.localizedDescription)}
         await readEntries();var pending=base("langPending");pending["selected"]=Array(selected);pending["limit"]=1
         let remaining:PendingLanguageBatch=try ResourceService.decode(try await BackendQuery.run(pending))
         let count=remaining.pending
-        guard count>0 else{status="已完成 · 社区补入 \(communityFilled) 条";return}
-        if #available(macOS 15.0, *) {
+        guard count>0 else{status="所选资源已无待译条目 · 社区补入 \(communityFilled) 条；可导出或应用译文";return}
+        if #available(macOS 15.0, *),translationMode=="system" {
             status="社区补入 \(communityFilled) 条 · 准备本机补全 \(count) 条";machineRequested=true;machineGeneration=UUID()
         } else {
             guard approveOnlineTranslation() else{status="已保留社区译文 · 待翻译 \(count) 条";offerOnline=true;return}
@@ -125,6 +128,7 @@ struct LocalizationWorkspace:View {
     @available(macOS 15.0, *)
     private func machineTranslate(_ session:TranslationSession)async {
         guard machineRequested,project != nil else{return};busy=true;failure="";let generation=machineGeneration;var filled=0,skipped:Set<String>=[]
+        offerOnline=false
         defer{if generation==machineGeneration{busy=false;machineRequested=false}}
         do {
             try await session.prepareTranslation();try Task.checkCancellation()
@@ -146,12 +150,13 @@ struct LocalizationWorkspace:View {
             }
             var final=base("langPending");final["selected"]=Array(selected);final["limit"]=1
             let left:PendingLanguageBatch=try ResourceService.decode(try await BackendQuery.run(final))
-            if left.pending>0{failure="\(left.pending) 条未能安全翻译，已保留待翻译，可手动编辑或提取给 AI。"}
-            HarborAudio.shared.play(.success)
+            status="社区 \(communityFilled) 条 · 本机 \(filled) 条 · 待翻译 \(left.pending) 条"
+            if left.pending>0{failure="\(left.pending) 条未能安全翻译，可在线补全、手动编辑或提取给 AI。";offerOnline=true}else{status+="；可导出汉化包或应用任务译文";HarborAudio.shared.play(.success)}
         }catch{guard generation==machineGeneration else{return};if Task.isCancelled || !machineRequested{status="已停止 · 本机已补全 \(filled) 条"}else{failure="本机翻译未完成："+error.localizedDescription;status="已保留社区与本机已完成的译文";offerOnline=true}}
     }
     private func legacyMachineTranslate()async throws {
-        let generation=machineGeneration;var filled=0,skipped:Set<String>=[]
+        let generation=machineGeneration,provider=DomesticTranslation.provider;var filled=0,skipped:Set<String>=[]
+        offerOnline=false
         defer{if generation==machineGeneration{machineRequested=false}}
         func save(_ changes:[[String:String]])async throws {
             guard !changes.isEmpty else{return}
@@ -165,25 +170,20 @@ struct LocalizationWorkspace:View {
             let batch:PendingLanguageBatch=try ResourceService.decode(try await BackendQuery.run(request))
             guard !batch.entries.isEmpty else{break}
             status="正在在线补全 · 已完成 \(filled) 条 · 待翻译 \(batch.pending) 条"
-            var changes:[[String:String]]=[]
-            do {
-                for entry in batch.entries {
-                    try Task.checkCancellation()
-                    do{changes.append(try await LegacyLanguageTranslation.translate(entry))}
-                    catch LegacyLanguageTranslation.Failure.unchanged{skipped.insert(entry.identity)}
-                }
-            } catch {
-                if !Task.isCancelled && generation==machineGeneration{try? await save(changes)}
-                throw error
-            }
+            let translated=try await OnlineLanguageTranslation.translate(batch.entries,provider:provider)
+            try Task.checkCancellation();guard machineRequested,generation==machineGeneration else{return}
+            diagnostics += translated.failures.sorted(by:{$0.key<$1.key}).prefix(12).map{$0.key+"："+$0.value}
+            if diagnostics.count>100{diagnostics=Array(diagnostics.suffix(100))}
+            // Persist successes before reporting a failed service or a rejected row.
+            let changes=translated.changes
             try Task.checkCancellation();guard machineRequested,generation==machineGeneration else{return}
             try await save(changes);skipped.formUnion(batch.entries.map(\.identity));await readEntries()
+            if changes.isEmpty,!translated.failures.isEmpty{offerOnline=true;throw FileTransactions.error("本批译文未能完成，已保留此前进度。请检查所选翻译服务后重试；详情见处理记录。")}
         }
         var final=base("langPending");final["selected"]=Array(selected);final["limit"]=1
         let left:PendingLanguageBatch=try ResourceService.decode(try await BackendQuery.run(final))
         status="社区 \(communityFilled) 条 · 在线 \(filled) 条 · 待翻译 \(left.pending) 条"
-        if left.pending>0{failure="\(left.pending) 条未能安全翻译，已保留待翻译，可手动编辑或提取给 AI。"}
-        HarborAudio.shared.play(.success)
+        if left.pending>0{failure="\(left.pending) 条未能安全翻译，可重试补全、手动编辑或提取给 AI。";offerOnline=true}else{status+="；可导出汉化包或应用任务译文";HarborAudio.shared.play(.success)}
     }
     private func importTranslations(){let panel=NSOpenPanel();panel.allowedContentTypes=[.zip,.json,UTType(filenameExtension:"lang") ?? .text];panel.prompt="导入译文";guard panel.runModal() == .OK,let file=panel.url else{return};run{try await commitEdits();var input=base("langImport");input["file"]=file.path;input["selected"]=Array(selected);let result=try await BackendQuery.run(input);if let updated=result["project"] as? [String:Any]{project=try ResourceService.decode(updated)};await readEntries();status="已导入 \(result["imported"] as? Int ?? 0) 条译文 · \(result["rejected"] as? Int ?? 0) 条格式不符"}}
     private func export(sourceOnly:Bool){let panel=NSSavePanel();panel.allowedContentTypes=[.zip];panel.nameFieldStringValue=packName+(sourceOnly ? "-未汉化":"")+".zip";panel.prompt=sourceOnly ? "提取语言":"导出汉化包";guard panel.runModal() == .OK,let file=panel.url else{return};run{try await commitEdits();guard let format=Double(packFormat),format>0 else{throw FileTransactions.error("请填写正确的资源包格式号。")} ;var input=base("langExport");input["selected"]=Array(selected);input["packName"]=packName;input["packFormat"]=format;input["mode"]=sourceOnly ? "source":"translated";input["output"]=file.path;let result=try await BackendQuery.run(input);status="已导出 \(result["entries"] as? Int ?? 0) 条 · \(result["sources"] as? Int ?? 0) 个实例资源";NSWorkspace.shared.activateFileViewerSelecting([file]);HarborAudio.shared.play(.success)}}

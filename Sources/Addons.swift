@@ -10,6 +10,7 @@ struct AddonProject:Codable,Identifiable,Sendable {
     let iconUrl:String?
     let downloads:Int
     let pageUrl:String?
+    var slug:String?=nil
     var id:String{projectId}
 }
 struct AddonSearch:Decodable,Sendable{let hits:[AddonProject];let totalHits:Int}
@@ -29,14 +30,20 @@ struct AddonPlanItem:Identifiable,Sendable{let version:AddonVersion;let file:Add
 private struct AddonReceipt:Codable{let projectId:String;let versionId:String;let filename:String;let kind:String}
 
 enum AddonService {
-    static let session:URLSession={let c=URLSessionConfiguration.ephemeral;c.timeoutIntervalForRequest=20;c.timeoutIntervalForResource=180;c.httpAdditionalHeaders=["User-Agent":"MC-Harbor/1.6.0 (+https://github.com/ADsurfboard/MC-Harbor)"];return URLSession(configuration:c)}()
-    private static let decoder:JSONDecoder={let d=JSONDecoder();d.keyDecodingStrategy = .convertFromSnakeCase;return d}()
+    static let session:URLSession={let c=URLSessionConfiguration.ephemeral;c.timeoutIntervalForRequest=20;c.timeoutIntervalForResource=180;c.httpAdditionalHeaders=["User-Agent":"MC-Harbor/1.6.1 (+https://github.com/ADsurfboard/MC-Harbor)"];return URLSession(configuration:c)}()
     static func loader(_ game:GameInstance)->String{game.loader == "Legacy Fabric" ? "fabric":game.loader == "Cleanroom" ? "forge":game.loader.lowercased()}
     static func request<T:Decodable>(_ path:String,query:[URLQueryItem]=[])async throws->T{
         var last:Error=FileTransactions.error("资源来源暂不可用。")
         for base in ResourceMirror.metadataBases {
             var components=URLComponents(string:base+path)!;components.queryItems=query
-            do{try Task.checkCancellation();let (data,response)=try await session.data(from:components.url!);let status=(response as? HTTPURLResponse)?.statusCode ?? 0;guard status==200,data.count<24_000_000 else{throw FileTransactions.error("资源来源返回 HTTP \(status)。")};return try decoder.decode(T.self,from:data)}catch{last=error;try Task.checkCancellation()}
+            do{
+                let url=components.url!
+                let data=try await ResourceMetadataCache.shared.data(url.absoluteString){
+                    let (data,response)=try await session.data(from:url);let status=(response as? HTTPURLResponse)?.statusCode ?? 0
+                    guard status==200,data.count<24_000_000 else{throw FileTransactions.error("资源来源返回 HTTP \(status)。")};return data
+                }
+                try Task.checkCancellation();let decoder=JSONDecoder();decoder.keyDecodingStrategy = .convertFromSnakeCase;return try decoder.decode(T.self,from:data)
+            }catch{last=error;try Task.checkCancellation()}
         }
         throw last
     }
@@ -204,7 +211,7 @@ struct AddonBrowser:View {
                     if kind == .mods{Picker("分区",selection:$section){ForEach(ModSection.allCases){Text($0.title).tag($0)}}.labelsHidden()}
                     SearchBox(prompt:remarkListFilter.isEmpty ? "中英文名称、关键词或备注":"搜索此列表的备注或模组",query:$query).onSubmit{showingRecommendations=false;search()}.harborOnChange(of:query){_,_ in if !query.isEmpty{showingRecommendations=false};search(debounce:true)}
                     if queryUsed != query && !queryUsed.isEmpty{Text("搜索："+queryUsed).font(.system(size:10)).harborSecondaryText().frame(maxWidth:.infinity,alignment:.leading)}
-                    HStack{Toggle("简介自动汉化",isOn:$model.preferences.translateModDescriptions).toggleStyle(.switch).controlSize(.mini);Spacer()}.font(.system(size:10)).help("公开模组简介使用在线翻译及备用源并缓存；服务不可用时保留原文。")
+                    HStack{Toggle("简介自动汉化",isOn:$model.preferences.translateModDescriptions).toggleStyle(.switch).controlSize(.mini);Spacer()}.font(.system(size:10)).help("开启后只显示已完成的中文简介；等待时显示加载中，失败可重试。")
                     if kind == .mods{remarkLists}
                     if canRecommend && showingRecommendations && remarkListFilter.isEmpty{
                         Text("适配 \(game.version) · \(game.loader)。请按需要选装，类似功能的模组可择一使用。").font(.system(size:10)).harborSecondaryText()
@@ -246,7 +253,7 @@ struct AddonBrowser:View {
     private func projectButton(_ project:AddonProject,suggestion:ModSuggestion?=nil)->some View{
         Button{selected=project;HarborAudio.shared.play(.navigate)}label:{
             HStack(alignment:.top,spacing:12){AddonIcon(url:project.iconUrl).frame(width:43,height:43);VStack(alignment:.leading,spacing:5){
-                HStack{Text(suggestion?.chinese ?? project.title).font(.system(size:13,weight:.medium)).lineLimit(1);if let suggestion,ModDiscovery.installed(suggestion,mods:installedMods){Text("已安装").font(.system(size:9)).foregroundStyle(model.accentTextColor)}}
+                HStack{ModProjectName(project:project,enabled:kind == .mods,preferred:suggestion?.chinese).font(.system(size:13,weight:.medium)).lineLimit(1);if let suggestion,ModDiscovery.installed(suggestion,mods:installedMods){Text("已安装").font(.system(size:9)).foregroundStyle(model.accentTextColor)}}
                 Text(suggestion == nil ? project.author:project.title).font(.system(size:10)).harborSecondaryText()
                 if let suggestion{Text(suggestion.reason).font(.system(size:11)).harborSecondaryText().lineLimit(2)}else{ModSummaryText(text:project.description,enabled:model.preferences.translateModDescriptions,compact:true,projectID:project.id,source:source)}
             };Spacer(minLength:0)}.padding(12).frame(maxWidth:.infinity,alignment:.leading).background(model.controlTint.opacity(selected?.id==project.id ? 0.11:0.025),in:RoundedRectangle(cornerRadius:16)).contentShape(RoundedRectangle(cornerRadius:16))
@@ -255,7 +262,7 @@ struct AddonBrowser:View {
     @ViewBuilder private var detail:some View{
         if let project=selected{ScrollView{VStack(alignment:.leading,spacing:20){
             AddonIcon(url:project.iconUrl).frame(width:72,height:72)
-            Text(project.title).font(.system(size:28,weight:.semibold))
+            ModProjectName(project:project,enabled:kind == .mods).font(.system(size:28,weight:.semibold))
             if kind == .mods{remarkEditor(project);Menu("收藏到模组夹"){ForEach(ModCollectionStore.shared.folders){folder in Button(folder.name){do{try ModCollectionStore.shared.add(project,source:source,to:folder.id);model.toast("已收藏")}catch{failure=error.localizedDescription}}};Button("新建模组夹…"){do{if let id=try ModCollectionStore.shared.promptCreate(){try ModCollectionStore.shared.add(project,source:source,to:id)}}catch{failure=error.localizedDescription}}}.buttonStyle(HarborButtonStyle())}
             if let suggestion=selectedSuggestion{Text(suggestion.chinese+" · "+suggestion.reason).font(.system(size:13)).foregroundStyle(model.accentTextColor)}
             ModSummaryText(text:project.description,enabled:model.preferences.translateModDescriptions,compact:false,projectID:project.id,source:source)
@@ -277,20 +284,72 @@ struct AddonBrowser:View {
     private func loadVersions()async{versions=[];versionID="";plan=[];guard let selected else{return};let saved=remarks.entry(selected.id,source:source,listID:remarkListFilter.isEmpty ? remarkListID:remarkListFilter) ?? remarks.entry(selected.id,source:source);remarkName=saved?.name ?? "";remarkListID=saved?.listID ?? remarks.lists.first?.id ?? "personal";preparing=true;defer{preparing=false};do{let values=try await ResourceService.versions(selected.id,game:game,kind:kind,source:source);try Task.checkCancellation();versions=values;versionID=values.first?.id ?? "";failure=values.isEmpty ? "暂无适配此实例的版本。":""}catch{if !Task.isCancelled{failure=error.localizedDescription}}}
     private func prepare()async{plan=[];guard let version=selectedVersion else{return};preparing=true;defer{preparing=false};do{let result=try await ResourceService.plan(version,game:game,kind:kind,source:source);try Task.checkCancellation();plan=result;failure=""}catch{if !Task.isCancelled{failure=error.localizedDescription}}}
 }
+/// The same name path is used by recommendations, all search pages and project details.
+struct ModProjectName:View {
+    let project:AddonProject
+    var enabled=true
+    var preferred:String?=nil
+    @AppStorage("harbor.translationProvider") private var provider="bilibili"
+    @State private var chinese:String?
+    @State private var completedKey=""
+    private var key:String{project.id+"/"+project.title+"/"+provider}
+    var body:some View {
+        Text(preferred ?? (completedKey==key ? chinese:nil) ?? project.title)
+            .help(project.title)
+            .task(id:key+String(enabled)){
+                guard enabled else{return}
+                let requestKey=key
+                let value=await ModNameIndex.projectName(project,provider:provider)
+                guard !Task.isCancelled,requestKey==key else{return};chinese=value;completedKey=requestKey
+            }
+    }
+}
+
+enum ModSummaryPresentation:Equatable {
+    case original(String),loading,translated(String),failed
+    static func state(text:String,enabled:Bool,original:Bool,value:String?,failed:Bool)->Self {
+        guard enabled,needsTranslation(text),!original else{return .original(text)}
+        if let value{return .translated(value)}
+        return failed ? .failed:.loading
+    }
+    static func needsTranslation(_ text:String)->Bool{!text.isEmpty && !ModDiscovery.identifierOnly(text) && text.range(of:"[A-Za-z]",options:.regularExpression) != nil}
+}
 struct ModSummaryText:View {
     let text:String;let enabled:Bool;let compact:Bool
     var projectID:String?=nil
     var source:AddonSource = .modrinth
+    @AppStorage("harbor.translationProvider") private var provider="bilibili"
     @State private var translated:String?
     @State private var original=false
     @State private var failed=false
     @State private var retry=0
-    private var needsTranslation:Bool{enabled && !ModDiscovery.identifierOnly(text) && !text.isEmpty && text.range(of:"[A-Za-z]",options:.regularExpression) != nil && text.range(of:"[\\p{Han}]",options:.regularExpression)==nil}
+    @State private var completedKey=""
+    private var key:String{source.rawValue+"/"+(projectID ?? "")+"/"+provider+"/"+text+String(enabled)+String(retry)}
+    private var needsTranslation:Bool{enabled && ModSummaryPresentation.needsTranslation(text)}
+    private var presentation:ModSummaryPresentation{ModSummaryPresentation.state(text:text,enabled:enabled,original:completedKey==key && original,value:completedKey==key ? translated:nil,failed:completedKey==key && failed)}
     var body:some View{
-        VStack(alignment:.leading,spacing:6){Text(enabled && !original ? translated ?? text:text).font(.system(size:compact ? 11:12)).harborSecondaryText().lineLimit(compact ? 2:nil)
-            if failed && needsTranslation{Button("翻译未完成 · 重试"){retry+=1}.font(.system(size:10)).buttonStyle(HarborBareButtonStyle())}
-            if !compact && needsTranslation{HStack{if translated != nil{Button(original ? "查看中文译文":"查看原文"){original.toggle()}.buttonStyle(HarborBareButtonStyle())};Text(failed ? "翻译暂不可用，显示原文":translated == nil ? "正在翻译简介…":"在线机器翻译").foregroundStyle(.tertiary)}.font(.system(size:10))}
-        }.task(id:text+String(enabled)+String(retry)){translated=nil;original=false;failed=false;guard enabled,!ModDiscovery.identifierOnly(text),!text.isEmpty,text.range(of:"[A-Za-z]",options:.regularExpression) != nil,text.range(of:"[\\p{Han}]",options:.regularExpression)==nil else{return};do{let mirror=await MCIMSummaryStore.shared.translation(project:projectID,source:source,original:text);let value:String;if let mirror{value=mirror}else{value=try await ModTextTranslation.shared.translate(text)};try Task.checkCancellation();translated=value}catch{if !Task.isCancelled{failed=true}}}
+        VStack(alignment:.leading,spacing:6){
+            switch presentation {
+            case .original(let value),.translated(let value):Text(value).font(.system(size:compact ? 11:12)).harborSecondaryText().lineLimit(compact ? 2:nil)
+            case .loading:HStack(spacing:6){ProgressView().controlSize(.mini);Text("加载中…").font(.system(size:compact ? 11:12)).harborSecondaryText()}.frame(minHeight:compact ? 28:38,alignment:.leading).accessibilityLabel("中文简介加载中")
+            case .failed:Button("简介汉化未完成 · 点击重试"){retry+=1}.font(.system(size:11)).buttonStyle(HarborBareButtonStyle())
+            }
+            if !compact && needsTranslation,completedKey==key,translated != nil{
+                HStack{Button(original ? "查看中文译文":"查看原文"){original.toggle()}.buttonStyle(HarborBareButtonStyle());Text("在线机器翻译").foregroundStyle(.tertiary)}.font(.system(size:10))
+            }
+        }.task(id:key){
+            let requestKey=key,selectedProvider=provider
+            translated=nil;original=false;failed=false
+            guard needsTranslation else{return}
+            do{
+                let cached=await ModTextTranslation.shared.cached(text,provider:selectedProvider)
+                let mirror:String?
+                if let cached{mirror=cached}else{mirror=await MCIMSummaryStore.shared.translation(project:projectID,source:source,original:text)}
+                let value:String
+                if let mirror{value=mirror}else{value=try await ModTextTranslation.shared.translate(text,provider:selectedProvider)}
+                try Task.checkCancellation();guard requestKey==key else{return};translated=value;completedKey=requestKey
+            }catch{if !Task.isCancelled,requestKey==key{failed=true;completedKey=requestKey}}
+        }
     }
 }
 private struct AddonIcon:View {
@@ -307,5 +366,5 @@ private actor ResourceCommitGate {
 struct InstalledModTranslation:View {
     @ObservedObject var model:LauncherModel
     let mod:ModFile
-    var body:some View{VStack(alignment:.leading,spacing:5){Text(ModDiscovery.chineseName(mod).isEmpty ? mod.name:ModDiscovery.chineseName(mod)+" · "+mod.name).font(.system(size:13,weight:.medium));if !mod.summary.isEmpty{ModSummaryText(text:mod.summary,enabled:true,compact:true)}else{ModSummaryText(text:mod.name,enabled:true,compact:true)}}.id(mod.id)}
+    var body:some View{VStack(alignment:.leading,spacing:5){ModProjectName(project:AddonProject(projectId:mod.modID,title:mod.name,description:mod.summary,author:"",iconUrl:nil,downloads:0,pageUrl:nil),preferred:ModDiscovery.chineseName(mod).isEmpty ? nil:ModDiscovery.chineseName(mod)).font(.system(size:13,weight:.medium));if !mod.summary.isEmpty{ModSummaryText(text:mod.summary,enabled:true,compact:true)}else{ModSummaryText(text:mod.name,enabled:true,compact:true)}}.id(mod.id)}
 }

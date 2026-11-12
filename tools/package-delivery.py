@@ -12,10 +12,10 @@ ROOT = Path(__file__).resolve().parent.parent
 OUTPUT = Path(os.environ.get('HARBOR_DELIVERY_DIR', ROOT / 'outputs')).resolve()
 APP = ROOT / 'build/MC Harbor.app'
 PDF = ROOT / 'MC-Harbor-Introduction.pdf'
-VERSION = '1.6.0'
+VERSION = '1.6.1'
 APP_ZIP = OUTPUT / f'MC-Harbor-{VERSION}-macOS-arm64.zip'
 SOURCE_ZIP = OUTPUT / f'MC-Harbor-{VERSION}-Apple-source.zip'
-PDF_OUT = OUTPUT / 'MC-Harbor-Apple-Introduction-1.6.0.pdf'
+PDF_OUT = OUTPUT / 'MC-Harbor-Apple-Introduction-1.6.1.pdf'
 SUMS = OUTPUT / f'SHA256SUMS-{VERSION}-apple.txt'
 
 
@@ -63,7 +63,7 @@ with tempfile.TemporaryDirectory(prefix='mcharbor-apple-delivery-') as temporary
     command('/usr/bin/ditto', str(APP), str(stage / APP.name))
     command('/usr/bin/codesign', '--verify', '--deep', '--strict', str(stage / APP.name))
     shutil.copy2(PDF, stage / PDF_OUT.name)
-    (stage / 'README-Install.txt').write_text('''MC Harbor 1.6.0 Apple 芯片版
+    (stage / 'README-Install.txt').write_text('''MC Harbor 1.6.1 Apple 芯片版
 
 适用 Apple 芯片、macOS 26 或以上。Intel 版请下载对应的独立安装包。
 先阅读随包 PDF；备份既有游戏和启动器数据后，再将 MC Harbor.app 放入应用程序文件夹。

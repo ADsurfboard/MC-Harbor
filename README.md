@@ -1,8 +1,8 @@
 # MC Harbor
 
-1.6.0 · Apple Silicon / Intel 双版本
+1.6.1 · Apple Silicon / Intel 双版本
 
-[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/tag/v1.6.0) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.6.0/MC-Harbor-Introduction-1.6.0.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)
+[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/tag/v1.6.1) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.6.1/MC-Harbor-Introduction-1.6.1.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)
 
 以下正文与随包 PDF 同版。
 
@@ -10,7 +10,7 @@
 保留 HMCL 的游戏能力，采用真实 WinHarbor 原生界面，
 把账号、下载、实例资源与汉化工作集中在一个窗口。
 
-1.6.0 · Apple Silicon / Intel 双版本
+1.6.1 · Apple Silicon / Intel 双版本
 Apple Silicon：macOS 26 起；Intel：macOS 12 起
 
 ## 日常操作，一处完成。
@@ -89,7 +89,7 @@ Apple Silicon：macOS 26 起；Intel：macOS 12 起
 
 普通 lang 导出为资源包；任务配置与数据包译文使用“应用任务 / 数据包”。先检查文件修订和存档占用，再保存原字节备份、校验 ZIP 并原子写回，失败回滚。导出的 ZIP 也包含 overrides 目录，可按实例根目录合并；原 JAR 不改写。
 
-自写 FTB 任务通常没有现成社区译文。macOS 15 及以上可用系统翻译；12—14 可选择在线补全，也可逐条校对或提取给 AI。旧版的 39 项隔离检查包含写入失败回滚；未替用户修改真实存档。
+自写 FTB 任务通常没有现成社区译文。各版本默认用所选在线服务补全；macOS 15 起也可选择本机翻译。未译数量和处理记录保持可见，仍可逐条校对或提取给 AI；任务 / 数据包的应用会先备份，不修改原模组 JAR。
 
 ## 编辑世界，补齐前置。
 
@@ -151,7 +151,7 @@ Java 任务按需启动；原壁纸和缩略图按文件修订缓存，资源索
 
 ### 本轮验证
 
-Intel 客户端在 Rosetta 下通过 53 项功能检查、24 好友场景检查及 22 项 Java 后台检查；旧系统翻译分段、占位符保护和真实在线返回也已核对。Worker / Python 好友服务各自的隔离检查通过。
+双架构版本分别检查客户端、24 好友场景、Java 后端、窗口及快捷方式。语言流程覆盖模组、KubeJS、FTB 任务与存档数据包的提取、翻译、导出及备份应用；旧系统翻译分段和格式保护另有隔离回归。第三方服务可用性与实机兼容边界单独记录。
 
 ### 已有基线
 
@@ -177,7 +177,7 @@ Intel 客户端在 Rosetta 下通过 53 项功能检查、24 好友场景检查�
 
 ### 一键汉化：社区优先，再补齐
 
-先使用 CFPA 社区中文；macOS 15 及以上可继续调用系统 Translation。各版本可选择国内 B站 Index-Translate 在线补全，也可配置阿里云 Qwen-MT；系统翻译不可用时保留在线选项。服务均受各自额度与可用性限制。未完成的条目保留，支持手动校对或提取给 AI。
+先使用资源内中文和 CFPA 社区译文，再用所选在线服务补全；macOS 15 起也可选择本机翻译。国内默认 B站 Index-Translate，阿里云 Qwen-MT 自备密钥；MyMemory 和 Google 公共接口作为手动备选。未变的英文不冒充完成，失败条目保留并可重试。
 
 ### 长段落与文本格式保护
 
@@ -251,7 +251,7 @@ Intel 版已在 Rosetta 下校验并启动官方陶瓦、退出房间，并验�
 
 ### 国内来源与真实汉化状态
 
-下载设置提供自动、官方优先和镜像优先。模组元数据与文件可使用 MCIM 国内镜像，失败回退官方来源；简介优先复用与原文匹配的镜像译文，再调用所选翻译服务。中文搜索结合常用名称映射和机器翻译，备注仍可搜索。失败有重试入口，不保存截断或未翻译的结果。
+下载设置提供自动、官方优先和镜像优先。模组元数据与文件可使用 MCIM 国内镜像，失败回退官方来源；简介优先复用与原文匹配的镜像译文，再调用所选翻译服务。全部搜索、推荐和详情共用离线中文名索引，未收录名称再请求翻译。简介开启汉化后先显示加载中，完成后才展示中文，失败显示重试入口；关闭开关可看原文。
 
 ### 实例快捷应用与关闭游戏
 
@@ -267,7 +267,7 @@ Intel 版已在 Rosetta 下校验并启动官方陶瓦、退出房间，并验�
 
 ### 命名与轻染色玻璃
 
-创建多个模组夹，分别命名和调整颜色。改色只叠加轻薄色调，保持半透明磨砂、阴影、透光和卡片展开的动态；开启减少动态效果后保留静态层次。封面自动读取模组原图标，没有图标时使用 Minecraft 风景图。
+创建多个模组夹，分别命名和调整颜色。改色只叠加轻薄色调，保持磨砂薄壳、卡片透色和局部袋口高光；前壳、后壳与卡片各自呈现深度和展开动态，去掉整圈描边。开启减少动态效果后保留静态层次。卡片读取模组原图，缺图使用 Minecraft 风景。PNG 透明区域与比例留白透出半透明流体：分别提取每张模组图的两种核心颜色，动态混合并做高斯模糊，原图边缘柔和衔接。空模组夹只有空壳。
 
 ### 打开前景窗口，继续按列表操作
 
@@ -304,7 +304,7 @@ Intel 版已在 Rosetta 下校验并启动官方陶瓦、退出房间，并验�
 
 发布前分别构建两种架构并运行回归；原生系统、窗口行为、事务和网络可用性需要分别验证。第三方镜像、翻译、认证与联机节点均可能变化；阿里翻译需自备有效密钥。自动测试不能代表所有模组组合、所有 macOS 小版本或所有地区网络已穷尽验证。
 
-来源：MCIM 接入与 API 文档 www.mcimirror.top；B站 Index-Translate 官方仓库 github.com/bilibili/Index-Translate；阿里云 Qwen-MT 官方 API 文档 help.aliyun.com/zh/model-studio/qwen-mt-api。
+来源：MCIM / mcimirror.top；B站 / github.com/bilibili/Index-Translate；阿里 / help.aliyun.com/zh/model-studio/qwen-mt-api；MyMemory / mymemory.translated.net/doc/spec.php；Google 公共接口为非官方备选，无稳定性保证。
 
 ## 构建与许可
 

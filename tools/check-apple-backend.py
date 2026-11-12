@@ -11,7 +11,7 @@ assert len(fx)==3 and java.is_file()
 classpath=os.pathsep.join(map(str,[Path(os.environ.get('HARBOR_QA_BACKEND_JAR',str(resources/'Backend.jar'))),resources/'HMCLCore.jar',*fx]))
 with tempfile.TemporaryDirectory(prefix='mc-harbor-intel-qa-',dir=root/'build') as temporary:
     path=Path(temporary);classes=path/'classes';classes.mkdir()
-    subprocess.run([str(jdk/'bin/javac'),'--release','17','-encoding','UTF-8','-cp',classpath,'-d',str(classes),str(root/'tools/UpdateBackendChecks.java')],check=True)
+    subprocess.run([str(jdk/'bin/javac'),'--release','17','-encoding','UTF-8','-cp',classpath,'-d',str(classes),str(root/'tools/UpdateBackendChecks.java'),str(root/'tools/LocalizationBackendChecks.java')],check=True)
     process=subprocess.run([str(java),'-Djava.awt.headless=true','-Dshenggan.headless=true','-cp',str(classes)+os.pathsep+classpath,'net.morben.shenggan.UpdateBackendChecks',str(path/'data')],text=True,capture_output=True,timeout=120)
     print(process.stdout,end='')
     if process.returncode:
