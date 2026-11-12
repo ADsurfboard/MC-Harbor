@@ -1,0 +1,3 @@
+[submodule "vendor/AmethystIOS"]
+	path = vendor/AmethystIOS
+	url = https://github.com/AngelAuraMC/Amethyst-iOS.git

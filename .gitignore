@@ -8,3 +8,11 @@ ShengganData/
 .DS_Store
 __pycache__/
 *.pyc
+
+# iOS reproducible build output and simulator state
+iOS/**/.build/
+iOS/DerivedData/
+iOS/build/
+iOS/*.xcodeproj/
+iOS/*.xcworkspace/
+iOS/evidence/private/

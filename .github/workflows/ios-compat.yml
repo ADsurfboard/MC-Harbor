@@ -1,0 +1,21 @@
+name: iOS port verification
+on:
+  push:
+    branches: ["codex/ios-port"]
+    paths: ["iOS/**", ".github/workflows/ios-compat.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  touch-and-storage:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect Apple toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+      - name: Test multi-touch, layouts and modpack storage boundaries
+        working-directory: iOS/HarborCore
+        run: swift test --jobs 3
