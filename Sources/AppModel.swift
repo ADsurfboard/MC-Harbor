@@ -5,7 +5,7 @@ import Security
 import UniformTypeIdentifiers
 
 @MainActor final class LauncherModel: ObservableObject {
-    @Published var preferences: NativePreferences { didSet { persist() } }
+    @Published var preferences: NativePreferences { didSet { if preferences.performanceMode{showIntro=false};persist() } }
     let sakura=SakuraConnection()
     let terracotta=TerracottaConnection()
     @Published var invitedServer=""
@@ -21,7 +21,10 @@ import UniformTypeIdentifiers
     @Published var downloadCategory="minecraft"
     @Published var works: [WorkItem] = []
     @Published var errorMessage: String?
-    @Published var downloadNotice:String?
+    @Published var downloadNotice:String? {didSet{
+        downloadNoticeTask?.cancel();guard downloadNotice != nil else{return}
+        downloadNoticeTask=Task{try? await HarborDelay.sleep(seconds:HarborNoticePolicy.lifetime);guard !Task.isCancelled else{return};downloadNotice=nil}
+    }}
     var resourceInstalling:[String:Set<UUID>]=[:]
     @Published var toastMessage: String?
     @Published var inspectedGame: GameInstance?
@@ -51,6 +54,7 @@ import UniformTypeIdentifiers
     private var preferenceWork:DispatchWorkItem?
     private let preferenceQueue=DispatchQueue(label:"net.morben.mcharbor.preferences")
     private var toastTask: Task<Void,Never>?
+    private var downloadNoticeTask: Task<Void,Never>?
     var selected: GameInstance? { games.first{$0.id==preferences.selectedGame} ?? games.first }
     var selectedAccount: LauncherAccount? { accounts.first{$0.id==preferences.selectedAccount} ?? accounts.first }
     var appearance: HarborAppearance { preferences.appearance }
@@ -71,7 +75,7 @@ import UniformTypeIdentifiers
         preferences = (try? JSONDecoder().decode(NativePreferences.self,from:JSONSerialization.data(withJSONObject:merged))) ?? NativePreferences()
         accounts=(try? JSONDecoder().decode([LauncherAccount].self,from:Data(contentsOf:NativePaths.root.appendingPathComponent("accounts.json")))) ?? []
         for account in accounts{if let profile=SkinStorage.cached(account.id){skinProfiles[account.id]=profile}}
-        showIntro=preferences.introEnabled && ProcessInfo.processInfo.environment["SHENGGAN_SKIP_INTRO"] != "1"
+        showIntro=preferences.introEnabled && !preferences.performanceMode && ProcessInfo.processInfo.environment["SHENGGAN_SKIP_INTRO"] != "1"
         ResourceMirror.source=preferences.downloadSource
         HarborAudio.shared.configure(enabled:preferences.soundsEnabled,volume:preferences.soundVolume)
         scan()
@@ -89,7 +93,7 @@ import UniformTypeIdentifiers
     func flushPreferences(){preferenceWork?.cancel();guard let data=try? JSONEncoder().encode(preferences) else{return};preferenceQueue.sync{try? data.write(to:NativePaths.root.appendingPathComponent("preferences.json"),options:.atomic)}}
 
     func scan() { let root=preferences.gameRoot;Task { let scanned=await Task.detached(priority:.userInitiated){NativeScanner.scan(root)}.value;games=scanned } }
-    func toast(_ text:String) { toastTask?.cancel();toastMessage=text;toastTask=Task{try? await HarborDelay.sleep(seconds:3.2);if !Task.isCancelled{toastMessage=nil}} }
+    func toast(_ text:String) { toastTask?.cancel();toastMessage=text;toastTask=Task{try? await HarborDelay.sleep(seconds:HarborNoticePolicy.lifetime);if !Task.isCancelled{toastMessage=nil}} }
     func open(_ path:String) { guard FileManager.default.fileExists(atPath:path) else{errorMessage="目录尚不存在。";return};NSWorkspace.shared.open(URL(fileURLWithPath:path)) }
     func selectRoot() { let panel=NSOpenPanel();panel.canChooseDirectories=true;panel.canChooseFiles=false;panel.prompt="选择游戏库";if panel.runModal() == .OK,let url=panel.url{preferences.gameRoot=url.path;scan()} }
     func favorite(_ game:GameInstance) { if preferences.favorites.contains(game.id){preferences.favorites.remove(game.id)}else{preferences.favorites.insert(game.id)} }

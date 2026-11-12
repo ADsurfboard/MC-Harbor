@@ -193,7 +193,7 @@ struct HarborActivityOverlay: View {
     var body: some View {
         let theme = HarborTheme(appearance: appearance,style:customization)
         HStack(spacing: 15) {
-            ProgressView()
+            HarborActivityIndicator()
                 .controlSize(.small)
                 .tint(HarborPalette.seaGlass)
             VStack(alignment: .leading, spacing: 3) {

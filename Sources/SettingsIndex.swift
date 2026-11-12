@@ -12,6 +12,7 @@ enum HarborSettingsIndex {
         .init(title:"毛玻璃与玻璃通透",section:"外观",anchor:"背景",keywords:"磨砂 材质 透明 通透度"),
         .init(title:"壁纸库与流体背景",section:"外观",anchor:"背景",keywords:"图片 视频 动态 壁纸柔化 窗口透明 后景材质"),
         .init(title:"模组夹信息显示",section:"外观",anchor:"模组夹信息显示",keywords:"图标 名称 加载器 Forge Fabric 模组版本 Minecraft 收藏时间 简介 作者 仅名称"),
+        .init(title:"独家优化",section:"外观",anchor:"动态与声音",keywords:"性能 轻量 流畅 卡顿 静态 无动画 关闭动效"),
         .init(title:"减少动态效果",section:"外观",anchor:"动态与声音",keywords:"动画 流畅 性能 动效"),
         .init(title:"界面音效与音量",section:"外观",anchor:"动态与声音",keywords:"试听 声音"),
         .init(title:"欢迎动画与显示名字",section:"欢迎动画",anchor:"启动欢迎",keywords:"用户名 动画时长 启动 预览"),
@@ -24,7 +25,7 @@ enum HarborSettingsIndex {
         .init(title:"连接检测与数据目录",section:"维护",anchor:"维护",keywords:"诊断 日志 应用数据 账号导入"),
         .init(title:"存档备份",section:"维护",anchor:"维护",keywords:"游戏 存档 备份"),
         .init(title:"贡献者",section:"维护",anchor:"贡献者",keywords:"jiekee 花圆银行 贡献名单"),
-        .init(title:"关于与作者主页",section:"维护",anchor:"关于",keywords:"版本 HMCL GitHub Issues issue B站 反馈 功能建议 许可 便携模式")
+        .init(title:"关于与作者主页",section:"维护",anchor:"关于",keywords:"作者 ADsurfboard GPT 版本 HMCL GitHub Issues issue B站 反馈 功能建议 许可 便携模式")
     ]
     static func search(_ query:String)->[HarborSettingItem]{let tokens=query.split(whereSeparator:{$0.isWhitespace}).map(String.init);guard !tokens.isEmpty else{return []};return items.filter{item in let text=item.title+" "+item.section+" "+item.keywords;return tokens.allSatisfy{text.localizedCaseInsensitiveContains($0)}}}
 }

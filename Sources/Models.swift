@@ -33,6 +33,7 @@ struct NativePreferences: Codable {
     var wallpaper = WallpaperSettings()
     var fluidBackground = false
     var reduceMotion = false
+    var performanceMode = false
     var gameRoot = FileManager.default.fileExists(atPath:"/Applications/.minecraft") ? "/Applications/.minecraft":NativePaths.root.appendingPathComponent("game").path
     var selectedGame = ""
     var favorites: Set<String> = []

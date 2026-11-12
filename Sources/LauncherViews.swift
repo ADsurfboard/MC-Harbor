@@ -20,16 +20,17 @@ import SwiftUI
 struct LauncherRoot:View {
     @ObservedObject var model:LauncherModel
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    private var motionPolicy:HarborMotionPolicy{.init(performance:model.preferences.performanceMode,reduceMotion:model.preferences.reduceMotion,systemReduceMotion:systemReduceMotion)}
     private var presented:Bool{model.inspectedGame != nil || model.modal != nil}
-    private var transition:AnyTransition{systemReduceMotion || model.preferences.reduceMotion ? .opacity:.scale(scale:0.955).combined(with:.opacity).combined(with:.offset(y:20))}
+    private var transition:AnyTransition{if model.preferences.performanceMode{return .identity};return systemReduceMotion || model.preferences.reduceMotion ? .opacity:.scale(scale:0.955).combined(with:.opacity).combined(with:.offset(y:20))}
     var body:some View {
         let theme=HarborTheme(appearance:model.appearance,style:model.themeRuntime)
         GeometryReader{geometry in
             ZStack {
                 NativeBackdrop(model:model)
                 HStack(spacing:0){NativeSidebar(model:model);VStack(spacing:0){topBar;Group{switch model.section{case .library:NativeLibraryView(model:model);case .downloads:NativeDownloadsView(model:model);case .collections:ModCollectionsView(model:model);case .accounts:NativeAccountsView(model:model);case .multiplayer:NativeMultiplayerView(model:model,connection:model.sakura);case .friends:NativeFriendsView(model:model,social:model.social);case .settings:NativeSettingsView(model:model)}}.frame(maxWidth:.infinity,maxHeight:.infinity)}}
-                    .blur(radius:presented ? 14:0)
-                    .scaleEffect(presented && !systemReduceMotion && !model.preferences.reduceMotion ? 0.987:1)
+                    .blur(radius:presented && !model.preferences.performanceMode ? 14:0)
+                    .scaleEffect(presented && !motionPolicy.staticEffects ? 0.987:1)
                     .opacity(model.showIntro ? 0:1)
                     .allowsHitTesting(!presented && !model.showIntro)
                     .accessibilityHidden(presented || model.showIntro)
@@ -43,22 +44,24 @@ struct LauncherRoot:View {
                     InstanceWorkspace(model:model,game:game)
                         .frame(maxWidth:1120,maxHeight:.infinity)
                         .padding(.horizontal,28).padding(.top,52).padding(.bottom,28)
-                        .blur(radius:model.modal != nil ? 12:0)
-                        .scaleEffect(model.modal != nil ? 0.987:1)
+                        .blur(radius:model.modal != nil && !model.preferences.performanceMode ? 12:0)
+                        .scaleEffect(model.modal != nil && !model.preferences.performanceMode ? 0.987:1)
                         .allowsHitTesting(model.modal==nil)
                         .accessibilityHidden(model.modal != nil)
                         .transition(transition).zIndex(2)
                 }
                 if let modal=model.modal{HarborModalHost(model:model,modal:modal,available:geometry.size).id(modal.id).transition(transition).zIndex(3)}
                 WindowConfigurator().frame(width:0,height:0)
-                if let toast=model.toastMessage {VStack{Spacer();HStack{Spacer();HarborToast(message:toast,appearance:model.appearance)}}.padding(24).transition(.opacity.combined(with:.move(edge:.bottom))).zIndex(4)}
-                if model.downloadNotice != nil{VStack{DownloadStartedNotice(model:model);Spacer()}.padding(24).transition(.move(edge:.top).combined(with:.opacity)).zIndex(5)}
+                if let toast=model.toastMessage {VStack{Spacer();HStack{Spacer();HarborToast(message:toast,appearance:model.appearance)}}.padding(24).transition(model.preferences.performanceMode ? .identity:.scale(scale:0.96,anchor:.bottom).combined(with:.opacity).combined(with:.move(edge:.bottom))).zIndex(4)}
+                if model.downloadNotice != nil{VStack{DownloadStartedNotice(model:model);Spacer()}.padding(24).transition(model.preferences.performanceMode ? .identity:.scale(scale:0.94,anchor:.top).combined(with:.move(edge:.top)).combined(with:.opacity)).zIndex(5)}
                 if model.showIntro {WelcomeSequence(model:model).transition(.opacity).zIndex(5)}
             }
         }
-        .animation(.spring(response:0.48,dampingFraction:0.86),value:model.inspectedGame?.id)
-        .animation(.spring(response:0.48,dampingFraction:0.86),value:model.modal?.id)
-        .animation(.smooth(duration:0.6),value:model.showIntro)
+        .animation(model.preferences.performanceMode ? nil:.spring(response:0.48,dampingFraction:0.86),value:model.inspectedGame?.id)
+        .animation(model.preferences.performanceMode ? nil:.spring(response:0.48,dampingFraction:0.86),value:model.modal?.id)
+        .animation(model.preferences.performanceMode ? nil:.smooth(duration:0.6),value:model.showIntro)
+        .animation(model.preferences.performanceMode ? nil:.spring(response:0.46,dampingFraction:0.78),value:model.downloadNotice)
+        .animation(model.preferences.performanceMode ? nil:.spring(response:0.42,dampingFraction:0.80),value:model.toastMessage)
         .foregroundStyle(theme.primaryText)
         .buttonStyle(HarborButtonStyle())
         .preferredColorScheme(model.appearance.isLight ? .light:.dark)
@@ -68,7 +71,9 @@ struct LauncherRoot:View {
         .environment(\.harborFrosted,model.preferences.frostedGlass)
         .environment(\.harborAppearance,model.appearance)
         .environment(\.harborThemeRuntime,model.themeRuntime)
-        .environment(\.harborReduceMotion,model.preferences.reduceMotion || systemReduceMotion)
+        .environment(\.harborReduceMotion,motionPolicy.staticEffects)
+        .environment(\.harborPerformanceMode,model.preferences.performanceMode)
+        .transaction{if model.preferences.performanceMode{$0.animation=nil;$0.disablesAnimations=true}}
         .alert("MC Harbor",isPresented:Binding(get:{model.errorMessage != nil},set:{if !$0{model.errorMessage=nil}})){Button("好"){model.errorMessage=nil}} message:{Text(model.errorMessage ?? "")}
         .onReceive(NotificationCenter.default.publisher(for:NSApplication.willTerminateNotification)){_ in model.terracotta.stop(synchronous:true);model.sakura.stop();model.social.chat.disconnect();model.social.flush();model.flushPreferences()}
         .onAppear{model.social.connectIfConfigured()}
@@ -80,7 +85,7 @@ struct LauncherRoot:View {
         .harborOnChange(of:model.errorMessage){_,message in if message != nil{HarborAudio.shared.play(.error)}}
     }
     private var topBar:some View {
-        HStack(spacing:16){Text(model.section.title).font(.system(size:13,weight:.semibold));Spacer();if let work=model.works.first(where:{$0.active}){ProgressView().controlSize(.mini);Text(work.title).font(.system(size:11)).harborSecondaryText().lineLimit(1)};Button{model.scan()}label:{HarborSymbol(systemName:"arrow.clockwise").font(.system(size:12))}.buttonStyle(HarborBareButtonStyle()).help("刷新")}
+        HStack(spacing:16){Text(model.section.title).font(.system(size:13,weight:.semibold));Spacer();if let work=model.works.first(where:{$0.active}){HarborActivityIndicator().controlSize(.mini);Text(work.title).font(.system(size:11)).harborSecondaryText().lineLimit(1)};Button{model.scan()}label:{HarborSymbol(systemName:"arrow.clockwise").font(.system(size:12))}.buttonStyle(HarborBareButtonStyle()).help("刷新")}
             .padding(.horizontal,28).frame(height:54).background(WindowDragRegion())
     }
 }
@@ -145,9 +150,9 @@ struct NativeBackdrop:View {
     @ObservedObject var model:LauncherModel
     @Environment(\.scenePhase) private var phase
     var body:some View{ZStack{
-        HarborWallpaperView(settings:model.preferences.wallpaper,appearance:model.appearance,pauseWhenInactive:true,animationEnabled:model.preferences.wallpaper.kind == .video)
+        HarborWallpaperView(settings:model.preferences.wallpaper,appearance:model.appearance,pauseWhenInactive:true,animationEnabled:model.preferences.wallpaper.kind == .video && !model.preferences.performanceMode)
         if model.appearance == .theme{model.themeColor.opacity(0.24).allowsHitTesting(false)}
-        if model.preferences.fluidBackground && model.preferences.wallpaper.kind == .harbor{FluidField(dark:model.appearance == .dark,color:model.themeRuntime.effects,active:phase == .active && !model.preferences.reduceMotion).opacity(0.62)}
+        if model.preferences.fluidBackground && model.preferences.wallpaper.kind == .harbor{FluidField(dark:model.appearance == .dark,color:model.themeRuntime.effects,active:phase == .active && !model.preferences.reduceMotion && !model.preferences.performanceMode).opacity(0.62)}
     }.ignoresSafeArea()}
 }
 struct FluidField:View {

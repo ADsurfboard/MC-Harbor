@@ -84,12 +84,13 @@ struct HarborMaterial<S:Shape>:View {
     @Environment(\.harborFrosted) private var frosted
     @Environment(\.harborAccent) private var accent
     @Environment(\.harborThemeRuntime) private var customization
+    @Environment(\.harborPerformanceMode) private var performance
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     var body:some View{let policy=HarborSurfacePolicy(clarity:clarity,frosted:frosted);let light=appearance.isLight;let base=light ? Color(hex:0xF0F3F1):HarborPalette.nightRaised
         ZStack{
             if reduceTransparency{shape.fill(appearance == .theme ? accent.paleThemeColor:base)}else{
                 if policy.diffusion>0.001{FrostedSurface(blur:36,radius:0,dark:!light).clipShape(shape).opacity(policy.diffusion)}
-                if policy.liquid>0.001{shape.fill(base.opacity(0.035)).glassEffect(Glass.clear.tint(accent.opacity(appearance == .theme ? 0.12:0.025)).interactive(interactive),in:shape).opacity(policy.liquid)}
+                if policy.liquid>0.001{shape.fill(base.opacity(0.035)).glassEffect(Glass.clear.tint(accent.opacity(appearance == .theme ? 0.12:0.025)).interactive(interactive && !performance),in:shape).opacity(policy.liquid)}
                 // A constant neutral veil avoids changing hue as clarity moves.
                 shape.fill((appearance == .theme ? accent:base).opacity(frosted ? (light ? 0.12:0.10):(appearance == .theme ? 0.10:0.015)))
                 if let surface=customization.surface{shape.fill(surface.opacity(customization.settings.surfaceStrength))}
@@ -102,6 +103,7 @@ struct HarborGlassModifier:ViewModifier {
     let radius:CGFloat
     let interactive:Bool
     @Environment(\.harborThemeRuntime) private var customization
+    @Environment(\.harborPerformanceMode) private var performance
     func body(content:Content)->some View{let shape=RoundedRectangle(cornerRadius:radius,style:.continuous);let theme=HarborTheme(appearance:appearance)
         content.background{HarborMaterial(shape:shape,appearance:appearance,interactive:interactive)}
             .overlay(shape.stroke(customization.border ?? theme.border,lineWidth:0.7).allowsHitTesting(false))
@@ -131,6 +133,7 @@ struct HarborActionButtonStyle: ButtonStyle {
     var prominent = false
     @Environment(\.harborAccent) private var accent
     @Environment(\.harborThemeRuntime) private var customization
+    @Environment(\.harborPerformanceMode) private var performance
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.harborReduceMotion) private var customReduceMotion
     private var reduceMotion: Bool { systemReduceMotion || customReduceMotion }
@@ -171,17 +174,17 @@ struct HarborActionButtonStyle: ButtonStyle {
             .contentShape(.interaction,Capsule())
 
             .scaleEffect(
-                configuration.isPressed
+                configuration.isPressed && !performance
                     ? (reduceMotion ? 0.98 : 0.85)
                     : 1
             )
             .offset(y: configuration.isPressed && !reduceMotion ? 2.5 : 0)
-            .brightness(configuration.isPressed ? 0.05 : 0)
-            .opacity(isEnabled ? (configuration.isPressed ? 0.88 : 1) : 0.48)
+            .brightness(configuration.isPressed && !performance ? 0.05 : 0)
+            .opacity(isEnabled ? (configuration.isPressed && !performance ? 0.88 : 1) : 0.48)
             .animation(
-                configuration.isPressed || reduceMotion
+                performance ? nil : (configuration.isPressed || reduceMotion
                     ? .easeOut(duration: 0.07)
-                    : .spring(response: 0.38, dampingFraction: 0.44, blendDuration: 0.08),
+                    : .spring(response: 0.38, dampingFraction: 0.44, blendDuration: 0.08)),
                 value: configuration.isPressed
             )
             .harborOnChange(of:configuration.isPressed){_,pressed in if pressed && isEnabled{HarborAudio.shared.play(.select)}}
@@ -195,6 +198,7 @@ struct HarborPressButtonStyle: ButtonStyle {
 
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.harborReduceMotion) private var customReduceMotion
+    @Environment(\.harborPerformanceMode) private var performance
     private var reduceMotion: Bool { systemReduceMotion || customReduceMotion }
     @Environment(\.isEnabled) private var isEnabled
 
@@ -203,17 +207,17 @@ struct HarborPressButtonStyle: ButtonStyle {
             .contentShape(.interaction,RoundedRectangle(cornerRadius:16))
 
             .scaleEffect(
-                configuration.isPressed
+                configuration.isPressed && !performance
                     ? (reduceMotion ? 0.98 : pressedScale)
                     : 1
             )
             .offset(y: configuration.isPressed && !reduceMotion ? pressedOffset : 0)
-            .brightness(configuration.isPressed ? 0.05 : 0)
-            .opacity(isEnabled ? (configuration.isPressed ? 0.88 : 1) : 0.48)
+            .brightness(configuration.isPressed && !performance ? 0.05 : 0)
+            .opacity(isEnabled ? (configuration.isPressed && !performance ? 0.88 : 1) : 0.48)
             .animation(
-                configuration.isPressed || reduceMotion
+                performance ? nil : (configuration.isPressed || reduceMotion
                     ? .easeOut(duration: 0.07)
-                    : .spring(response: 0.38, dampingFraction: 0.44, blendDuration: 0.08),
+                    : .spring(response: 0.38, dampingFraction: 0.44, blendDuration: 0.08)),
                 value: configuration.isPressed
             )
             .harborOnChange(of:configuration.isPressed){_,pressed in if pressed && isEnabled{HarborAudio.shared.play(.select)}}

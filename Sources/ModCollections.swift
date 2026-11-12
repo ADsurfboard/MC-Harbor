@@ -15,8 +15,8 @@ struct ModCollection:Codable,Identifiable,Equatable {let id:String;var name:Stri
     let root:URL
     init(root:URL=NativePaths.root.appendingPathComponent("mod-collections")){self.root=root;folders=(try? JSONDecoder().decode([ModCollection].self,from:Data(contentsOf:root.appendingPathComponent("folders.json")))) ?? []}
     private func save(_ value:[ModCollection])throws{try FileManager.default.createDirectory(at:root,withIntermediateDirectories:true);try JSONEncoder().encode(value).write(to:root.appendingPathComponent("folders.json"),options:.atomic);folders=value}
-    @discardableResult func create(_ name:String,color:String="#A7CDBB")throws->String{let title=name.trimmingCharacters(in:.whitespacesAndNewlines);guard !title.isEmpty,title.count<=60 else{throw FileTransactions.error("模组夹名称需为 1–60 字。")};let id=UUID().uuidString;var value=folders;value.append(.init(id:id,name:title,color:color,entries:[]));try save(value);return id}
-    func update(_ id:String,name:String,color:String)throws{let title=name.trimmingCharacters(in:.whitespacesAndNewlines);guard !title.isEmpty,title.count<=60,color.range(of:"^#[A-Fa-f0-9]{6}$",options:.regularExpression) != nil else{throw FileTransactions.error("请填写有效的名称与颜色。")};var value=folders;guard let i=value.firstIndex(where:{$0.id==id}) else{return};value[i].name=title;value[i].color=color;try save(value)}
+    @discardableResult func create(_ name:String,color:String="none")throws->String{let title=name.trimmingCharacters(in:.whitespacesAndNewlines);guard !title.isEmpty,title.count<=60 else{throw FileTransactions.error("模组夹名称需为 1–60 字。")};let id=UUID().uuidString;var value=folders;value.append(.init(id:id,name:title,color:color,entries:[]));try save(value);return id}
+    func update(_ id:String,name:String,color:String)throws{let title=name.trimmingCharacters(in:.whitespacesAndNewlines);guard !title.isEmpty,title.count<=60,(color=="none" || color.range(of:"^#[A-Fa-f0-9]{6}$",options:.regularExpression) != nil) else{throw FileTransactions.error("请填写有效的名称与颜色。")};var value=folders;guard let i=value.firstIndex(where:{$0.id==id}) else{return};value[i].name=title;value[i].color=color;try save(value)}
     func delete(_ id:String)throws{try save(folders.filter{$0.id != id})} // Cached files retained for recovery / other folders.
     func remove(_ ids:Set<String>,folder:String)throws{var value=folders;guard let i=value.firstIndex(where:{$0.id==folder}) else{return};value[i].entries.removeAll{ids.contains($0.id)};try save(value)}
     func add(_ project:AddonProject,source:AddonSource,to folder:String,version:AddonVersion?=nil)throws{var value=folders;guard let i=value.firstIndex(where:{$0.id==folder}) else{throw FileTransactions.error("模组夹已不存在。")};let id=source.rawValue+":"+project.id;guard !value[i].entries.contains(where:{$0.id==id}) else{return};value[i].entries.append(.init(id:id,title:project.title,icon:project.iconUrl,file:nil,project:project,source:source,collectedAt:Date(),loaders:version?.loaders,gameVersions:version?.gameVersions,modVersion:version?.versionNumber,summary:project.description,authors:project.author));try save(value)}
@@ -85,7 +85,7 @@ struct ModFolderCard:View {
     @Environment(\.colorScheme) private var colorScheme
     private var open:Bool{hovering && !reduceMotion}
     private static let grain=NSImage(contentsOf:NativePaths.resources.appendingPathComponent("Brand/FrostGrain.png")) ?? NSImage(size:NSSize(width:1,height:1))
-    private var tint:Color{Color(hexString:folder.color)}
+    private var tint:Color{folder.color=="none" ? .clear:Color(hexString:folder.color)}
     private var dark:Bool{colorScheme == .dark}
     private var entries:[ModCollectionEntry?]{folder.entries.prefix(3).map{Optional($0)}}
     private func documents(time:Double)->some View {
@@ -101,10 +101,10 @@ struct ModFolderCard:View {
     private func shell(time:Double)->some View {
         ZStack(alignment:.bottom){
             // The pocket transmits softened document colours; it is not a solid tinted tile.
-            CollectionPocketShape(opening:open ? 1:0).fill((dark ? Color(white:0.34):Color.white).opacity(dark ? 0.17:0.13))
-            documents(time:time).compositingGroup().blur(radius:11).saturation(1.12).opacity(dark ? 0.5:0.44)
+            CollectionPocketShape(opening:open ? 1:0).fill((dark ? Color(white:0.34):Color.white).opacity(dark ? 0.24:0.22))
+            documents(time:time).compositingGroup().blur(radius:14).saturation(1.06).opacity(dark ? 0.55:0.50)
                 .frame(width:210,height:112,alignment:.bottom)
-            CollectionPocketShape(opening:open ? 1:0).fill(tint.opacity(dark ? 0.12:0.10))
+            CollectionPocketShape(opening:open ? 1:0).fill(tint.opacity(dark ? 0.16:0.14))
             Image(nsImage:Self.grain).resizable(resizingMode:.tile).opacity(dark ? 0.022:0.016)
             CollectionPocketShape(opening:open ? 1:0).fill(LinearGradient(colors:[.white.opacity(dark ? 0.16:0.38),.white.opacity(0.05),.white.opacity(dark ? 0.04:0.22)],startPoint:.topLeading,endPoint:.bottomTrailing))
             CollectionPocketShape(opening:open ? 1:0).fill(LinearGradient(colors:[.clear,(dark ? Color.black:Color.white).opacity(dark ? 0.12:0.26)],startPoint:.top,endPoint:.bottom))
@@ -146,7 +146,7 @@ struct ModCollectionPanel:View {
     let folderID:String
     @ObservedObject private var store=ModCollectionStore.shared
     @State private var name=""
-    @State private var color="#A7CDBB"
+    @State private var color="none"
     @State private var query=""
     @State private var target=""
     @State private var status=""
@@ -155,7 +155,7 @@ struct ModCollectionPanel:View {
     @State private var detailEntry:ModCollectionEntry?
     private var folder:ModCollection?{store.folders.first{$0.id==folderID}}
     private var filtered:[ModCollectionEntry]{folder?.entries.filter{query.isEmpty || $0.title.localizedCaseInsensitiveContains(query)} ?? []}
-    var body:some View{VStack(spacing:18){HStack{Text("模组夹").font(.system(size:25,weight:.semibold));Spacer();Button{model.modal=nil}label:{Image(systemName:"xmark").frame(width:22,height:22)}.buttonStyle(HarborButtonStyle())};HStack{TextField("名称",text:$name).textFieldStyle(.roundedBorder);ColorPicker("颜色",selection:Binding(get:{Color(hexString:color)},set:{color=$0.hexString}),supportsOpacity:false).frame(width:95);Button("保存"){do{try store.update(folderID,name:name,color:color)}catch{model.errorMessage=error.localizedDescription}}.buttonStyle(HarborButtonStyle())};HStack{SearchBox(prompt:"搜索模组夹内的模组",query:$query);Menu("显示信息"){CollectionDisplayOptions(settings:$model.preferences.collectionDisplay)}.buttonStyle(HarborButtonStyle())}
+    var body:some View{VStack(spacing:18){HStack{Text("模组夹").font(.system(size:25,weight:.semibold));Spacer();Button{model.modal=nil}label:{Image(systemName:"xmark").frame(width:22,height:22)}.buttonStyle(HarborButtonStyle())};HStack{TextField("名称",text:$name).textFieldStyle(.roundedBorder);ColorPicker("颜色",selection:Binding(get:{color=="none" ? .gray:Color(hexString:color)},set:{color=$0.hexString}),supportsOpacity:false).frame(width:95);Button(color=="none" ? "无颜色 ✓":"无颜色"){color="none"}.buttonStyle(HarborButtonStyle());Button("保存"){do{try store.update(folderID,name:name,color:color)}catch{model.errorMessage=error.localizedDescription}}.buttonStyle(HarborButtonStyle())};HStack{SearchBox(prompt:"搜索模组夹内的模组",query:$query);Menu("显示信息"){CollectionDisplayOptions(settings:$model.preferences.collectionDisplay)}.buttonStyle(HarborButtonStyle())}
         ScrollView{LazyVStack(spacing:9){ForEach(filtered){entry in CollectionEntryRow(entry:entry,settings:model.preferences.collectionDisplay,selected:selection.contains(entry.id),toggle:{if selection.contains(entry.id){selection.remove(entry.id)}else{selection.insert(entry.id)}},details:{detailEntry=entry})}}}.frame(minHeight:200,maxHeight:.infinity)
 
         HStack{Button(selection.count==filtered.count ? "取消全选":"全选"){selection=selection.count==filtered.count ? []:Set(filtered.map(\.id))};Button("移出所选",role:.destructive){do{try store.remove(selection,folder:folderID);selection=[]}catch{model.errorMessage=error.localizedDescription}}.disabled(selection.isEmpty || busy);Spacer();Text(status).font(.system(size:11)).harborSecondaryText().lineLimit(2)}.buttonStyle(HarborButtonStyle())
