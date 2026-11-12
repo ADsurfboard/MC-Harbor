@@ -5,7 +5,7 @@ import json,os,plistlib,struct,subprocess,zipfile
 root=Path(__file__).resolve().parent.parent
 app=root/'build/MC Harbor.app';resources=app/'Contents/Resources'
 info=plistlib.loads((app/'Contents/Info.plist').read_bytes())
-assert info['LSMinimumSystemVersion']=='12.0' and info['CFBundleShortVersionString']=='1.6.0'
+assert info['LSMinimumSystemVersion']=='12.0' and info['CFBundleShortVersionString']=='1.6.1'
 subprocess.run(['/usr/bin/codesign','--verify','--deep','--strict',str(app)],check=True)
 
 def inspect(data,label):

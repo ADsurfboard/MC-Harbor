@@ -86,36 +86,89 @@ private actor RecommendationCache {
     }
 }
 
+/// Shared bounded work; cancelling a row never cancels another row's identical request.
+actor TranslationRequestGate {
+    static let shared=TranslationRequestGate()
+    private var active=0
+    private let limit:Int
+    init(limit:Int=3){self.limit=max(1,limit)}
+    private var waiting:[(UUID,CheckedContinuation<Void,Error>)]=[]
+    private func cancel(_ id:UUID){if let index=waiting.firstIndex(where:{$0.0==id}){waiting.remove(at:index).1.resume(throwing:CancellationError())}}
+    private func acquire()async throws {
+        let id=UUID()
+        try await withTaskCancellationHandler{
+            try Task.checkCancellation()
+            try await withCheckedThrowingContinuation{(continuation:CheckedContinuation<Void,Error>) in
+                if Task.isCancelled{continuation.resume(throwing:CancellationError())}
+                else if active<limit{active+=1;continuation.resume()}
+                else{waiting.append((id,continuation))}
+            }
+        }onCancel:{Task{await self.cancel(id)}}
+    }
+    private func release(){if waiting.isEmpty{active-=1}else{waiting.removeFirst().1.resume()}}
+    func run<T:Sendable>(_ operation:@escaping @Sendable ()async throws->T)async throws->T {
+        try await acquire();defer{release()};try Task.checkCancellation();return try await operation()
+    }
+}
+private actor TranslationCacheDisk {
+    static let shared=TranslationCacheDisk()
+    func read(_ file:URL)->[String:String]{guard let size=(try? file.resourceValues(forKeys:[.fileSizeKey]))?.fileSize,size<8_000_000,let data=try? Data(contentsOf:file) else{return [:]};return (try? JSONDecoder().decode([String:String].self,from:data)) ?? [:]}
+    func write(_ value:[String:String],file:URL){try? FileManager.default.createDirectory(at:file.deletingLastPathComponent(),withIntermediateDirectories:true);try? JSONEncoder().encode(value).write(to:file,options:.atomic)}
+}
 actor ModTextTranslation {
     static let shared=ModTextTranslation()
     private var cache:[String:String]=[:]
+    private var order:[String]=[]
+    private var loading:Task<[String:String],Never>?
+    private struct Flight {let id:UUID;let task:Task<String,Error>;var consumers:Set<UUID>}
+    private var flights:[String:Flight]=[:]
     private var loaded=false
-    private var activeRequests=0
-    private let file=NativePaths.root.appendingPathComponent("cache/mod-text-translations.json")
-    func translate(_ text:String,toChinese:Bool=true)async throws->String {
+    private var flushTask:Task<Void,Never>?
+    private let file:URL
+    private let lookup:@Sendable (String,Bool,String)async throws->String
+    init(file:URL=NativePaths.root.appendingPathComponent("cache/mod-text-translations.json"),lookup:@escaping @Sendable (String,Bool,String)async throws->String={try await DomesticTranslation.query($0,toChinese:$1,provider:$2)}){self.file=file;self.lookup=lookup}
+    private func load()async {
+        if loaded{return}
+        if loading==nil{let file=file;loading=Task{await TranslationCacheDisk.shared.read(file)}}
+        let saved=await loading!.value
+        guard !loaded else{return};loaded=true;cache=saved;order=Array(saved.keys).sorted();trim()
+    }
+    private func trim(){while order.count>2000{cache.removeValue(forKey:order.removeFirst())}}
+    private func persist(){flushTask?.cancel();flushTask=Task{do{try await Task.sleep(nanoseconds:500_000_000);try Task.checkCancellation();await TranslationCacheDisk.shared.write(cache,file:file)}catch{}}}
+    func cached(_ text:String,provider:String)async->String?{await load();guard let value=cache[provider+"|en|zh-CN|"+text],value.range(of:"[\\p{Han}]",options:.regularExpression) != nil else{return nil};return value}
+    private func leave(_ key:String,flightID:UUID,consumer:UUID,cancel:Bool){guard var flight=flights[key],flight.id==flightID else{return};flight.consumers.remove(consumer);if flight.consumers.isEmpty{if cancel{flight.task.cancel()};flights.removeValue(forKey:key)}else{flights[key]=flight}}
+    func translate(_ text:String,toChinese:Bool=true,provider:String=DomesticTranslation.provider)async throws->String {
         if ModDiscovery.identifierOnly(text){return text}
-        if !loaded{loaded=true;cache=(try? JSONDecoder().decode([String:String].self,from:Data(contentsOf:file))) ?? [:]}
-        let pair=toChinese ? "en|zh-CN":"zh-CN|en",key=DomesticTranslation.provider+"|"+pair+"|"+text
-        if let saved=cache[key]{return saved}
-        // Limit simultaneous visible-row translations and check the cache again
-        // after waiting, so duplicate summaries do not consume remote quota.
-        while activeRequests>=2{try await HarborDelay.sleep(seconds:0.15);if let saved=cache[key]{return saved}}
-        try Task.checkCancellation()
-        if let saved=cache[key]{return saved}
-        activeRequests+=1;defer{activeRequests-=1}
-        var translated=""
-        for part in try LegacyLanguageTranslation.chunks(text) {
-            try Task.checkCancellation()
-            if !part.translate{translated+=part.text;continue}
-            do{translated+=try await PublicModTranslation.shared.translate(part.text,toChinese:toChinese)}catch LegacyLanguageTranslation.Failure.unchanged{translated+=part.text}
+        await load();try Task.checkCancellation()
+        let pair=toChinese ? "en|zh-CN":"zh-CN|en",key=provider+"|"+pair+"|"+text
+        if let saved=cache[key],saved.range(of:toChinese ? "[\\p{Han}]":"[A-Za-z]",options:.regularExpression) != nil{return saved}
+        let consumer=UUID()
+        let flightID:UUID,task:Task<String,Error>
+        if var flight=flights[key]{flight.consumers.insert(consumer);flights[key]=flight;flightID=flight.id;task=flight.task}
+        else{
+        flightID=UUID();let lookup=lookup
+        task=Task<String,Error>{
+            try await TranslationRequestGate.shared.run{
+                let parsed=TranslationText.parts(text,toChinese:toChinese);var values:[String:String]=[:]
+                for part in parsed where part.translate && values[part.text]==nil {
+                    let chunks=try LegacyLanguageTranslation.chunks(part.text,limit:provider=="mymemory" ? 400:3600)
+                    var value=""
+                    for chunk in chunks {try Task.checkCancellation();value+=chunk.translate ? try await lookup(chunk.text,toChinese,provider):chunk.text}
+                    values[part.text]=value
+                }
+                let result=try TranslationText.restore(parsed,values:values)
+                guard result.range(of:toChinese ? "[\\p{Han}]":"[A-Za-z]",options:.regularExpression) != nil else{throw LegacyLanguageTranslation.Failure.unchanged}
+                return result
+            }
         }
-        guard !toChinese || translated.range(of:"[\\p{Han}]",options:.regularExpression) != nil else{throw LegacyLanguageTranslation.Failure.unchanged}
-        try Task.checkCancellation()
-        if cache.count>2000{cache.removeAll(keepingCapacity:true)}
-        cache[key]=translated
-        try? FileManager.default.createDirectory(at:file.deletingLastPathComponent(),withIntermediateDirectories:true)
-        try? JSONEncoder().encode(cache).write(to:file,options:.atomic)
-        return translated
+        flights[key]=Flight(id:flightID,task:task,consumers:[consumer])
+        }
+        do{
+            let value=try await withTaskCancellationHandler{try await task.value}onCancel:{Task{await self.leave(key,flightID:flightID,consumer:consumer,cancel:true)}}
+            try Task.checkCancellation()
+            if cache[key] != value{cache[key]=value;order.removeAll{$0==key};order.append(key);trim();persist()}
+            leave(key,flightID:flightID,consumer:consumer,cancel:false);return value
+        }catch{leave(key,flightID:flightID,consumer:consumer,cancel:true);throw error}
     }
     static func searchQuery(_ original:String)async->String {
         guard original.range(of:"[\\p{Han}]",options:.regularExpression) != nil else{return original}
@@ -125,10 +178,25 @@ actor ModTextTranslation {
     }
 }
 
+enum OnlineLanguageTranslation {
+    struct Result:Sendable {var changes:[[String:String]]=[];var failures:[String:String]=[:]}
+    static func translate(_ entries:[PendingLanguageEntry],provider:String=DomesticTranslation.provider,lookup:@escaping @Sendable (String,String)async throws->String={try await ModTextTranslation.shared.translate($0,provider:$1)})async throws->Result {
+        try Task.checkCancellation()
+        let result=await withTaskGroup(of:Result.self,returning:Result.self){group in
+            // The shared gate limits remote work; each failed row stays independently retryable.
+            for entry in entries{group.addTask{
+                do{try Task.checkCancellation();let value=try await lookup(entry.source,provider);try Task.checkCancellation();return Result(changes:[["resource":entry.resource,"entry":entry.id,"source":entry.source,"translation":value]])}
+                catch{return Result(failures:[entry.identity:error.localizedDescription])}
+            }}
+            var result=Result();for await row in group{result.changes+=row.changes;result.failures.merge(row.failures,uniquingKeysWith:{$1})};return result
+        }
+        try Task.checkCancellation();return result
+    }
+}
+
 /// Public descriptions only. A provider's quota never disables later pages.
 actor PublicModTranslation {
     static let shared=PublicModTranslation()
-    private var primaryRetryAfter=Date.distantPast
     static func parseBackup(_ data:Data,source:String)throws->String {
         guard let root=try JSONSerialization.jsonObject(with:data) as? [Any],let segments=root.first as? [[Any]] else{throw LegacyLanguageTranslation.Failure.unchanged}
         let result=segments.compactMap{$0.first as? String}.joined()

@@ -3,6 +3,17 @@ import AppKit
 import Foundation
 import SwiftUI
 
+private actor TranslationProbe {
+    var calls=0,active=0,peak=0;var inputs:[String]=[]
+    func query(_ text:String,_ toChinese:Bool,_ provider:String)async throws->String{
+        calls+=1;active+=1;peak=max(peak,active);inputs.append(text);defer{active-=1}
+        try await Task.sleep(nanoseconds:40_000_000)
+        if text=="Failure row"{throw FileTransactions.error("Fixture service refused this row")}
+        return toChinese ? "译文 "+provider+" "+text:"Organize inventory"
+    }
+    func snapshot()->(Int,Int,[String]){(calls,peak,inputs)}
+}
+
 extension UpdateChecks {
     @MainActor static func discovery(_ config:[String:Any],root:URL)async throws {
         var failed=0
@@ -15,6 +26,79 @@ extension UpdateChecks {
         check("offline-Chinese-index-not-literal",await ModTextTranslation.searchQuery("雕凿工艺")=="Chisels & Bits")
         check("English-query-unchanged",await ModTextTranslation.searchQuery("Sodium")=="Sodium")
         check("Chinese-complex-name",await ModTextTranslation.searchQuery("机械动力")=="Create")
+        check("all-search-title-Sodium-Chinese",await ModNameIndex.shared.chinese(title:"Sodium")=="钠")
+        check("all-search-title-slug-exact",await ModNameIndex.shared.chinese(title:"Just Enough Items (JEI)",slug:"jei")=="JEI物品管理器")
+        check("all-search-title-index-beyond-recommendations",await ModNameIndex.shared.chinese(title:"Chisels & Bits")=="雕凿工艺")
+        check("different-project-never-matched-by-prefix",await ModNameIndex.shared.chinese(title:"Create: Unrelated QA Addon")==nil)
+        let indexStart=Date()
+        for _ in 0..<1000{_ = await ModNameIndex.shared.chinese(title:"Sodium")}
+        check("indexed-name-lookup-not-rescanned",Date().timeIntervalSince(indexStart)<2)
+        let probe=TranslationProbe(),cache=ModTextTranslation(file:root.appendingPathComponent("cache/probe.json")){try await probe.query($0,$1,$2)}
+        let duplicateValues=try await withThrowingTaskGroup(of:String.self,returning:[String].self){group in
+            for _ in 0..<30{group.addTask{try await cache.translate("Same summary",provider:"bilibili")}}
+            var values:[String]=[];for try await value in group{values.append(value)};return values
+        }
+        check("thirty-identical-requests-coalesced",await probe.snapshot().0==1 && Set(duplicateValues).count==1)
+        try await withThrowingTaskGroup(of:Void.self){group in for n in 0..<12{group.addTask{_ = try await cache.translate("Unique summary "+String(n),provider:"bilibili")}};try await group.waitForAll()}
+        check("translation-global-concurrency-bounded",await probe.snapshot().1<=3)
+        _ = try await cache.translate("Same summary",provider:"mymemory")
+        check("provider-cache-separated",await probe.snapshot().0==14)
+        check("Chinese-only-query-segments-are-translated",try await cache.translate("整理背包",toChinese:false,provider:"bilibili")=="Organize inventory")
+        check("reverse-translation-protects-identifiers",TranslationText.parts("收集 %s",toChinese:false).contains{!$0.translate && $0.text=="%s"})
+        let protected=try await cache.translate("Collect %1$s at {0} with §a color",provider:"bilibili")
+        check("cached-translation-preserves-tokens",protected.contains("%1$s") && protected.contains("{0}") && protected.contains("§a"))
+        check("placeholders-not-sent-to-provider",await probe.snapshot().2.allSatisfy{!$0.contains("%1$s") && !$0.contains("{0}") && !$0.contains("§a")})
+        let cancelOwner=Task{try await cache.translate("Cancelled shared summary",provider:"bilibili")}
+        try await Task.sleep(nanoseconds:5_000_000);cancelOwner.cancel()
+        let survivor=try await cache.translate("Cancelled shared summary",provider:"bilibili")
+        do{_ = try await cancelOwner.value;check("cancelled-consumer-stays-cancelled",false)}catch is CancellationError{check("cancelled-consumer-stays-cancelled",true)}
+        check("shared-request-survives-other-consumer-cancellation",survivor.contains("译文"))
+        let metadataCache=ResourceMetadataCache(),metadataProbe=TranslationProbe()
+        let metadata=try await withThrowingTaskGroup(of:Data.self,returning:[Data].self){group in
+            for _ in 0..<20{group.addTask{try await metadataCache.data("public-get"){Data(try await metadataProbe.query("metadata",true,"bilibili").utf8)}}}
+            var results:[Data]=[];for try await value in group{results.append(value)};return results
+        }
+        check("public-metadata-request-coalescing",await metadataProbe.snapshot().0==1 && Set(metadata).count==1)
+        _ = try await metadataCache.data("public-get",ttl:0){Data(try await metadataProbe.query("metadata",true,"bilibili").utf8)}
+        check("metadata-TTL-refreshes",await metadataProbe.snapshot().0==2)
+        let beforeStop=await probe.snapshot().0
+        let stopped=Task{try await cache.translate("Stop this sole consumer",provider:"bilibili")}
+        for _ in 0..<50{if await probe.snapshot().0>beforeStop{break};try await Task.sleep(nanoseconds:1_000_000)}
+        stopped.cancel()
+        do{_ = try await stopped.value;check("last-consumer-can-cancel-work",false)}catch is CancellationError{check("last-consumer-can-cancel-work",true)}
+        let samples=(0..<200).map{FolderFlowField.sample(x:Double($0%20)/20,y:Double($0/20)/10,time:123.4)}
+        check("flow-field-bounded",samples.allSatisfy{(0...1).contains($0)})
+        check("flow-field-actually-moves",FolderFlowField.sample(x:0.3,y:0.7,time:0) != FolderFlowField.sample(x:0.3,y:0.7,time:7))
+        func paletteImage(_ rgba:[UInt8],width:Int,height:Int)throws->CGImage{
+            guard let space=CGColorSpace(name:CGColorSpace.sRGB),let provider=CGDataProvider(data:Data(rgba) as CFData),let image=CGImage(width:width,height:height,bitsPerComponent:8,bitsPerPixel:32,bytesPerRow:width*4,space:space,bitmapInfo:CGBitmapInfo(rawValue:CGImageAlphaInfo.premultipliedLast.rawValue|CGBitmapInfo.byteOrder32Big.rawValue),provider:provider,decode:nil,shouldInterpolate:false,intent:.defaultIntent) else{throw FileTransactions.error("Palette fixture failed")};return image
+        }
+        let red=FolderColorPair.RGB(r:1,g:0,b:0),blue=FolderColorPair.RGB(r:0,g:0,b:1)
+        let split=try paletteImage(Array(repeating:[UInt8(255),0,0,255],count:20).flatMap{$0}+Array(repeating:[UInt8(0),0,255,255],count:20).flatMap{$0},width:40,height:1)
+        let pair=FolderColorPair.analyze(split)
+        check("palette-extracts-two-original-core-colours",pair.map{($0.first.distance(red)<0.01 && $0.second.distance(blue)<0.01)||($0.first.distance(blue)<0.01 && $0.second.distance(red)<0.01)}==true)
+        let alphaImage=try paletteImage(Array(repeating:[UInt8(128),0,0,128],count:20).flatMap{$0}+Array(repeating:[UInt8(0),255,0,0],count:20).flatMap{$0},width:40,height:1)
+        let alpha=FolderColorPair.analyze(alphaImage)
+        check("palette-ignores-transparent-RGB-and-unpremultiplies",alpha.map{$0.first.distance(red)<0.001 && $0.second.distance(red)<0.001}==true)
+        check("palette-empty-alpha-has-no-invented-colours",FolderColorPair.analyze(try paletteImage([0,0,0,0],width:1,height:1))==nil)
+        check("palette-deterministic",pair==FolderColorPair.analyze(split))
+        check("fluid-colours-stay-on-source-two-tone-line",samples.allSatisfy{let rgb=red.mixed(with:blue,amount:$0);return rgb.g==0 && abs(rgb.r+rgb.b-1)<0.00001})
+        let iconFile=root.appendingPathComponent("palette-local.png")
+        try NSBitmapImageRep(cgImage:split).representation(using:.png,properties:[:])!.write(to:iconFile)
+        let visuals=await withTaskGroup(of:CollectionVisual?.self,returning:[CollectionVisual].self){group in for _ in 0..<16{group.addTask{await CollectionArtworkLoader.shared.visual(iconFile.path)}};var values:[CollectionVisual]=[];for await value in group{if let value{values.append(value)}};return values}
+        check("artwork-single-decode-shared-across-sixteen-consumers",visuals.count==16 && visuals.allSatisfy{$0.bitmap.image === visuals[0].bitmap.image})
+        check("artwork-loader-delivers-source-palette",visuals.first?.colors==pair)
+        let batchEntries=[PendingLanguageEntry(resource:"qa",id:"ok",source:"Success row"),PendingLanguageEntry(resource:"qa",id:"bad",source:"Failure row")]
+        let batch=try await OnlineLanguageTranslation.translate(batchEntries,provider:"bilibili"){try await probe.query($0,true,$1)}
+        check("one-refused-row-keeps-other-success",batch.changes.count==1 && batch.failures["qa/bad"] != nil)
+        try await Task.sleep(nanoseconds:650_000_000)
+        let restoredTranslationCache=ModTextTranslation(file:root.appendingPathComponent("cache/probe.json")){_,_,_ in throw FileTransactions.error("No network allowed")}
+        check("debounced-cache-restores-without-network",try await restoredTranslationCache.translate("Same summary",provider:"bilibili")==duplicateValues.first)
+        check("summary-loading-never-displays-English",ModSummaryPresentation.state(text:"English summary",enabled:true,original:false,value:nil,failed:false) == .loading)
+        check("summary-failure-never-displays-English",ModSummaryPresentation.state(text:"English summary",enabled:true,original:false,value:nil,failed:true) == .failed)
+        check("summary-translated-only-when-ready",ModSummaryPresentation.state(text:"English summary",enabled:true,original:false,value:"中文简介",failed:false) == .translated("中文简介"))
+        check("summary-toggle-off-keeps-original",ModSummaryPresentation.state(text:"English summary",enabled:false,original:false,value:nil,failed:false) == .original("English summary"))
+        check("summary-mixed-English-Chinese-is-processed",ModSummaryPresentation.needsTranslation("优化 and reduce memory"))
+        check("foreign-providers-are-manually-selectable",Set(OnlineTranslationProvider.allCases.map(\.rawValue))==Set(["bilibili","aliyun","mymemory","google"]))
         let mod=ModFile(id:"test",name:"Sodium",path:folder.appendingPathComponent("sodium-0.5.jar"),enabled:true,size:1,modID:"sodium")
         check("installed-recommendation",ModDiscovery.installed(ModDiscovery.catalog[0],mods:[mod]))
         check("uninstalled-recommendation",!ModDiscovery.installed(ModDiscovery.catalog[1],mods:[mod]))

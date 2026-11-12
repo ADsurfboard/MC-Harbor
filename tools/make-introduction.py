@@ -11,13 +11,13 @@ from reportlab.platypus import Paragraph
 from reportlab.lib.styles import ParagraphStyle
 
 ROOT=Path(__file__).resolve().parent.parent
-OUT=Path(os.environ.get('HARBOR_DOC_OUTPUT',str(ROOT/'outputs/MC-Harbor-Introduction-1.6.0.pdf')));OUT.parent.mkdir(parents=True,exist_ok=True)
+OUT=Path(os.environ.get('HARBOR_DOC_OUTPUT',str(ROOT/'outputs/MC-Harbor-Introduction-1.6.1.pdf')));OUT.parent.mkdir(parents=True,exist_ok=True)
 pdfmetrics.registerFont(TTFont('CJK','/System/Library/Fonts/Supplemental/Arial Unicode.ttf'))
 W,H=595.276,841.89
 INK=HexColor('#10271E');GREEN=HexColor('#29825B');MUTED=HexColor('#5C6E65');PALE=HexColor('#EDF4EE');LINE=HexColor('#D9E5DD')
 DOC=canvas.Canvas(str(OUT),pagesize=(W,H),pageCompression=1)
-DOC.setTitle('MC Harbor | 启动器介绍');DOC.setAuthor('morben 墨尔本');DOC.setSubject('1.6.0 双架构版：原生 macOS Minecraft 启动器、功能与汉化')
-README=['# MC Harbor','1.6.0 · Apple Silicon / Intel 双版本','[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/tag/v1.6.0) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.6.0/MC-Harbor-Introduction-1.6.0.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)','以下正文与随包 PDF 同版。']
+DOC.setTitle('MC Harbor | 启动器介绍');DOC.setAuthor('morben 墨尔本');DOC.setSubject('1.6.1 双架构版：原生 macOS Minecraft 启动器、功能与汉化')
+README=['# MC Harbor','1.6.1 · Apple Silicon / Intel 双版本','[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/tag/v1.6.1) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.6.1/MC-Harbor-Introduction-1.6.1.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)','以下正文与随包 PDF 同版。']
 STYLE=ParagraphStyle('body',fontName='CJK',fontSize=10.4,leading=17.4,textColor=INK,wordWrap='CJK',spaceAfter=0)
 
 def txt(text,x,y,size=11,color=INK,font='CJK'):
@@ -39,7 +39,7 @@ def page(number,tag,title,description):
     y=para(description,46,H-132,W-92,11,MUTED)
     rule(y-21);return y-52
 def finish(number):
-    rule(52);txt('MC Harbor  ·  1.6.0  ·  2026.11.12',46,33,8,MUTED)
+    rule(52);txt('MC Harbor  ·  1.6.1  ·  2026.11.12',46,33,8,MUTED)
     txt(f'{number:02d} / 13',W-86,33,8,MUTED);DOC.showPage()
 def section(title,text,y):
     README.append('### '+title)
@@ -67,7 +67,7 @@ para('为 macOS 重新设计的 Minecraft 启动器。\n保留 HMCL 的游戏能
 DOC.setStrokeColor(HexColor('#375448'));DOC.line(48,269,W-48,269)
 for x,big,small in [(48,'SwiftUI','原生界面'),(218,'HMCL','稳定内核'),(388,'Frosted','原生磨砂')]:
     txt(big,x,231,17,HexColor('#F4F8F4'));txt(small,x,207,10,HexColor('#A9C7B4'))
-para('1.6.0 · Apple Silicon / Intel 双版本\nApple Silicon：macOS 26 起；Intel：macOS 12 起',48,132,W-96,10,HexColor('#ADC4B5'),17)
+para('1.6.1 · Apple Silicon / Intel 双版本\nApple Silicon：macOS 26 起；Intel：macOS 12 起',48,132,W-96,10,HexColor('#ADC4B5'),17)
 txt('Apple Silicon + Intel / 2026.11.12',48,51,9,HexColor('#A9C7B4'));txt('01 / 13',W-91,51,9,HexColor('#A9C7B4'));DOC.showPage()
 
 # 02 - Features
@@ -101,7 +101,7 @@ y=section('FTB Quests 的核心文本','读取章节与章节组标题、任务�
 y=section('存档数据包与书页','自动发现 saves/<世界>/datapacks 中的 ZIP 和文件夹，以及实例 datapacks。提取进度的标题 / 说明、Patchouli 书页，以及 tellraw 和 title 指令的文字组件，覆盖聊天、标题与动作栏显示。只处理识别出的文本，任务 ID、物品 ID、触发条件与指令结构保留。',y)
 y=section('一套编辑与 AI 导回流程','任务和数据包同样支持全部 / 部分选择、原文对照、逐条编辑和草稿重读。提取给 AI 会保留原始 SNBT / JSON5 / 数据文件，并提供带映射键的未汉化模板；翻译后用导入译文接回。颜色代码、格式占位符与物品链接等标记会校验。',y)
 y=section('资源包与任务补丁分开应用','普通 lang 导出为资源包；任务配置与数据包译文使用“应用任务 / 数据包”。先检查文件修订和存档占用，再保存原字节备份、校验 ZIP 并原子写回，失败回滚。导出的 ZIP 也包含 overrides 目录，可按实例根目录合并；原 JAR 不改写。',y)
-para('自写 FTB 任务通常没有现成社区译文。macOS 15 及以上可用系统翻译；12—14 可选择在线补全，也可逐条校对或提取给 AI。旧版的 39 项隔离检查包含写入失败回滚；未替用户修改真实存档。',46,y,W-92,9.5,MUTED)
+para('自写 FTB 任务通常没有现成社区译文。各版本默认用所选在线服务补全；macOS 15 起也可选择本机翻译。未译数量和处理记录保持可见，仍可逐条校对或提取给 AI；任务 / 数据包的应用会先备份，不修改原模组 JAR。',46,y,W-92,9.5,MUTED)
 finish(4)
 
 # 04 - World editor and dependency completion
@@ -132,7 +132,7 @@ finish(6)
 
 # 06 - Validation and sources
 y=page(7,'VERIFICATION & SOURCES','可核对的功能与边界。','功能、许可和验证范围随对应源码与交付记录保留。')
-y=section('本轮验证','Intel 客户端在 Rosetta 下通过 53 项功能检查、24 好友场景检查及 22 项 Java 后台检查；旧系统翻译分段、占位符保护和真实在线返回也已核对。Worker / Python 好友服务各自的隔离检查通过。',y)
+y=section('本轮验证','双架构版本分别检查客户端、24 好友场景、Java 后端、窗口及快捷方式。语言流程覆盖模组、KubeJS、FTB 任务与存档数据包的提取、翻译、导出及备份应用；旧系统翻译分段和格式保护另有隔离回归。第三方服务可用性与实机兼容边界单独记录。',y)
 y=section('已有基线','原 1.5 版已检查原生业务、账号、下载与实例资源；隔离环境实际安装 / 启动 1.20.1，并验证坏源回退、备份与 MultiMC 世界字节回环。实际实例和账号以个人设备的配置为准。',y)
 y=para('验证边界：Intel 程序已在 Rosetta 运行，macOS 12—14 的实际界面与完整游戏尚未在对应设备上验收；未逐个试玩所有整合包，未 Apple 公证。外部服务与游戏表现不能永久保证。',46,y,W-92,9.5,MUTED)-27
 txt('主要开源来源',46,y,15);y-=24
@@ -145,7 +145,7 @@ para('界面源于用户提供的 WinHarbor；兼容版使用原生磨砂材质�
 finish(7)
 # 08 - Native 1.5 update
 y=page(8,'LIBRARIES & TRANSLATION','更完整的汉化，更顺手的素材库。','两版保留叠片、粒子、音效和四种欢迎播报；Apple Silicon 使用原生 Liquid Glass，Intel 使用系统磨砂材质。')
-y=section('一键汉化：社区优先，再补齐','先使用 CFPA 社区中文；macOS 15 及以上可继续调用系统 Translation。各版本可选择国内 B站 Index-Translate 在线补全，也可配置阿里云 Qwen-MT；系统翻译不可用时保留在线选项。服务均受各自额度与可用性限制。未完成的条目保留，支持手动校对或提取给 AI。',y)
+y=section('一键汉化：社区优先，再补齐','先使用资源内中文和 CFPA 社区译文，再用所选在线服务补全；macOS 15 起也可选择本机翻译。国内默认 B站 Index-Translate，阿里云 Qwen-MT 自备密钥；MyMemory 和 Google 公共接口作为手动备选。未变的英文不冒充完成，失败条目保留并可重试。',y)
 y=section('长段落与文本格式保护','长任务说明按词边界拆分，格式占位符、颜色代码、物品 / 任务链接和网址留在翻译引擎之外，写回前继续校验。保留已有中文与手动译文，拒绝写入原文已经改变的旧结果；可停止任务并保留完成部分。对照编辑区支持上下拖动、隐藏 / 再显示，并记住高度与显示状态。',y)
 y=section('LittleSkin 原生皮肤库','在账号页搜索公共皮肤、按收藏或最新排序、翻页、收藏与打开作者原网页。标准皮肤下载后验证 SHA256 与 PNG 尺寸，用现有 skinview3d 渲染真实 Minecraft 三维角色。确认后应用到所选账号；在线上传仍取决于该账号服务能力。高清皮肤会明确提示标准账号尺寸要求。',y)
 y=section('命名、预览、切换壁纸','壁纸库支持批量导入图片 / 视频，逐张命名、预览和切换。视频缩略图右下角显示视频标记，预览默认静音；原有背景登记到库中。新导入内容使用受管理的副本，移除不会删除原始文件。',y)
@@ -173,13 +173,13 @@ finish(10)
 y=page(11,'UPDATE 1.6','下载、导入与启动，补齐细节。','同一套功能同步到 Apple Silicon 与 Intel，使用各自适配的原生材质。')
 y=section('整合包拖入与过程详情','可将 ZIP / MRPACK 拖到启动器，或使用导入按钮。导入任务展示读取清单、解压与资源处理、实例配置写入、完成等阶段，并显示引擎实际报告的进度；失败保留明确原因，不将加载转圈当作完成。已有实例不会被覆盖。',y)
 y=section('按需导出与批量管理','导出前勾选模组、模组配置、游戏设置、服务器列表、资源包、光影、KubeJS / 脚本和存档。服务器与存档默认不选；账号、令牌、缓存及启动器私有目录不进入整合包。实例资源改用间距明确的卡片行，支持全选、批量启停、移到废纸篓及收藏。',y)
-y=section('国内来源与真实汉化状态','下载设置提供自动、官方优先和镜像优先。模组元数据与文件可使用 MCIM 国内镜像，失败回退官方来源；简介优先复用与原文匹配的镜像译文，再调用所选翻译服务。中文搜索结合常用名称映射和机器翻译，备注仍可搜索。失败有重试入口，不保存截断或未翻译的结果。',y)
+y=section('国内来源与真实汉化状态','下载设置提供自动、官方优先和镜像优先。模组元数据与文件可使用 MCIM 国内镜像，失败回退官方来源；简介优先复用与原文匹配的镜像译文，再调用所选翻译服务。全部搜索、推荐和详情共用离线中文名索引，未收录名称再请求翻译。简介开启汉化后先显示加载中，完成后才展示中文，失败显示重试入口；关闭开关可看原文。',y)
 y=section('实例快捷应用与关闭游戏','实例菜单生成独立 .app 快捷方式，明确交给 MC Harbor 处理，不依赖浏览器的默认打开方式；等待实例扫描后再启动目标游戏。游戏库与实例窗口增加关闭游戏按钮，只管理本次启动器启动的游戏进程。建议先在游戏内保存退出存档。',y)
 y=section('首次授权与本次运行复用','账号会话保存在 macOS 钥匙串。首次需要时由系统决定是否询问，读取成功后可在当前运行中暂存，退出即清空。可关闭此缓存；系统“始终允许”仍受应用签名及钥匙串状态限制。阿里翻译使用用户自己的密钥，单独保存，不向翻译服务发送账号令牌。',y)
 finish(11)
 # 12 - Collections
 y=page(12,'MOD COLLECTIONS','模组夹，收好下一套配置。','模组夹由项目作者提出。它保存可反复使用的模组集合，不只是一次下载任务。')
-y=section('命名与轻染色玻璃','创建多个模组夹，分别命名和调整颜色。改色只叠加轻薄色调，保持半透明磨砂、阴影、透光和卡片展开的动态；开启减少动态效果后保留静态层次。封面自动读取模组原图标，没有图标时使用 Minecraft 风景图。',y)
+y=section('命名与轻染色玻璃','创建多个模组夹，分别命名和调整颜色。改色只叠加轻薄色调，保持磨砂薄壳、卡片透色和局部袋口高光；前壳、后壳与卡片各自呈现深度和展开动态，去掉整圈描边。开启减少动态效果后保留静态层次。卡片读取模组原图，缺图使用 Minecraft 风景。PNG 透明区域与比例留白透出半透明流体：分别提取每张模组图的两种核心颜色，动态混合并做高斯模糊，原图边缘柔和衔接。空模组夹只有空壳。',y)
 y=section('打开前景窗口，继续按列表操作','文件夹卡片在悬停和选择时展开预览；点击打开统一的前景窗口，以列表展示收藏项。可搜索、勾选、全选、移出模组、改名、改色或删除模组夹。移出收藏和删除模组夹不会移除任何实例中的文件。',y)
 y=section('在线项目与本地收藏','下载详情可将项目收藏到指定模组夹；实例内可批量收藏本地模组。本地文件使用独立副本和内容哈希保存，不因删除原实例而失效。在线收藏保留原平台项目，导入时重新寻找适配目标 Minecraft 版本与加载器的文件及前置。',y)
 y=section('批量导入与冲突处理','选择目标实例及所需收藏后，先检查在线版本与依赖，再建立安装任务。下载文件校验哈希，重复模组或冲突依赖会明确提示；已有版本经事务处理保留备份，失败回滚。本地收藏不承诺自动跨 Minecraft 或加载器版本适配，请自行确认兼容性。',y)
@@ -192,7 +192,7 @@ for contributor in json.loads((ROOT/'Assets/Contributors/contributors.json').rea
     y=section(contributor['name'],'\n'.join(contributor['contributions']),y)
 y=section('作者的模组夹设计','模组夹、命名与轻染色材质、自动图标预览及展开交互由 ADsurfboard 提出；不混入社区问题反馈的署名。',y)
 y=section('验证范围与服务边界','发布前分别构建两种架构并运行回归；原生系统、窗口行为、事务和网络可用性需要分别验证。第三方镜像、翻译、认证与联机节点均可能变化；阿里翻译需自备有效密钥。自动测试不能代表所有模组组合、所有 macOS 小版本或所有地区网络已穷尽验证。',y)
-para('来源：MCIM 接入与 API 文档 www.mcimirror.top；B站 Index-Translate 官方仓库 github.com/bilibili/Index-Translate；阿里云 Qwen-MT 官方 API 文档 help.aliyun.com/zh/model-studio/qwen-mt-api。',46,y,W-92,9,MUTED)
+para('来源：MCIM / mcimirror.top；B站 / github.com/bilibili/Index-Translate；阿里 / help.aliyun.com/zh/model-studio/qwen-mt-api；MyMemory / mymemory.translated.net/doc/spec.php；Google 公共接口为非官方备选，无稳定性保证。',46,y,W-92,9,MUTED)
 finish(13)
 DOC.save()
 README += ['## 构建与许可','构建、开发测试、音效授权与免费服务边界详见 [BUILDING.md](BUILDING.md) 和 [docs/SERVICES.md](docs/SERVICES.md)。本工程为 GPL-3.0-or-later；第三方素材按各自许可分发。','[完整贡献名单](CONTRIBUTORS.md)','如果喜欢，记得 Star 我（']

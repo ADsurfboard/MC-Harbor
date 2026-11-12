@@ -1,0 +1,25 @@
+package net.morben.shenggan;
+import com.google.gson.*;import java.io.*;import java.nio.file.*;import java.util.*;import java.util.function.*;import java.util.zip.*;
+final class LocalizationBackendChecks {
+    static final Gson G=new Gson();
+    static void run(Path data,BiConsumer<String,Boolean> check)throws Exception {
+        Path run=data.resolve("game/versions/LanguageQA");Files.createDirectories(run.resolve("mods"));
+        Path jar=run.resolve("mods/qa.jar");try(ZipOutputStream z=new ZipOutputStream(Files.newOutputStream(jar))){for(var d:Map.of("assets/langqa/lang/en_us.json","{\"ready\":\"Ready\",\"number\":\"123\",\"identifier\":\"JEI\",\"hello\":\"Hello %s\",\"existing\":\"Existing\"}","assets/langqa/lang/zh_cn.json","{\"ready\":\"Ready\",\"hello\":\"Hello %s\",\"existing\":\"已有中文\"}").entrySet()){z.putNextEntry(new ZipEntry(d.getKey()));z.write(d.getValue().getBytes(java.nio.charset.StandardCharsets.UTF_8));z.closeEntry();}}
+        byte[] original=Files.readAllBytes(jar);JsonObject in=new JsonObject();in.addProperty("runDirectory",run.toString());in.addProperty("id","LanguageQA");in.addProperty("version","1.20.1");in.addProperty("loader","Forge");
+        Map<String,Object> scan=new NativeLocalization(in,data).scan(List.of(NativeResourceFiles.item(jar,"mods","QA",null,null,data)));String project=scan.get("project").toString();in.addProperty("project",project);JsonObject source=G.toJsonTree(scan.get("sources")).getAsJsonArray().get(0).getAsJsonObject();String id=source.get("id").getAsString();in.addProperty("resource",id);in.add("selected",G.toJsonTree(List.of(id)));
+        JsonArray rows=G.toJsonTree(new NativeLocalization(in,data).read().get("entries")).getAsJsonArray();Map<String,JsonObject> indexed=new HashMap<>();for(JsonElement r:rows)indexed.put(r.getAsJsonObject().get("key").getAsString(),r.getAsJsonObject());
+        check.accept("embedded-English-is-not-completed",indexed.get("ready").get("translation").getAsString().isEmpty()&&source.get("translated").getAsInt()==3);
+        check.accept("protected-only-needs-no-translation",indexed.get("number").get("translation").getAsString().equals("123")&&indexed.get("identifier").get("translation").getAsString().equals("JEI"));
+        check.accept("language-existing-Chinese-preserved",indexed.get("existing").get("translation").getAsString().equals("已有中文"));
+        check.accept("pending-includes-English-zh-file",((Number)new NativeLocalization(in,data).pending().get("pending")).intValue()==2);
+        in.addProperty("onlyMissing",true);in.addProperty("origin","machine");in.add("changes",G.toJsonTree(List.of(Map.of("resource",id,"entry","langqa::ready","source","Ready","translation","Ready"),Map.of("resource",id,"entry","langqa::hello","source","Hello %s","translation","你好"))));Map<String,Object> saved=new NativeLocalization(in,data).save();check.accept("unchanged-and-damaged-MT-rejected",((Number)saved.get("saved")).intValue()==0&&((Number)saved.get("skipped")).intValue()==2);
+        in.add("changes",G.toJsonTree(List.of(Map.of("resource",id,"entry","langqa::ready","source","Ready","translation","就绪"))));new NativeLocalization(in,data).save();check.accept("partial-progress-count-is-exact",((Number)new NativeLocalization(in,data).pending().get("pending")).intValue()==1);
+        JsonObject metadata=JsonParser.parseString(Files.readString(Path.of(project).resolve("project.json"))).getAsJsonObject();metadata.remove("countsVersion");metadata.getAsJsonArray("sources").get(0).getAsJsonObject().addProperty("translated",5);Files.writeString(Path.of(project).resolve("project.json"),G.toJson(metadata));
+        check.accept("legacy-counts-repaired-on-pending",((Number)new NativeLocalization(in,data).pending().get("pending")).intValue()==1);
+        in.add("changes",G.toJsonTree(List.of(Map.of("resource",id,"entry","langqa::hello","source","Hello %s","translation","你好 %s"))));new NativeLocalization(in,data).save();check.accept("completion-only-after-all-valid",((Number)new NativeLocalization(in,data).pending().get("pending")).intValue()==0);
+        in.addProperty("packName","Language QA");in.addProperty("packFormat",15);Path output=data.resolve("translated.zip");in.addProperty("output",output.toString());Map<String,Object> pack=new NativeLocalization(in,data).export();check.accept("export-complete-has-zero-pending",((Number)pack.get("pending")).intValue()==0);
+        try(ZipFile z=new ZipFile(output.toFile())){String zh=new String(z.getInputStream(z.getEntry("assets/langqa/lang/zh_cn.json")).readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);check.accept("export-real-Chinese-and-placeholder",zh.contains("你好 %s")&&zh.contains("就绪")&&zh.contains("已有中文"));}
+        check.accept("localization-original-jar-untouched",Arrays.equals(original,Files.readAllBytes(jar)));
+        check.accept("namespace-and-format-not-translated",!NativeLocalization.needsTranslation("minecraft:stone")&&!NativeLocalization.needsTranslation("%1$s ${name} {0}")&&NativeLocalization.needsTranslation("Collect logs"));
+    }
+}
