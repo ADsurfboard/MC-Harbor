@@ -19,3 +19,23 @@ jobs:
       - name: Test multi-touch, layouts and modpack storage boundaries
         working-directory: iOS/HarborCore
         run: swift test --jobs 3
+  native-ui:
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare reproducible Xcode project
+        run: |
+          command -v xcodegen || brew install xcodegen
+          cd iOS
+          xcodegen generate
+      - name: Build real UIKit and SwiftUI app host
+        working-directory: iOS
+        run: |
+          xcodebuild -project MCHarborIOS.xcodeproj -scheme HarborIOSHarness -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData CODE_SIGNING_ALLOWED=NO build
+      - name: Retain build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ui-build-diagnostics
+          path: iOS/DerivedData/Logs

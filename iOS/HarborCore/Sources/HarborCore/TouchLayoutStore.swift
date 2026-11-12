@@ -7,9 +7,9 @@ public actor TouchLayoutStore {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     }
     public func layouts() throws -> [TouchLayout] {
-        let files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+        let files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
         return files.filter { $0.pathExtension == "json" }.compactMap { url in
-            guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]), values.isRegularFile == true, values.isSymbolicLink != true,
+            guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey]), values.isRegularFile == true, values.isSymbolicLink != true, (values.fileSize ?? 0) <= 128 * 1024,
                   let data = try? Data(contentsOf: url), let layout = try? TouchLayout.decode(data) else { return nil }
             return layout
         }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
