@@ -29,10 +29,14 @@ def diagnostic(name, arguments, timeout=25):
         report['cleanupErrors'].append(name + ': ' + str(error))
 
 try:
+    report['hostMemoryBefore'] = subprocess.check_output(['sysctl', 'vm.swapusage'], text=True, timeout=10).strip()
     info = plistlib.loads((APP / 'Info.plist').read_bytes())
     bundle = info['CFBundleIdentifier']
     assert bundle == 'net.morben.harbor.ios'
     inventory = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', '--json'], timeout=30))
+    report['bootedDevicesBefore'] = [d['name'] for group in inventory['devices'].values() for d in group if d['state'] == 'Booted']
+    if os.environ.get('GITHUB_ACTIONS') == 'true':
+        assert not report['bootedDevicesBefore'], 'Release UI-test simulator clones before booting the native-app device'
     runtime = next(r for r in reversed(inventory['runtimes']) if r.get('isAvailable') and '.iOS-' in r['identifier'])
     compatible = next(d for d in inventory['devices'][runtime['identifier']]
                       if d.get('isAvailable') and d['name'].startswith('iPhone'))
@@ -43,7 +47,9 @@ try:
     report.update(device=device_type['name'], runtime=runtime['identifier'], bundle=bundle, udid=udid)
     run(['xcrun', 'simctl', 'boot', udid])
     run(['xcrun', 'simctl', 'bootstatus', udid, '-b'], timeout=180)
-    run(['xcrun', 'simctl', 'install', udid, str(APP)])
+    # The complete bundle includes four signed JVMs, unlike the small UI host.
+    # Hosted-runner first-install work must have its own bounded budget.
+    run(['xcrun', 'simctl', 'install', udid, str(APP)], timeout=300)
     data = Path(run(['xcrun', 'simctl', 'get_app_container', udid, bundle, 'data'], capture_output=True).stdout.strip())
     home = data / 'Library/Application Support/MC-Harbor'
     ready = home / '.native-smoke-ready'
@@ -73,7 +79,8 @@ try:
     assert not (data / 'Documents/accounts').exists(), 'Accounts must not be Files-shared'
     report.update(rootAppeared=True, privateStorage=True, pid=pid)
     run(['xcodebuild', '-project', str(ROOT / 'MCHarborIOS.xcodeproj'), '-scheme', 'HarborNativeRuntimeTests',
-         '-destination', 'platform=iOS Simulator,id=' + udid, '-derivedDataPath', str(ROOT / 'DerivedData'),
+         '-destination', 'platform=iOS Simulator,id=' + udid, '-parallel-testing-enabled', 'NO',
+         '-maximum-concurrent-test-simulator-destinations', '1', '-derivedDataPath', str(ROOT / 'DerivedData'),
          '-resultBundlePath', str(OUT / 'native-profile.xcresult'), 'CODE_SIGNING_ALLOWED=NO', 'test'], timeout=360)
     report.update(passed=True, realProfileCancelSaveAndRelaunch=True)
 except Exception as error:
@@ -92,5 +99,7 @@ finally:
                     shutil.copy2(crash, OUT / crash.name)
         diagnostic('terminate.log', ['xcrun', 'simctl', 'terminate', udid, 'net.morben.harbor.ios'])
         diagnostic('shutdown.log', ['xcrun', 'simctl', 'shutdown', udid], timeout=45)
+        if os.environ.get('GITHUB_ACTIONS') == 'true':
+            diagnostic('shutdown-test-clones.log', ['xcrun', 'simctl', 'shutdown', 'all'], timeout=90)
         diagnostic('delete.log', ['xcrun', 'simctl', 'delete', udid])
     REPORT.write_text(json.dumps(report, ensure_ascii=False, indent=2))

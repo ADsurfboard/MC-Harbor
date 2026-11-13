@@ -15,12 +15,15 @@ assert len(choices)==2,'Both iPhone and iPad simulator runtimes are required'
 for family,device in choices:
  result=EVIDENCE/('ui-'+family+'.xcresult')
  try:
-  completed=subprocess.run(['xcodebuild','-project','MCHarborIOS.xcodeproj','-scheme','HarborIOSHarness','-destination','platform=iOS Simulator,id='+device,'-derivedDataPath','DerivedData','-resultBundlePath',str(result),'CODE_SIGNING_ALLOWED=NO','test'],cwd=ROOT)
+  completed=subprocess.run(['xcodebuild','-project','MCHarborIOS.xcodeproj','-scheme','HarborIOSHarness','-destination','platform=iOS Simulator,id='+device,'-parallel-testing-enabled','NO','-maximum-concurrent-test-simulator-destinations','1','-derivedDataPath','DerivedData','-resultBundlePath',str(result),'CODE_SIGNING_ALLOWED=NO','test'],cwd=ROOT)
  finally:
   # These are disposable hosted-runner devices. Release each before the next
   # family/native smoke run instead of leaving multiple iOS VMs booted.
   if __import__('os').environ.get('GITHUB_ACTIONS')=='true':
-   subprocess.run(['xcrun','simctl','shutdown',device],capture_output=True,timeout=45)
+   # Xcode may launch a cloned test device instead of the destination UDID.
+   # Only this ephemeral GitHub VM owns all of these devices, never a user's Mac.
+   subprocess.run(['xcrun','simctl','list','devices','booted','--json'],check=True,timeout=30)
+   subprocess.run(['xcrun','simctl','shutdown','all'],capture_output=True,check=True,timeout=90)
  (EVIDENCE/('ui-'+family+'.json')).write_text(json.dumps({'family':family,'device':device,'resultBundle':str(result),'passed':completed.returncode==0},indent=2))
  output=EVIDENCE/'screenshots'/family;output.mkdir(parents=True,exist_ok=True)
  run(['xcrun','xcresulttool','export','attachments','--path',str(result),'--output-path',str(output)])

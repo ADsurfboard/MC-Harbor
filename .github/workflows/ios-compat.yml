@@ -81,6 +81,10 @@ jobs:
             iOS/evidence/ui-*.xcresult
             iOS/evidence/ui-*.json
             iOS/evidence/screenshots
+      - name: Release UI-test simulators before native engine work
+        run: |
+          xcrun simctl list devices booted --json
+          xcrun simctl shutdown all
       - uses: actions/setup-java@v4
         with:
           distribution: zulu
