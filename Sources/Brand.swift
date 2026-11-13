@@ -3,7 +3,7 @@ import SwiftUI
 enum HarborBrand {
     static let name = "MC Harbor"
     static let shortName = "MC Harbor"
-    static let version = "1.6.1"
+    static let version = "1.6.2"
     static let authorURL=URL(string:"https://github.com/ADsurfboard")!
     static let issuesURL=URL(string:"https://github.com/ADsurfboard/MC-Harbor/issues/new/choose")!
     static let bilibiliURL=URL(string:"https://space.bilibili.com/1628767816")!

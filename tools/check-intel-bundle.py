@@ -5,7 +5,7 @@ import json,os,plistlib,struct,subprocess,zipfile
 root=Path(__file__).resolve().parent.parent
 app=root/'build/MC Harbor.app';resources=app/'Contents/Resources'
 info=plistlib.loads((app/'Contents/Info.plist').read_bytes())
-assert info['LSMinimumSystemVersion']=='12.0' and info['CFBundleShortVersionString']=='1.6.1'
+assert info['LSMinimumSystemVersion']=='12.0' and info['CFBundleShortVersionString']=='1.6.2'
 subprocess.run(['/usr/bin/codesign','--verify','--deep','--strict',str(app)],check=True)
 
 def inspect(data,label):
@@ -50,7 +50,8 @@ for name in ['welcome.mp3','welcome-male.mp3','welcome-female2.mp3','welcome-mal
     assert (resources/name).read_bytes()==(root/'Assets/Voice'/name).read_bytes()
 bank=resources/'Interface.soundbank'
 if os.environ.get('HARBOR_TEST_WITHOUT_SFX')!='1':assert bank.is_file() and bank.read_bytes()==(root/'build/Interface.soundbank').read_bytes()
-assert (resources/'Contributors/jiekee.png').read_bytes()==(root/'Assets/Contributors/jiekee.png').read_bytes()
+for name in ['flowerbank.png','jiekee.png','shiziyueyuan.png','contributors.json']:
+    assert (resources/'Contributors'/name).read_bytes()==(root/'Assets/Contributors'/name).read_bytes()
 assert len(list(resources.glob('*.icns')))==1
 assert 'glassEffect(' not in '\n'.join(p.read_text() for p in (root/'Sources').glob('*.swift'))
 report={'minimumMacOS':'12.0','launcherArchitecture':'x86_64','runtimeMachOFiles':native,'javafxNativeLibraries':libraries,'strictSignature':True,'voicesByteIdentical':True,'licensedSoundbankIncluded':bank.is_file(),'liquidGlassRemoved':True}

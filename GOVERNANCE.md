@@ -17,7 +17,7 @@
 
 此委任不转移项目所有权、管理权限，也不将 macOS、iOS 或其他平台的创作归属给 Windows 开发者。其他平台的官方开发与发布继续由 ADsurfboard 负责。
 
-Windows 提交在 Windows 分支进行；需要把修复同步到公共或其他平台分支时，由 ADsurfboard 审核决定。Windows 专用发布标签使用 `windows-*`。GitHub 的仓库协作者权限还包含议题、拉取请求等协作能力，分支与标签规则用于限制代码和版本标签的直接修改范围。
+Windows 提交在 Windows 分支进行；需要把修复同步到公共或其他平台分支时，由 ADsurfboard 审核决定。Windows 专用发布标签使用 `windows-*`。GitHub 的仓库协作者权限还包含议题、拉取请求等协作能力，分支与标签规则用于限制代码和版本标签的直接修改范围。个人仓库的 Write 权限仍包含 Release 的创建、编辑与删除能力；这些规则不等于逐项隔离全部仓库操作，不能承诺只有 Windows Release 可被协作者操作。
 
 ## 状态与贡献记录
 
