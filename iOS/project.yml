@@ -69,6 +69,15 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: net.morben.harbor.ios.uitests
+  HarborNativeIOSUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [NativeUITests]
+    dependencies:
+      - target: HarborIOSHarness
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: net.morben.harbor.ios.nativeuitests
 schemes:
   HarborIOSUI:
     build:
@@ -83,3 +92,10 @@ schemes:
     test:
       targets: [HarborIOSUITests]
       gatherCoverageData: true
+  HarborNativeRuntimeTests:
+    build:
+      targets:
+        HarborIOSHarness: all
+        HarborNativeIOSUITests: [test]
+    test:
+      targets: [HarborNativeIOSUITests]

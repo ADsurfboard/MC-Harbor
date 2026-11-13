@@ -48,5 +48,6 @@ struct HarborInstanceCard: View {
             Image(systemName: "ellipsis").font(.headline).frame(width: 44, height: 44)
                 .background(.thinMaterial, in: Circle()).contentShape(Circle())
         }.accessibilityLabel(instance.name + "，更多操作")
+            .accessibilityIdentifier("instance.more." + instance.id)
     }
 }

@@ -99,7 +99,8 @@ static double lookSensitivity = 1;
     if ([page isEqual:@"resources"]) return [[UINavigationController alloc] initWithRootViewController:[ModpackInstallViewController new]];
     if ([page isEqual:@"instance"] && profile && PLProfiles.current.profiles[profile]) {
         LauncherProfileEditorViewController *editor = [LauncherProfileEditorViewController new];
-        editor.profile = PLProfiles.current.profiles[profile];
+        // Cancel must not mutate the live profile before the player saves.
+        editor.profile = [PLProfiles.current.profiles[profile] mutableCopy];
         return [[UINavigationController alloc] initWithRootViewController:editor];
     }
     HarborEnginePage *container = [HarborEnginePage new]; container.adapter=self; container.page=page; container.profile=profile;

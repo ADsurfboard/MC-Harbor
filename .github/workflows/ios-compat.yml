@@ -25,6 +25,8 @@ jobs:
       - name: Test multi-touch, layouts and modpack storage boundaries
         working-directory: iOS/HarborCore
         run: swift test --jobs 3
+      - name: Test production account-token storage without real Keychain access
+        run: python3 iOS/tools/test-account-tokens.py
       - uses: actions/setup-java@v4
         with:
           distribution: zulu

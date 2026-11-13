@@ -14,7 +14,13 @@ for family in ['iPhone','iPad']:
 assert len(choices)==2,'Both iPhone and iPad simulator runtimes are required'
 for family,device in choices:
  result=EVIDENCE/('ui-'+family+'.xcresult')
- completed=subprocess.run(['xcodebuild','-project','MCHarborIOS.xcodeproj','-scheme','HarborIOSHarness','-destination','platform=iOS Simulator,id='+device,'-derivedDataPath','DerivedData','-resultBundlePath',str(result),'CODE_SIGNING_ALLOWED=NO','test'],cwd=ROOT)
+ try:
+  completed=subprocess.run(['xcodebuild','-project','MCHarborIOS.xcodeproj','-scheme','HarborIOSHarness','-destination','platform=iOS Simulator,id='+device,'-derivedDataPath','DerivedData','-resultBundlePath',str(result),'CODE_SIGNING_ALLOWED=NO','test'],cwd=ROOT)
+ finally:
+  # These are disposable hosted-runner devices. Release each before the next
+  # family/native smoke run instead of leaving multiple iOS VMs booted.
+  if __import__('os').environ.get('GITHUB_ACTIONS')=='true':
+   subprocess.run(['xcrun','simctl','shutdown',device],capture_output=True,timeout=45)
  (EVIDENCE/('ui-'+family+'.json')).write_text(json.dumps({'family':family,'device':device,'resultBundle':str(result),'passed':completed.returncode==0},indent=2))
  output=EVIDENCE/'screenshots'/family;output.mkdir(parents=True,exist_ok=True)
  run(['xcrun','xcresulttool','export','attachments','--path',str(result),'--output-path',str(output)])

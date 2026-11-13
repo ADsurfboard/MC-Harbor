@@ -160,6 +160,8 @@ struct HarborPhoneRoot: View {
         .onAppear {
             if ProcessInfo.processInfo.environment["HARBOR_SMOKE_TEST"] == "1" {
                 NSLog("[MC Harbor] HARBOR_ROOT_READY")
+                try? Data("HARBOR_ROOT_READY".utf8).write(
+                    to: services.harborHomeURL.appendingPathComponent(".native-smoke-ready"), options: .atomic)
             }
         }
     }
