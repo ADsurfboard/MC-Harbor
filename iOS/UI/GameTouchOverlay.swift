@@ -152,6 +152,7 @@ import HarborCore
             case .press(.mouseButton(let button)): services?.sendMouseButton(Int32(button), pressed: true)
             case .release(.mouseButton(let button)): services?.sendMouseButton(Int32(button), pressed: false)
             case .look, .scroll, .cursor: break // The native game surface owns these gestures.
+            @unknown default: break // Future input types must not leave a native key pressed.
             }
         }
     }

@@ -21,7 +21,7 @@ jobs:
         run: swift test --jobs 3
   native-ui:
     runs-on: macos-26
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - name: Prepare reproducible Xcode project
@@ -33,9 +33,45 @@ jobs:
         working-directory: iOS
         run: |
           xcodebuild -project MCHarborIOS.xcodeproj -scheme HarborIOSHarness -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData CODE_SIGNING_ALLOWED=NO build
+      - name: Run actual iPhone and iPad UI tests
+        working-directory: iOS
+        run: python3 tools/test-simulator-ui.py
       - name: Retain build diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ios-ui-build-diagnostics
-          path: iOS/DerivedData/Logs
+          path: |
+            iOS/DerivedData/Logs
+            iOS/evidence/ui-*.xcresult
+            iOS/evidence/ui-*.json
+            iOS/evidence/screenshots
+  native-game-engine:
+    runs-on: macos-26
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '8'
+          architecture: aarch64
+      - name: Prepare native tools
+        run: |
+          command -v xcodegen || brew install xcodegen
+          command -v cmake || brew install cmake
+          command -v ldid || brew install ldid
+      - name: Build real JVM, graphics and native touch integration
+        run: python3 iOS/tools/build-native-engine.py --platform simulator
+      - name: Retain native engine and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-native-engine-verification
+          path: |
+            iOS/evidence/native-*.json
+            iOS/build/MC-Harbor-simulator.app
+            iOS/.build/engine-simulator/patch-proof.json
+            iOS/.build/engine-simulator/source/Natives/build/CMakeFiles/CMakeConfigureLog.yaml

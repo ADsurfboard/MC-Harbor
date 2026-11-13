@@ -16,7 +16,7 @@ import CryptoKit
 }
 
 @MainActor @objc(HarborRootFactory) public final class HarborRootFactory: NSObject {
-    @objc public static func makeController(services: HarborNativeServices) -> UIViewController {
+    @objc(makeControllerWithServices:) public static func makeController(services: HarborNativeServices) -> UIViewController {
         UIHostingController(rootView: HarborPhoneRoot(services: services))
     }
     @objc public static func controlConfigurationURL(home: URL, profile: String?) -> URL {
@@ -25,7 +25,7 @@ import CryptoKit
         return home.appendingPathComponent("harbor-touch", isDirectory: true)
             .appendingPathComponent(component + ".json")
     }
-    @objc public static func controlConfigurationData(home: URL, profile: String?) -> Data {
+    @objc(controlConfigurationDataWithHome:profile:) public static func controlConfigurationData(home: URL, profile: String?) -> Data {
         for candidate in [controlConfigurationURL(home: home, profile: profile), controlConfigurationURL(home: home, profile: nil)] {
             if let size = try? candidate.resourceValues(forKeys: [.fileSizeKey]).fileSize, size <= 128 * 1024,
                let data = try? Data(contentsOf: candidate), let layout = try? TouchLayout.decode(data),
@@ -33,7 +33,7 @@ import CryptoKit
         }
         return (try? JSONEncoder().encode(TouchLayout.standard())) ?? Data()
     }
-    @objc public static func installGameControls(on view: UIView, services: HarborNativeServices, profile: String?) -> HarborGameTouchOverlay {
+    @objc(installGameControlsOn:services:profile:) public static func installGameControls(on view: UIView, services: HarborNativeServices, profile: String?) -> HarborGameTouchOverlay {
         let configuration = (try? TouchLayout.decode(controlConfigurationData(home: services.harborHomeURL, profile: profile))) ?? .standard()
         let overlay = HarborGameTouchOverlay(frame: view.bounds, configuration: configuration, services: services)
         overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
