@@ -1,4 +1,5 @@
 #import "HarborEngineAdapter.h"
+#include <math.h>
 #import <HarborIOSUI/HarborIOSUI-Swift.h>
 #import "LauncherSplitViewController.h"
 #import "LauncherNavigationController.h"

@@ -47,6 +47,10 @@ jobs:
             iOS/evidence/ui-*.json
             iOS/evidence/screenshots
   native-game-engine:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [device, simulator]
     runs-on: macos-26
     timeout-minutes: 55
     steps:
@@ -64,14 +68,14 @@ jobs:
           command -v cmake || brew install cmake
           command -v ldid || brew install ldid
       - name: Build real JVM, graphics and native touch integration
-        run: python3 iOS/tools/build-native-engine.py --platform simulator
+        run: python3 iOS/tools/build-native-engine.py --platform ${{ matrix.platform }}
       - name: Retain native engine and diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ios-native-engine-verification
+          name: ios-native-engine-verification-${{ matrix.platform }}
           path: |
             iOS/evidence/native-*.json
-            iOS/build/MC-Harbor-simulator.app
-            iOS/.build/engine-simulator/patch-proof.json
-            iOS/.build/engine-simulator/source/Natives/build/CMakeFiles/CMakeConfigureLog.yaml
+            iOS/build/MC-Harbor-${{ matrix.platform }}.app
+            iOS/.build/engine-${{ matrix.platform }}/patch-proof.json
+            iOS/.build/engine-${{ matrix.platform }}/source/Natives/build/CMakeFiles/CMakeConfigureLog.yaml

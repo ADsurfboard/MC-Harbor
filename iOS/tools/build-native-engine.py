@@ -5,7 +5,7 @@ All patches apply to a marked, reproducible build copy. Neither the submodule no
 the macOS source, installed app, player data or credentials are modified.
 """
 from pathlib import Path
-import argparse, subprocess, shutil, json, plistlib, os, hashlib, sys
+import argparse, subprocess, shutil, json, plistlib, os, hashlib, sys, re
 
 IOS=Path(__file__).resolve().parents[1]; REPO=IOS.parent
 UPSTREAM='f98c4133c72d39e06ceac42b57cc4477c52105fc'
@@ -49,6 +49,8 @@ replace('Natives/SurfaceViewController.m','    CGFloat screenScale = self.screen
 replace('Natives/installer/modpack/ModrinthAPI.m','#import "PLProfiles.h"','#import "PLProfiles.h"\n#import "HarborArchiveGuard.h"')
 replace('Natives/installer/modpack/ModrinthAPI.m','    NSData *indexData = [archive extractDataFromFile:',
     '    if (!HBRValidateArchive(archive, destPath, &error)) { [downloader finishDownloadWithErrorString:error.localizedDescription]; return; }\n    NSData *indexData = [archive extractDataFromFile:')
+replace('Natives/installer/modpack/ModrinthAPI.m','    if (error) {\n        [downloader finishDownloadWithErrorString:[NSString stringWithFormat:@"Failed to parse modrinth.index.json: %@", error.localizedDescription]];',
+    '    if (error || ![indexDict isKindOfClass:NSDictionary.class]) {\n        [downloader finishDownloadWithErrorString:[NSString stringWithFormat:@"Invalid modrinth.index.json: %@", error.localizedDescription ?: @"Expected an object"]];')
 replace('Natives/installer/modpack/ModrinthAPI.m','    downloader.progress.totalUnitCount = [indexDict[@"files"] count];',
     '    if (!HBRValidateRemoteFiles(indexDict[@"files"], destPath, &error)) { [downloader finishDownloadWithErrorString:error.localizedDescription]; return; }\n    downloader.progress.totalUnitCount = [indexDict[@"files"] count];')
 utils=ENGINE/'Natives/installer/modpack/ModpackUtils.m';content=utils.read_text()
@@ -58,6 +60,23 @@ content=content[:a]+''' + (void)archive:(UZKArchive *)archive extractDirectory:(
 }
 '''+content[b:]
 utils.write_text('#import "HarborArchiveGuard.h"\n'+content)
+
+# Fix an upstream use-after-release / duplicate SecTask allocation before use
+# on actual devices. Keep entitlement checks intact rather than skipping them.
+utils_source=ENGINE/'Natives/utils.m';content=utils_source.read_text()
+a=content.index('BOOL getEntitlementValue(NSString *key) {');b=content.index('\nBOOL isJITEnabled(',a)
+content=content[:a]+'''BOOL getEntitlementValue(NSString *key) {
+    void *task = SecTaskCreateFromSelf(NULL);
+    if (!task) return NO;
+    CFTypeRef value = SecTaskCopyValueForEntitlement(task, key, nil);
+    CFRelease(task);
+    if (!value) return NO;
+    BOOL enabled = ![(__bridge id)value isKindOfClass:NSNumber.class] || [(__bridge id)value boolValue];
+    CFRelease(value);
+    return enabled;
+}
+'''+content[b:]
+utils_source.write_text(content)
 
 # Tokens and accounts remain outside the Files-sharing Documents directory.
 main=(ENGINE/'Natives/main.m').read_text();start=main.index('void init_setupHomeDirectory() {');end=main.index('\nint main(',start)
@@ -83,7 +102,13 @@ s=s.replace('&& cmake \\\n','&& cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \\\n')
 # Retain the upstream runtime's license / notices in every distributable.
 s=s.replace('ASSEMBLY_EXCEPTION,bin,include,jre,legal,LICENSE,man,THIRD_PARTY_README,','bin,include,jre,man,')
 if args.platform=='simulator':s=s.replace('--platform iphoneos','--platform iphonesimulator')
+s=s.replace('curl -OJfSL', 'curl --connect-timeout 15 --max-time 600 --retry 2 -OJfSL')
 make.write_text(s)
+
+# Reuse the project's real icon. The system owns the final rounded mask.
+for iconset in (ENGINE/'Natives/Assets.xcassets').glob('AppIcon-*.appiconset'):
+    shutil.copy2(REPO/'Assets/Brand/Icon.png', iconset/'Harbor-Icon.png')
+    (iconset/'Contents.json').write_text(json.dumps({'images':[{'filename':'Harbor-Icon.png','idiom':'universal','platform':'ios','size':'1024x1024'}],'info':{'author':'xcode','version':1}}))
 
 info=ENGINE/'Natives/Info.plist';p=plistlib.loads(info.read_bytes())
 p.update(CFBundleIdentifier='net.morben.harbor.ios',CFBundleDisplayName='MC Harbor',CFBundleName='MC Harbor',CFBundleShortVersionString='0.1.0',CFBundleVersion='1',MinimumOSVersion='16.0')
@@ -115,12 +140,17 @@ if args.platform=='simulator':
     spec=importlib.util.spec_from_file_location('simulator_archives',IOS/'tools/simulator-archives.py')
     archives=importlib.util.module_from_spec(spec);spec.loader.exec_module(archives)
     library_directory=ENGINE/'Natives/external/MobileGlues/src/main/cpp/libraries/ios'
+    for stub in ENGINE.rglob('*.tbd'):
+        text=stub.read_text()
+        text=re.sub(r'(?m)^(platform:\s*)ios\s*$',r'\1ios-simulator',text)
+        text=re.sub(r'arm64-ios(?!-simulator)', 'arm64-ios-simulator', text)
+        stub.write_text(text)
     archive_report=[archives.retarget_archive(path) for path in sorted(library_directory.glob('*.a'))]
     (EVIDENCE/'native-simulator-archive-adaptation.json').write_text(json.dumps(archive_report,indent=2))
     for binary in list(macho_files(frameworks))+list(macho_files(ENGINE/'Natives/external/MobileGlues/src/main/cpp/libraries/ios')):
         run(['xcrun','vtool','-arch','arm64','-set-build-version','7','16.0','26.0','-replace','-output',binary,binary])
 sdkpath=subprocess.check_output(['xcrun','--sdk',sdk,'--show-sdk-path'],text=True).strip()
-java_home=os.environ.get('JAVA_HOME_8_X64') or os.environ.get('JAVA_HOME')
+java_home=os.environ.get('JAVA_HOME_8_ARM64') or os.environ.get('JAVA_HOME')
 if not java_home:java_home=subprocess.check_output(['/usr/libexec/java_home','-v','1.8'],text=True).strip()
 java_bin=Path(java_home)/'bin'
 run(['make','-j2','payload','SDKPATH='+sdkpath,'BOOTJDK='+str(java_bin),'PLATFORM='+('2' if args.platform=='device' else '7'),'RELEASE=0','JOBS=2','RUNNER=0'],cwd=ENGINE)

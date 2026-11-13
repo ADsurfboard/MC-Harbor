@@ -65,10 +65,10 @@ struct TouchLayoutEditor: View {
                             ForEach(290...301, id: \.self) { key in Text("F\(key-289)").tag(Optional(key)) }
                             Text("空格").tag(Optional(32)); Text("Tab").tag(Optional(258)); Text("Shift").tag(Optional(340))
                             Text("Ctrl").tag(Optional(341)); Text("Alt").tag(Optional(342))
-                        }
+                        }.disabled(layout.buttons[index].action == .pause)
                         Toggle("显示按键", isOn: $layout.buttons[index].visible)
                             .disabled(layout.buttons[index].action == .pause)
-                        Toggle("点按切换保持状态", isOn: $layout.buttons[index].toggle)
+                        Toggle("点按切换保持状态", isOn: $layout.buttons[index].toggle).disabled(layout.buttons[index].action == .pause)
                         slider("按键大小", value: $layout.buttons[index].diameter, range: 44...160, unit: "pt")
                         slider("按键不透明度", value: $layout.buttons[index].opacity, range: 0.1...1)
                         slider("横向位置", value: $layout.buttons[index].center.x, range: 0...1)

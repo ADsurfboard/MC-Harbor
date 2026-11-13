@@ -27,6 +27,18 @@ final class StorageSafetyTests: XCTestCase {
         layout.mirrorHorizontally(); layout.mirrorHorizontally()
         XCTAssertEqual(layout, before)
     }
+    func testPauseCannotBecomeAModKeyAndMirroringPreservesCameraChoice() throws {
+        var layout = TouchLayout.standard()
+        let index = try XCTUnwrap(layout.buttons.firstIndex { $0.action == .pause })
+        layout.buttons[index].customKey = 65; layout.buttons[index].toggle = true
+        layout.settings.invertCameraX = true
+        try layout.sanitize()
+        XCTAssertEqual(TouchInputRouter.binding(layout.buttons[index]), .key(256))
+        XCTAssertFalse(layout.buttons[index].toggle)
+        let before = layout
+        layout.mirrorHorizontally(); layout.mirrorHorizontally()
+        XCTAssertEqual(layout, before)
+    }
     func testMalformedLayoutsAndFutureVersionsAreRejected() throws {
         var layout = TouchLayout.standard(); layout.schemaVersion = 99
         XCTAssertThrowsError(try TouchLayout.decode(JSONEncoder().encode(layout))) { XCTAssertEqual($0 as? TouchLayoutError, .unsupportedVersion(99)) }

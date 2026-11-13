@@ -52,6 +52,7 @@ public struct TouchButton: Codable, Identifiable, Equatable, Sendable {
         return action.chineseName
     }
     public mutating func sanitize() throws {
+        if action == .pause { customKey = nil; toggle = false }
         if let key = customKey, !Self.validKeyboardKey(key) { throw TouchLayoutError.invalidKeyBinding(key) }
         if let label = customLabel { customLabel = String(label.prefix(24)) }
         center = .init(x: center.x, y: center.y)
@@ -134,7 +135,6 @@ public struct TouchLayout: Codable, Equatable, Identifiable, Sendable {
     public mutating func mirrorHorizontally() {
         settings.joystickCenter.x = 1 - settings.joystickCenter.x
         for i in buttons.indices { buttons[i].center.x = 1 - buttons[i].center.x }
-        settings.invertCameraX = false
     }
     public static func decode(_ data: Data) throws -> Self {
         guard data.count <= 128 * 1024 else { throw TouchLayoutError.tooLarge }
