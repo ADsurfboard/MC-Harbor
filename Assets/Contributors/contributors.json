@@ -15,5 +15,17 @@
     "contributions": [
       "导入进度展示建议：提出整合包导入时展示当前处理阶段与下载进度，替代仅显示加载转圈，让玩家了解任务状态并判断是否停滞。"
     ]
+  },
+  {
+    "id": "shiziyueyuan",
+    "name": "时咨月.",
+    "avatar": "shiziyueyuan.png",
+    "role": "Windows 版本授权开发者 · 移植负责人",
+    "category": "developer",
+    "url": "https://github.com/shiziyueyuan",
+    "contributions": [
+      "经项目作者 ADsurfboard 正式授权，负责 MC Harbor 后续 Windows 版本的移植开发、兼容性适配、测试与维护，工作在本仓库 windows 分支进行。",
+      "授权范围为 Windows 版本；macOS、iOS 及其他版本继续由 ADsurfboard 独立开发与维护。当前署名记录其开发职责，不代表 Windows 移植已完成。"
+    ]
   }
 ]

@@ -283,6 +283,16 @@ Intel 版已在 Rosetta 下校验并启动官方陶瓦、退出房间，并验�
 
 参考交互：Inspora / damienghader 的 interactive folder cards。素材使用真实模组图标，风景备用图保留 Minecraft 原图；不把参考帖的示例图片当作本项目图标。
 
+## 开发者与平台分工
+
+MC Harbor 由 [ADsurfboard](https://github.com/ADsurfboard) 发起、设计并持续维护。**macOS、iOS 及除 Windows 外的版本继续由 ADsurfboard 独立开发。**
+
+<img src="Assets/Contributors/shiziyueyuan.png" width="72" height="72" alt="时咨月. 头像">
+
+**[时咨月.](https://github.com/shiziyueyuan)** 为项目正式授权的 **Windows 版本开发者与移植负责人**，在本仓库的 [`windows`](https://github.com/ADsurfboard/MC-Harbor/tree/windows) 分支开展后续移植、适配、测试与维护。此授权仅说明 Windows 官方开发分工，Windows 版本尚未作为正式成品发布。
+
+[开发分工与权限](GOVERNANCE.md) · [Windows 开发入口](docs/WINDOWS_PORT.md)
+
 ## 每条反馈，都有明确署名。
 
 作者设计与社区建议分开记录，贡献名单同时保留在应用、源码说明与此文档中。
@@ -295,6 +305,10 @@ Intel 版已在 Rosetta 下校验并启动官方陶瓦、退出房间，并验�
 ### 花圆银行
 
 导入进度展示建议：提出整合包导入时展示当前处理阶段与下载进度，替代仅显示加载转圈，让玩家了解任务状态并判断是否停滞。
+
+### 时咨月.
+
+负责后续 Windows 移植方向的官方开发工作。平台职责与实际完成的代码贡献分别记录，macOS、iOS 等版本的作者署名仍为 ADsurfboard。
 
 ### 作者的模组夹设计
 
