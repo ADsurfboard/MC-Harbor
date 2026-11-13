@@ -65,6 +65,7 @@ jobs:
           cd iOS
           xcodegen generate
       - name: Build real UIKit and SwiftUI app host
+        id: ui_build
         working-directory: iOS
         run: |
           xcodebuild -project MCHarborIOS.xcodeproj -scheme HarborIOSHarness -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData CODE_SIGNING_ALLOWED=NO build
@@ -82,22 +83,32 @@ jobs:
             iOS/evidence/ui-*.json
             iOS/evidence/screenshots
       - name: Release UI-test simulators before native engine work
+        # UI failures still fail this job. Continue independent native checks
+        # so one failure does not hide the other runtime diagnostics.
+        if: ${{ !cancelled() && steps.ui_build.outcome == 'success' }}
         run: |
           xcrun simctl list devices booted --json
           xcrun simctl shutdown all
       - uses: actions/setup-java@v4
+        id: native_java
+        if: ${{ !cancelled() && steps.ui_build.outcome == 'success' }}
         with:
           distribution: zulu
           java-version: '8'
           architecture: aarch64
       - name: Prepare native tools
+        id: native_tools
+        if: ${{ !cancelled() && steps.native_java.outcome == 'success' }}
         run: |
           command -v xcodegen || brew install xcodegen
           command -v cmake || brew install cmake
           command -v ldid || brew install ldid
       - name: Build real JVM, graphics and native touch integration
+        id: native_build
+        if: ${{ !cancelled() && steps.native_tools.outcome == 'success' }}
         run: python3 iOS/tools/build-native-engine.py --platform simulator
       - name: Install and launch the complete native app on iPhone simulator
+        if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
         run: python3 iOS/tools/smoke-native-simulator.py
       - name: Retain native engine and diagnostics
         if: always()
