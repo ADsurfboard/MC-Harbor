@@ -26,7 +26,14 @@ targets:
   HarborIOSUI:
     type: framework
     platform: iOS
-    sources: [UI]
+    sources:
+      - UI
+      - path: ../Assets/Loaders
+        buildPhase: resources
+      - path: ../Assets/Brand/Mark.png
+        buildPhase: resources
+      - path: ../Assets/Brand/Mark-dark.png
+        buildPhase: resources
     dependencies:
       - target: HarborCore
     settings:

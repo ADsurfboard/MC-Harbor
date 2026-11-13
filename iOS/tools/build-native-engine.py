@@ -35,7 +35,7 @@ def replace(relative,old,new,count=1):
     p=ENGINE/relative;s=p.read_text();assert s.count(old)==count,(relative,s.count(old),old[:80])
     p.write_text(s.replace(old,new));patches.append({'file':relative,'replacements':count})
 
-for name in ['HarborEngineAdapter.h','HarborEngineAdapter.m']:
+for name in ['HarborEngineAdapter.h','HarborEngineAdapter.m','HarborArchiveGuard.h','HarborArchiveGuard.m']:
     shutil.copy2(IOS/'Native'/name,ENGINE/'Natives'/name)
 replace('Natives/ios_uikit_bridge.m','#import "SurfaceViewController.h"','#import "SurfaceViewController.h"\n#import "HarborEngineAdapter.h"')
 replace('Natives/ios_uikit_bridge.m','void launchInitialViewController(UIWindow *window) {\n    window.rootViewController = [[LauncherSplitViewController alloc] initWithStyle:UISplitViewControllerStyleDoubleColumn];','void launchInitialViewController(UIWindow *window) {\n    HBRInstallRoot(window);')
@@ -44,6 +44,20 @@ replace('Natives/SurfaceViewController.m','#import "SurfaceViewController.h"','#
 replace('Natives/SurfaceViewController.m','[super viewDidAppear:animated];','[super viewDidAppear:animated];\n    HBRInstallGameControls(self);')
 replace('Natives/SurfaceViewController.m','- (void)updateGrabState {','- (void)updateGrabState {\n    HBRUpdateGameGrabState();')
 replace('Natives/SurfaceViewController.m','    CGFloat screenScale = self.screenScale;','    if (event == ACTION_MOVE_MOTION && isGrabbing) location = HBRApplyLookDelta(location);\n    CGFloat screenScale = self.screenScale;')
+
+# Validate complete manifests before any downloaded / extracted payload is written.
+replace('Natives/installer/modpack/ModrinthAPI.m','#import "PLProfiles.h"','#import "PLProfiles.h"\n#import "HarborArchiveGuard.h"')
+replace('Natives/installer/modpack/ModrinthAPI.m','    NSData *indexData = [archive extractDataFromFile:',
+    '    if (!HBRValidateArchive(archive, destPath, &error)) { [downloader finishDownloadWithErrorString:error.localizedDescription]; return; }\n    NSData *indexData = [archive extractDataFromFile:')
+replace('Natives/installer/modpack/ModrinthAPI.m','    downloader.progress.totalUnitCount = [indexDict[@"files"] count];',
+    '    if (!HBRValidateRemoteFiles(indexDict[@"files"], destPath, &error)) { [downloader finishDownloadWithErrorString:error.localizedDescription]; return; }\n    downloader.progress.totalUnitCount = [indexDict[@"files"] count];')
+utils=ENGINE/'Natives/installer/modpack/ModpackUtils.m';content=utils.read_text()
+a=content.index('+ (void)archive:');b=content.index('\n+ (NSDictionary *)infoForDependencies:',a)
+content=content[:a]+''' + (void)archive:(UZKArchive *)archive extractDirectory:(NSString *)dir toPath:(NSString *)path error:(NSError *__autoreleasing*)error {
+    HBRExtractDirectory(archive, dir, path, error);
+}
+'''+content[b:]
+utils.write_text('#import "HarborArchiveGuard.h"\n'+content)
 
 # Tokens and accounts remain outside the Files-sharing Documents directory.
 main=(ENGINE/'Natives/main.m').read_text();start=main.index('void init_setupHomeDirectory() {');end=main.index('\nint main(',start)
@@ -61,7 +75,7 @@ main=main[:start]+'''void init_setupHomeDirectory() {
 cmake=ENGINE/'Natives/CMakeLists.txt';s=cmake.read_text()
 target='arm64-apple-ios16.0' + ('-simulator' if args.platform=='simulator' else '')
 s=s.replace('-target arm64-apple-ios -mcpu=apple-a8','-target '+target)
-s+='''\n# MC Harbor native UI and real input adapter\ntarget_sources(AngelAuraAmethyst PRIVATE HarborEngineAdapter.m)\ntarget_link_libraries(AngelAuraAmethyst PUBLIC "-framework HarborIOSUI" "-framework HarborCore")\n'''
+s+='''\n# MC Harbor native UI and real input adapter\ntarget_sources(AngelAuraAmethyst PRIVATE HarborEngineAdapter.m HarborArchiveGuard.m)\ntarget_link_libraries(AngelAuraAmethyst PUBLIC "-framework HarborIOSUI" "-framework HarborCore")\n'''
 cmake.write_text(s)
 make=ENGINE/'Makefile';s=make.read_text().replace('-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0','-DCMAKE_OSX_DEPLOYMENT_TARGET=16.0')
 s=s.replace('-DCMAKE_C_FLAGS="-arch arm64"', '-DCMAKE_C_FLAGS="-arch arm64 -target '+target+'"')

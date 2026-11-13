@@ -8,7 +8,6 @@ struct TouchLayoutEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State private var layout = TouchLayout.standard()
     @State private var selected: UUID?
-    @State private var dragOrigins: [UUID: NormalizedPoint] = [:]
     @State private var error: String?
     @State private var importing = false
     @State private var exporting = false
@@ -18,39 +17,7 @@ struct TouchLayoutEditor: View {
         NavigationStack {
             Form {
                 Section {
-                    GeometryReader { geometry in
-                        let size = geometry.size
-                        let width = Double(size.width), height = Double(size.height)
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 24).fill(.linearGradient(colors: [Color(red: 0.07, green: 0.17, blue: 0.14), Color(red: 0.16, green: 0.25, blue: 0.22)], startPoint: .topLeading, endPoint: .bottomTrailing))
-                            Image(systemName: "plus").font(.title2).foregroundStyle(.white.opacity(0.4))
-                            Circle().fill(.white.opacity(0.12))
-                                .frame(width: layout.settings.joystickDiameter * 0.6, height: layout.settings.joystickDiameter * 0.6)
-                                .overlay(Image(systemName: "arrow.up.and.down.and.arrow.left.and.right").foregroundStyle(.white))
-                                .position(x: CGFloat(layout.settings.joystickCenter.x * width), y: CGFloat(layout.settings.joystickCenter.y * height))
-                                .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .named("touchCanvas")).onChanged { value in
-                                    layout.settings.joystickCenter = .init(x: Double(value.location.x) / max(1,width), y: Double(value.location.y) / max(1,height))
-                                })
-                            ForEach(layout.buttons.filter(\.visible)) { button in
-                                Text(shortName(button.action)).font(.system(size: 11, weight: .semibold)).foregroundStyle(.white)
-                                    .frame(width: max(32, button.diameter * 0.6), height: max(32, button.diameter * 0.6))
-                                    .background(.white.opacity(button.id == selected ? 0.42 : button.opacity * 0.35), in: Circle())
-                                    .frame(minWidth: 44, minHeight: 44)
-                                    .contentShape(Circle())
-                                    .position(x: CGFloat(button.center.x * width), y: CGFloat(button.center.y * height))
-                                    .onTapGesture { selected = button.id }
-                                    .gesture(DragGesture().onChanged { value in
-                                        selected = button.id
-                                        if dragOrigins[button.id] == nil { dragOrigins[button.id] = button.center }
-                                        guard let original = dragOrigins[button.id], let index = layout.buttons.firstIndex(where: { $0.id == button.id }) else { return }
-                                        let x = original.x + Double(value.translation.width) / max(1,width)
-                                        let y = original.y + Double(value.translation.height) / max(1,height)
-                                        layout.buttons[index].center = NormalizedPoint(x: x, y: y)
-                                    }.onEnded { _ in dragOrigins.removeValue(forKey: button.id) })
-                                    .accessibilityLabel(button.displayName)
-                            }
-                        }.coordinateSpace(name: "touchCanvas")
-                    }.aspectRatio(2, contentMode: .fit)
+                    TouchLayoutCanvas(layout: $layout, selected: $selected).aspectRatio(2, contentMode: .fit)
                     Text("拖动按键和摇杆调整位置；下方可精确设置。实际游戏会按屏幕安全区自动适配。").font(.footnote).foregroundStyle(.secondary)
                     TextField("布局名称", text: $layout.name)
                     Button { layout.mirrorHorizontally() } label: { Label("左右手镜像", systemImage: "arrow.left.and.right").frame(minHeight: 44) }

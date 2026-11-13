@@ -85,7 +85,7 @@ struct HarborPhoneRoot: View {
                 List {
                     Section {
                         HStack(alignment: .center, spacing: 16) {
-                            Image(systemName: "cube.transparent.fill").font(.system(size: 36)).foregroundStyle(.tint)
+                            HarborBrandArtwork().frame(width: 46, height: 46)
                             VStack(alignment: .leading, spacing: 5) {
                                 Text("MC Harbor").font(.largeTitle.bold())
                                 Text("Minecraft，随身出发。").font(.subheadline).foregroundStyle(.secondary)
@@ -103,8 +103,7 @@ struct HarborPhoneRoot: View {
                         ForEach(library.instances) { instance in
                             VStack(alignment: .leading, spacing: 16) {
                                 HStack(spacing: 14) {
-                                    Image(systemName: instance.loader.lowercased().contains("forge") ? "hammer.fill" : "cube.fill")
-                                        .font(.system(size: 28)).frame(width: 48, height: 48).foregroundStyle(.tint)
+                                    HarborLoaderArtwork(loader: instance.loader).frame(width: 48, height: 48)
                                     VStack(alignment: .leading, spacing: 5) {
                                         Text(instance.name).font(.headline).fixedSize(horizontal: false, vertical: true)
                                         Text([instance.version, instance.loader].filter { !$0.isEmpty }.joined(separator: " · "))
