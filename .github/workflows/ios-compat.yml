@@ -10,11 +10,14 @@ concurrency:
   group: ios-port-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  touch-and-storage:
-    runs-on: macos-26
-    timeout-minutes: 15
+  device-and-core:
+    # Cross-build iPhone ARM64 on Intel to avoid requesting four scarce ARM VMs.
+    runs-on: macos-26-intel
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Inspect Apple toolchain
         run: |
           xcodebuild -version
@@ -22,11 +25,38 @@ jobs:
       - name: Test multi-touch, layouts and modpack storage boundaries
         working-directory: iOS/HarborCore
         run: swift test --jobs 3
-  native-ui:
-    runs-on: macos-26
-    timeout-minutes: 35
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '8'
+          architecture: x64
+      - name: Prepare native tools
+        run: |
+          command -v xcodegen || brew install xcodegen
+          command -v cmake || brew install cmake
+          command -v ldid || brew install ldid
+      - name: Build real iPhone ARM64 app and IPA
+        run: python3 iOS/tools/build-native-engine.py --platform device
+      - name: Retain device package and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-native-engine-verification-device
+          path: |
+            iOS/evidence/native-*.json
+            iOS/build/*.ipa
+            iOS/.build/engine-device/patch-proof.json
+            iOS/.build/engine-device/source/Natives/build/CMakeFiles/CMakeConfigureLog.yaml
+  simulator-and-ui:
+    # Reuse one ARM VM for both UI and complete native-app runtime checks.
+    runs-on: macos-15
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    timeout-minutes: 65
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Prepare reproducible Xcode project
         run: |
           command -v xcodegen || brew install xcodegen
@@ -49,17 +79,6 @@ jobs:
             iOS/evidence/ui-*.xcresult
             iOS/evidence/ui-*.json
             iOS/evidence/screenshots
-  native-game-engine:
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: [device, simulator]
-    runs-on: macos-26
-    timeout-minutes: 55
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
       - uses: actions/setup-java@v4
         with:
           distribution: zulu
@@ -71,19 +90,17 @@ jobs:
           command -v cmake || brew install cmake
           command -v ldid || brew install ldid
       - name: Build real JVM, graphics and native touch integration
-        run: python3 iOS/tools/build-native-engine.py --platform ${{ matrix.platform }}
+        run: python3 iOS/tools/build-native-engine.py --platform simulator
       - name: Install and launch the complete native app on iPhone simulator
-        if: matrix.platform == 'simulator'
         run: python3 iOS/tools/smoke-native-simulator.py
       - name: Retain native engine and diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ios-native-engine-verification-${{ matrix.platform }}
+          name: ios-native-engine-verification-simulator
           path: |
             iOS/evidence/native-*.json
             iOS/evidence/native-simulator-smoke
-            iOS/build/*.ipa
             iOS/build/*.zip
-            iOS/.build/engine-${{ matrix.platform }}/patch-proof.json
-            iOS/.build/engine-${{ matrix.platform }}/source/Natives/build/CMakeFiles/CMakeConfigureLog.yaml
+            iOS/.build/engine-simulator/patch-proof.json
+            iOS/.build/engine-simulator/source/Natives/build/CMakeFiles/CMakeConfigureLog.yaml

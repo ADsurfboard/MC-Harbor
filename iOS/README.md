@@ -11,6 +11,14 @@
 - 实例与整合包导入的预检查拒绝路径越界、符号链接、大小写 / Unicode 重名、超量文件、磁盘空间不足和异常解压膨胀。预检查需要接入实际解压器后再验收完整导入流程。
 - 原生 Java / OpenGL / Vulkan、现有触屏、键鼠与手柄实现以 GPL 开源项目 [AngelAura Amethyst iOS](https://github.com/AngelAuraMC/Amethyst-iOS) 为基础，固定提交 `f98c4133c72d39e06ceac42b57cc4477c52105fc`，作为 `vendor/AmethystIOS` 子模块保留其源码与许可证。
 
+## 已完成的验证与下载边界
+
+16 项触控与存储核心检查已通过。iPhone、iPad 的横竖屏启动按钮和布局编辑 / 保存 / 再读取共四项真实模拟器 UI 检查已通过。完整原生引擎的 iPhone ARM64 与 ARM64 模拟器目标均已完成构建和签名检查；完整 App 的安装、冷启动和游戏运行仍按独立步骤验收。
+
+CI 先将设备 ARM64 交叉构建放在 Intel 执行器，模拟器与界面检查复用一台 ARM 执行器，以减少 GitHub ARM 容量不足造成的排队取消。每个测试的断言仍保留。对应结果以 [最新 iOS Actions](https://github.com/ADsurfboard/MC-Harbor/actions/workflows/ios-compat.yml?query=branch%3Acodex%2Fios-port) 的具体提交为准；旧失败记录不删除。
+
+构建输出包含保留执行权限的 IPA 与模拟器 ZIP，并记录 SHA-256。当前为工程预览：IPA 是临时签名，需要个人开发签名和受支持的 JIT 授权；模拟器 ZIP 需要 Apple 模拟器，不是可直接在 macOS 双击运行的 App。这些产物不等于已经通过 Minecraft 实玩或完整功能验收的正式 iOS 发行版。
+
 ## 工具链
 
 工程采用 XcodeGen / Swift Package Manager；可以在 VS Code / SweetPad 编辑和运行任务。Apple SDK、签名、Instruments 和 iPhone 模拟器仍由 Xcode 提供。开源工程工具不替代这些系统组件。

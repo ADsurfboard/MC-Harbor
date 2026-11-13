@@ -4,7 +4,7 @@
 This verifies process/UI startup and private storage. It does not assert that
 Minecraft, a JVM, JIT or game rendering has been exercised.
 """
-import json, os, plistlib, re, subprocess, time
+import json, os, plistlib, re, shutil, subprocess, time
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -13,6 +13,7 @@ OUT=ROOT/'evidence/native-simulator-smoke';OUT.mkdir(parents=True,exist_ok=True)
 REPORT=OUT/'result.json'
 report={'kind':'complete-native-app-cold-launch','passed':False,'minecraftGameplayVerified':False}
 device=None;booted_here=False;pid=None
+started=time.time()
 def run(arguments,**kwargs):
     return subprocess.run(arguments,check=True,text=True,timeout=90,**kwargs)
 try:
@@ -54,5 +55,10 @@ except Exception as error:
 finally:
     REPORT.write_text(json.dumps(report,ensure_ascii=False,indent=2))
     if device:
+        if not report['passed']:
+            subprocess.run(['xcrun','simctl','io',device['udid'],'screenshot',str(OUT/'native-app-failure.png')],capture_output=True,timeout=30)
+            for crash in (Path.home()/'Library/Logs/DiagnosticReports').glob('AngelAuraAmethyst*'):
+                if crash.is_file() and crash.stat().st_mtime>=started-3:
+                    shutil.copy2(crash,OUT/crash.name)
         subprocess.run(['xcrun','simctl','terminate',device['udid'],'net.morben.harbor.ios'],capture_output=True,timeout=30)
         if booted_here:subprocess.run(['xcrun','simctl','shutdown',device['udid']],capture_output=True,timeout=30)

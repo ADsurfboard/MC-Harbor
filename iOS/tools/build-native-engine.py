@@ -123,7 +123,7 @@ if args.prepare_only:
 
 run(['xcodegen','generate'],cwd=IOS)
 derived=IOS/'build'/('ui-'+args.platform)
-run(['xcodebuild','-project','MCHarborIOS.xcodeproj','-scheme','HarborIOSUI','-sdk',sdk,'-destination','generic/platform='+('iOS' if args.platform=='device' else 'iOS Simulator'),'-derivedDataPath',derived,'CODE_SIGNING_ALLOWED=NO','build'],cwd=IOS)
+run(['xcodebuild','-project','MCHarborIOS.xcodeproj','-scheme','HarborIOSUI','-sdk',sdk,'-destination','generic/platform='+('iOS' if args.platform=='device' else 'iOS Simulator'),'-derivedDataPath',derived,'ARCHS=arm64','ONLY_ACTIVE_ARCH=NO','CODE_SIGNING_ALLOWED=NO','build'],cwd=IOS)
 frameworks=ENGINE/'Natives/resources/Frameworks'
 for name in ['HarborCore','HarborIOSUI']:
     product=derived/'Build/Products'/('Debug-iphoneos' if args.platform=='device' else 'Debug-iphonesimulator')/(name+'.framework')
