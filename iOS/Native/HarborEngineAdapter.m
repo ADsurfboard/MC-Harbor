@@ -4,6 +4,7 @@
 #import "LauncherSplitViewController.h"
 #import "LauncherNavigationController.h"
 #import "LauncherProfileEditorViewController.h"
+#import "LauncherProfilesViewController.h"
 #import "LauncherPreferencesViewController.h"
 #import "LauncherPrefContCfgViewController.h"
 #import "CustomControlsViewController.h"
@@ -18,6 +19,14 @@
 @interface LauncherNavigationController (HarborLaunch)
 - (void)reloadProfileList;
 - (void)launchMinecraft:(id)sender;
+- (void)enterModInstaller;
+@end
+
+@interface LauncherProfilesViewController (HarborInstall)
+- (void)actionCreateFabricProfile;
+- (void)actionCreateForgeProfile;
+- (void)actionCreateModpackProfile;
+- (void)actionEditProfile:(NSDictionary *)profile;
 @end
 
 @interface HarborEngineAdapter : NSObject<HarborNativeServices>
@@ -26,13 +35,14 @@
 @property(nonatomic,weak) HarborGameTouchOverlay *overlay;
 + (instancetype)shared;
 - (void)prepareTouchConfiguration;
+- (LauncherNavigationController *)launcherController;
 @end
 
 @interface HarborEnginePage : UIViewController
 @property(nonatomic,strong) HarborEngineAdapter *adapter;
 @property(nonatomic,copy) NSString *page;
 @property(nonatomic,copy) NSString *profile;
-@property(nonatomic) BOOL performedLaunch;
+@property(nonatomic) BOOL performedAction;
 @end
 
 static BOOL lookInvertX = NO, lookInvertY = NO;
@@ -56,6 +66,20 @@ static double lookSensitivity = 1;
         _legacy.view.tintColor = [UIColor colorWithRed:0.12 green:0.52 blue:0.36 alpha:1];
     }
     return _legacy;
+}
+- (LauncherNavigationController *)launcherController {
+    // The split view may collapse on iPhone. Do not assume a secondary index.
+    NSMutableArray<UIViewController *> *pending = [NSMutableArray arrayWithObject:self.legacy];
+    while (pending.count) {
+        UIViewController *controller = pending.lastObject;
+        [pending removeLastObject];
+        if ([controller isKindOfClass:LauncherNavigationController.class]) {
+            [controller loadViewIfNeeded]; // Register download/progress observers.
+            return (id)controller;
+        }
+        [pending addObjectsFromArray:controller.childViewControllers];
+    }
+    return nil;
 }
 - (NSData *)instanceListJSON {
     [PLProfiles updateCurrent];
@@ -96,7 +120,6 @@ static double lookSensitivity = 1;
     }
     if ([page isEqual:@"settings"]) return [[UINavigationController alloc] initWithRootViewController:[LauncherPreferencesViewController new]];
     if ([page isEqual:@"controls"]) return [[UINavigationController alloc] initWithRootViewController:[LauncherPrefContCfgViewController new]];
-    if ([page isEqual:@"resources"]) return [[UINavigationController alloc] initWithRootViewController:[ModpackInstallViewController new]];
     if ([page isEqual:@"instance"] && profile && PLProfiles.current.profiles[profile]) {
         LauncherProfileEditorViewController *editor = [LauncherProfileEditorViewController new];
         // Cancel must not mutate the live profile before the player saves.
@@ -144,15 +167,31 @@ static double lookSensitivity = 1;
 }
 - (void)viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated];
-    if (![self.page isEqual:@"launch"] || self.performedLaunch) return;
-    self.performedLaunch=YES;
+    if (self.performedAction) return;
+    self.performedAction=YES;
+    LauncherNavigationController *detail=[self.adapter launcherController];
+    if (!detail) { showDialog(@"无法打开运行层", @"请关闭当前页面后重试。"); return; }
+    LauncherProfilesViewController *profiles = (id)detail.viewControllers.firstObject;
+    if (![profiles isKindOfClass:LauncherProfilesViewController.class]) {
+        profiles = [LauncherProfilesViewController new];
+        [detail setViewControllers:@[profiles] animated:NO];
+    }
+    if ([self.page isEqual:@"resources"]) { [profiles actionCreateModpackProfile]; return; }
+    if ([self.page isEqual:@"fabric"]) { [profiles actionCreateFabricProfile]; return; }
+    if ([self.page isEqual:@"forge"]) { [profiles actionCreateForgeProfile]; return; }
+    if ([self.page isEqual:@"import"]) { [detail enterModInstaller]; return; }
+    if ([self.page isEqual:@"install"]) { [profiles actionEditProfile:@{@"name":@"", @"lastVersionId":@"latest-release"}]; return; }
+    if (![self.page isEqual:@"launch"]) return;
     if (self.profile && PLProfiles.current.profiles[self.profile]) [PLProfiles.current setSelectedProfileName:self.profile];
     [self.adapter prepareTouchConfiguration];
-    LauncherNavigationController *detail=(id)self.adapter.legacy.viewControllers.lastObject;
     [detail reloadProfileList];
     dispatch_async(dispatch_get_main_queue(), ^{ [detail launchMinecraft:nil]; });
 }
 @end
+
+UIViewController *HBRLauncherController(void) {
+    return [HarborEngineAdapter.shared launcherController];
+}
 
 void HBRInstallRoot(UIWindow *window) {
     window.rootViewController=[HarborRootFactory makeControllerWithServices:HarborEngineAdapter.shared];

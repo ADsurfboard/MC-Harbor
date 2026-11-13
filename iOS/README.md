@@ -17,6 +17,8 @@
 
 凭证存储另有 23 项原生回归检查，使用生产编码 / 解码代码及替代的 Security 调用，绝不访问开发者或 CI 的真实钥匙串。覆盖安全解码、无效凭证、写入失败保留旧值、并发新增冲突和显式删除。真实 Microsoft 登录及设备钥匙串权限仍需单独验收。实例编辑采用工作副本，取消不会写回；完整 App 的取消、保存、重启持久化进入独立 UI 检查，结果以对应 CI 为准。
 
+根界面使用统一的弹窗状态，避免 iPad 上独立展示入口竞争。资源入口分别连接 Modrinth 整合包、Fabric / Quilt、Forge / NeoForge 与 JAR 文件选择器；先初始化真正的下载控制器及进度监听，再进入相应页面。页面进入、取消和保存属于业务检查范围；这些入口接入不等于所有加载器、网络和整合包安装流程已经验收。
+
 CI 先将设备 ARM64 交叉构建放在 Intel 执行器，模拟器与界面检查复用一台 ARM 执行器，以减少 GitHub ARM 容量不足造成的排队取消。每个测试的断言仍保留。对应结果以 [最新 iOS Actions](https://github.com/ADsurfboard/MC-Harbor/actions/workflows/ios-compat.yml?query=branch%3Acodex%2Fios-port) 的具体提交为准；旧失败记录不删除。
 
 构建输出包含保留执行权限的 IPA 与模拟器 ZIP，并记录 SHA-256。当前为工程预览：IPA 是临时签名，需要个人开发签名和受支持的 JIT 授权；模拟器 ZIP 需要 Apple 模拟器，不是可直接在 macOS 双击运行的 App。这些产物不等于已经通过 Minecraft 实玩或完整功能验收的正式 iOS 发行版。

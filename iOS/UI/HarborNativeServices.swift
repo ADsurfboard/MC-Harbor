@@ -68,12 +68,22 @@ struct NativePageHost: UIViewControllerRepresentable {
     func updateUIViewController(_ controller: UIViewController, context: Context) {}
 }
 
+struct NativePresentationContent: View {
+    let services: HarborNativeServices
+    let page: NativePage
+    var body: some View {
+        if page.name == "touch" {
+            TouchLayoutEditor(home: services.harborHomeURL, profile: page.profile)
+        } else {
+            NativePageHost(services: services, page: page).ignoresSafeArea()
+        }
+    }
+}
+
 struct HarborPhoneRoot: View {
     let services: HarborNativeServices
     @StateObject private var library: PhoneLibrary
     @State private var page: NativePage?
-    @State private var touchProfile: String?
-    @State private var showsTouchEditor = false
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     init(services: HarborNativeServices) {
@@ -105,7 +115,7 @@ struct HarborPhoneRoot: View {
                             HarborInstanceCard(instance: instance, compact: verticalSizeClass == .compact,
                                 launch: { page = .init(name: "launch", profile: instance.id) },
                                 manage: { page = .init(name: "instance", profile: instance.id) },
-                                controls: { touchProfile = instance.id; showsTouchEditor = true })
+                                controls: { page = .init(name: "touch", profile: instance.id) })
                         }
                     }
                 }
@@ -124,16 +134,17 @@ struct HarborPhoneRoot: View {
             NavigationStack {
                 List {
                     Section("实例资源") {
-                        nativeRow("模组与整合包", symbol: "shippingbox", pageName: "resources")
-                        nativeRow("加载器安装", symbol: "square.stack.3d.down.right", pageName: "loaders")
-                        nativeRow("导入文件", symbol: "square.and.arrow.down", pageName: "import")
+                        nativeRow("Modrinth 整合包", symbol: "shippingbox", pageName: "resources")
+                        nativeRow("Fabric 与 Quilt", symbol: "square.stack.3d.down.right", pageName: "fabric")
+                        nativeRow("Forge 与 NeoForge", symbol: "square.stack.3d.down.right", pageName: "forge")
+                        nativeRow("打开 JAR 安装器", symbol: "square.and.arrow.down", pageName: "import")
                     }
                 }.navigationTitle("资源")
             }.tabItem { Label("资源", systemImage: "arrow.down.circle") }
             NavigationStack {
                 List {
                     Section("游戏控制") {
-                        Button { touchProfile = nil; showsTouchEditor = true } label: {
+                        Button { page = .init(name: "touch") } label: {
                             Label("触控与摇杆", systemImage: "hand.draw").frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
                         }.accessibilityIdentifier("settings.touch")
                         nativeRow("手柄、键鼠与原生控制设置", symbol: "gamecontroller", pageName: "controls")
@@ -151,10 +162,7 @@ struct HarborPhoneRoot: View {
         }
         .tint(Color(red: 0.12, green: 0.52, blue: 0.36))
         .sheet(item: $page, onDismiss: { library.refresh() }) { selected in
-            NativePageHost(services: services, page: selected).ignoresSafeArea()
-        }
-        .sheet(isPresented: $showsTouchEditor) {
-            TouchLayoutEditor(home: services.harborHomeURL, profile: touchProfile)
+            NativePresentationContent(services: services, page: selected)
         }
         .onChange(of: scenePhase) { phase in if phase == .active { library.refresh() } }
         .onAppear {
@@ -168,6 +176,6 @@ struct HarborPhoneRoot: View {
     private func nativeRow(_ title: String, symbol: String, pageName: String) -> some View {
         Button { page = .init(name: pageName) } label: {
             Label(title, systemImage: symbol).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
-        }
+        }.accessibilityIdentifier("native.page." + pageName)
     }
 }

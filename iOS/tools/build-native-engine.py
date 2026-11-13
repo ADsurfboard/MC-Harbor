@@ -44,6 +44,11 @@ replace('Natives/SurfaceViewController.m','#import "SurfaceViewController.h"','#
 replace('Natives/SurfaceViewController.m','[super viewDidAppear:animated];','[super viewDidAppear:animated];\n    HBRInstallGameControls(self);')
 replace('Natives/SurfaceViewController.m','- (void)updateGrabState {','- (void)updateGrabState {\n    HBRUpdateGameGrabState();')
 replace('Natives/SurfaceViewController.m','    CGFloat screenScale = self.screenScale;','    if (event == ACTION_MOVE_MOTION && isGrabbing) location = HBRApplyLookDelta(location);\n    CGFloat screenScale = self.screenScale;')
+replace('Natives/installer/ForgeInstallViewController.m', '#import "AFNetworking.h"',
+        '#import "AFNetworking.h"\n#import "HarborEngineAdapter.h"')
+replace('Natives/installer/ForgeInstallViewController.m',
+        'LauncherNavigationController *navVC = (id)((UISplitViewController *)self.presentingViewController).viewControllers[1];',
+        'LauncherNavigationController *navVC = (id)HBRLauncherController();\n            if (!navVC) { showDialog(@"无法打开安装器", @"运行层尚未准备好，请返回游戏库后重试。"); return; }')
 
 # A profile editor can now be presented by SwiftUI, not only the old split view.
 # Refresh the legacy list only when it is actually the presenting controller.
