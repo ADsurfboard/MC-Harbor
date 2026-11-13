@@ -157,6 +157,11 @@ struct HarborPhoneRoot: View {
             TouchLayoutEditor(home: services.harborHomeURL, profile: touchProfile)
         }
         .onChange(of: scenePhase) { phase in if phase == .active { library.refresh() } }
+        .onAppear {
+            if ProcessInfo.processInfo.environment["HARBOR_SMOKE_TEST"] == "1" {
+                NSLog("[MC Harbor] HARBOR_ROOT_READY")
+            }
+        }
     }
     private func nativeRow(_ title: String, symbol: String, pageName: String) -> some View {
         Button { page = .init(name: pageName) } label: {

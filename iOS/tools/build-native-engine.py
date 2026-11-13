@@ -5,7 +5,7 @@ All patches apply to a marked, reproducible build copy. Neither the submodule no
 the macOS source, installed app, player data or credentials are modified.
 """
 from pathlib import Path
-import argparse, subprocess, shutil, json, plistlib, os, hashlib, sys, re
+import argparse, subprocess, shutil, json, plistlib, os, hashlib, sys, re, tempfile, zipfile, stat
 
 IOS=Path(__file__).resolve().parents[1]; REPO=IOS.parent
 UPSTREAM='f98c4133c72d39e06ceac42b57cc4477c52105fc'
@@ -112,6 +112,9 @@ for iconset in (ENGINE/'Natives/Assets.xcassets').glob('AppIcon-*.appiconset'):
 
 info=ENGINE/'Natives/Info.plist';p=plistlib.loads(info.read_bytes())
 p.update(CFBundleIdentifier='net.morben.harbor.ios',CFBundleDisplayName='MC Harbor',CFBundleName='MC Harbor',CFBundleShortVersionString='0.1.0',CFBundleVersion='1',MinimumOSVersion='16.0')
+p['UIDeviceFamily']=[1,2]
+p['NSLocalNetworkUsageDescription']='MC Harbor 使用本地网络发现局域网游戏和连接已授权的 AltServer。'
+p['NSMicrophoneUsageDescription']='仅在你使用支持语音聊天的模组时，MC Harbor 才需要麦克风。'
 p['CFBundleURLTypes']=[{'CFBundleURLName':'net.morben.harbor.ios.launch','CFBundleURLSchemes':['mcharbor','amethyst']}]
 info.write_bytes(plistlib.dumps(p))
 (BUILD/'patch-proof.json').write_text(json.dumps({'upstream':UPSTREAM,'platform':args.platform,'patches':patches,'privateStorage':True,'runtimeLicensesRetained':True},indent=2))
@@ -162,6 +165,20 @@ for framework in sorted((destination/'Frameworks').glob('*.framework')):
     run(['codesign','--force','--sign','-',framework])
 run(['codesign','--force','--sign','-',destination])
 run(['codesign','--verify','--deep','--strict',destination])
-report={'upstream':UPSTREAM,'platform':args.platform,'app':str(destination),'nativeExecutable':(destination/'AngelAuraAmethyst').is_file(),'frameworks':[x.name for x in (destination/'Frameworks').glob('Harbor*.framework')],'javaRuntimes':[x.name for x in (destination/'java_runtimes').iterdir() if x.is_dir()]}
+package=IOS/'build'/('MC-Harbor-iOS-0.1.0-preview.ipa' if args.platform=='device' else 'MC-Harbor-iOS-Simulator-0.1.0-preview.zip')
+if package.exists(): package.unlink()
+if args.platform=='device':
+    with tempfile.TemporaryDirectory(prefix='harbor-package-',dir=BUILD) as staging:
+        payload=Path(staging)/'Payload';payload.mkdir()
+        run(['ditto',destination,payload/'MC Harbor.app'])
+        run(['ditto','-c','-k','--keepParent',payload,package])
+else:
+    run(['ditto','-c','-k','--keepParent',destination,package])
+with zipfile.ZipFile(package) as archive:
+    executable=next(x for x in archive.infolist() if x.filename.endswith('.app/AngelAuraAmethyst'))
+    assert stat.S_IMODE(executable.external_attr>>16)&0o111,'Packaged app lost its executable permissions'
+    assert archive.testzip() is None,'Packaged app failed ZIP integrity verification'
+with package.open('rb') as stream: digest=hashlib.file_digest(stream,'sha256').hexdigest()
+report={'upstream':UPSTREAM,'platform':args.platform,'app':str(destination),'nativeExecutable':(destination/'AngelAuraAmethyst').is_file(),'frameworks':[x.name for x in (destination/'Frameworks').glob('Harbor*.framework')],'javaRuntimes':[x.name for x in (destination/'java_runtimes').iterdir() if x.is_dir()],'package':package.name,'packageBytes':package.stat().st_size,'packageSHA256':digest,'signing':'ad-hoc; device installation requires personal developer signing','minecraftGameplayVerified':False}
 (EVIDENCE/('native-build-'+args.platform+'.json')).write_text(json.dumps(report,indent=2))
 print(json.dumps(report),flush=True)

@@ -23,7 +23,10 @@ import XCTest
     }
     func testTouchEditorPersistsSettingsAndAlwaysKeepsPause() throws {
         let app = XCUIApplication(); app.launch()
-        app.tabBars.buttons["设置"].tap()
+        // iPadOS 26 exposes floating tabs as cells instead of a TabBar.
+        // Match the visible labelled control without assuming its AX class.
+        let settings = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "设置")).firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: 10)); XCTAssertTrue(settings.isHittable); settings.tap()
         let touch = app.buttons["settings.touch"]; XCTAssertTrue(touch.waitForExistence(timeout: 10)); touch.tap()
         XCTAssertTrue(app.navigationBars["触控与摇杆"].waitForExistence(timeout: 10))
         capture("touch-editor")
