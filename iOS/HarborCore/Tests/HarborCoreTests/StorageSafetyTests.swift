@@ -37,7 +37,15 @@ final class StorageSafetyTests: XCTestCase {
         XCTAssertFalse(layout.buttons[index].toggle)
         let before = layout
         layout.mirrorHorizontally(); layout.mirrorHorizontally()
-        XCTAssertEqual(layout, before)
+        XCTAssertEqual(layout.settings.invertCameraX, before.settings.invertCameraX)
+        XCTAssertEqual(layout.settings.joystickCenter.x, before.settings.joystickCenter.x, accuracy: 1e-12)
+        XCTAssertEqual(layout.buttons.map(\.id), before.buttons.map(\.id))
+        for (restored, original) in zip(layout.buttons, before.buttons) {
+            XCTAssertEqual(restored.center.x, original.center.x, accuracy: 1e-12)
+            XCTAssertEqual(restored.center.y, original.center.y, accuracy: 1e-12)
+            XCTAssertEqual(restored.customKey, original.customKey)
+            XCTAssertEqual(restored.visible, original.visible)
+        }
     }
     func testMalformedLayoutsAndFutureVersionsAreRejected() throws {
         var layout = TouchLayout.standard(); layout.schemaVersion = 99

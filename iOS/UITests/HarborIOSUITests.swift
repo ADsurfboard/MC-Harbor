@@ -12,7 +12,11 @@ import XCTest
         capture("library-portrait")
         XCUIDevice.shared.orientation = .landscapeLeft
         XCTAssertTrue(launch.waitForExistence(timeout: 5))
+        capture("library-landscape-before-scroll")
+        print("HARBOR_LANDSCAPE before app=\(app.frame) button=\(launch.frame)")
         if !launch.isHittable { app.swipeUp() }
+        capture("library-landscape-after-scroll")
+        print("HARBOR_LANDSCAPE after app=\(app.frame) button=\(launch.frame)")
         XCTAssertTrue(launch.isHittable)
         capture("library-landscape")
         XCUIDevice.shared.orientation = .portrait

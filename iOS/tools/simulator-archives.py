@@ -36,3 +36,19 @@ def retarget_archive(path: Path) -> dict:
     if cursor!=len(data): raise ValueError('Archive padding mismatch')
     if changed:path.write_bytes(data)
     return {'file':path.name,'objects':objects,'changedBuildVersions':changed,'bytes':len(data)}
+
+
+def retarget_tapi(path: Path) -> dict:
+    import re
+    text=path.read_text()
+    if text.startswith('--- !tapi-tbd-v3'):
+        assert re.search(r'(?m)^platform:\s*ios$',text), 'Unexpected upstream TAPI platform'
+        assert 'archs:' in text and 'arm64' in text
+        text=text.replace('--- !tapi-tbd-v3','--- !tapi-tbd\ntbd-version: 4')
+        text=re.sub(r'(?m)^uuids:.*\n','',text)
+        text=re.sub(r'(?m)^platform:.*\n','',text)
+        text=re.sub(r'archs:\s*\[ arm64 \]', 'targets: [ arm64-ios-simulator ]',text)
+    else:
+        assert 'tbd-version: 4' in text and 'arm64-ios-simulator' in text, 'Unsupported TAPI format'
+    path.write_text(text)
+    return {'file':path.name,'format':4,'target':'arm64-ios-simulator'}

@@ -94,7 +94,7 @@ main=main[:start]+'''void init_setupHomeDirectory() {
 cmake=ENGINE/'Natives/CMakeLists.txt';s=cmake.read_text()
 target='arm64-apple-ios16.0' + ('-simulator' if args.platform=='simulator' else '')
 s=s.replace('-target arm64-apple-ios -mcpu=apple-a8','-target '+target)
-s+='''\n# MC Harbor native UI and real input adapter\ntarget_sources(AngelAuraAmethyst PRIVATE HarborEngineAdapter.m HarborArchiveGuard.m)\ntarget_link_libraries(AngelAuraAmethyst PUBLIC "-framework HarborIOSUI" "-framework HarborCore")\n'''
+s+='''\n# MC Harbor native UI and real input adapter\ntarget_sources(AngelAuraAmethyst PRIVATE HarborEngineAdapter.m HarborArchiveGuard.m)\ntarget_compile_options(AngelAuraAmethyst PRIVATE "-F${CMAKE_CURRENT_LIST_DIR}/resources/Frameworks")\ntarget_link_libraries(AngelAuraAmethyst PUBLIC "-framework HarborIOSUI" "-framework HarborCore")\n'''
 cmake.write_text(s)
 make=ENGINE/'Makefile';s=make.read_text().replace('-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0','-DCMAKE_OSX_DEPLOYMENT_TARGET=16.0')
 s=s.replace('-DCMAKE_C_FLAGS="-arch arm64"', '-DCMAKE_C_FLAGS="-arch arm64 -target '+target+'"')
@@ -140,13 +140,9 @@ if args.platform=='simulator':
     spec=importlib.util.spec_from_file_location('simulator_archives',IOS/'tools/simulator-archives.py')
     archives=importlib.util.module_from_spec(spec);spec.loader.exec_module(archives)
     library_directory=ENGINE/'Natives/external/MobileGlues/src/main/cpp/libraries/ios'
-    for stub in ENGINE.rglob('*.tbd'):
-        text=stub.read_text()
-        text=re.sub(r'(?m)^(platform:\s*)ios\s*$',r'\1ios-simulator',text)
-        text=re.sub(r'arm64-ios(?!-simulator)', 'arm64-ios-simulator', text)
-        stub.write_text(text)
+    stub_report=[archives.retarget_tapi(stub) for stub in ENGINE.rglob('*.tbd')]
     archive_report=[archives.retarget_archive(path) for path in sorted(library_directory.glob('*.a'))]
-    (EVIDENCE/'native-simulator-archive-adaptation.json').write_text(json.dumps(archive_report,indent=2))
+    (EVIDENCE/'native-simulator-archive-adaptation.json').write_text(json.dumps({'archives':archive_report,'tapiStubs':stub_report},indent=2))
     for binary in list(macho_files(frameworks))+list(macho_files(ENGINE/'Natives/external/MobileGlues/src/main/cpp/libraries/ios')):
         run(['xcrun','vtool','-arch','arm64','-set-build-version','7','16.0','26.0','-replace','-output',binary,binary])
 sdkpath=subprocess.check_output(['xcrun','--sdk',sdk,'--show-sdk-path'],text=True).strip()
