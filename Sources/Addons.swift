@@ -30,7 +30,7 @@ struct AddonPlanItem:Identifiable,Sendable{let version:AddonVersion;let file:Add
 private struct AddonReceipt:Codable{let projectId:String;let versionId:String;let filename:String;let kind:String}
 
 enum AddonService {
-    static let session:URLSession={let c=URLSessionConfiguration.ephemeral;c.timeoutIntervalForRequest=20;c.timeoutIntervalForResource=180;c.httpAdditionalHeaders=["User-Agent":"MC-Harbor/1.6.1 (+https://github.com/ADsurfboard/MC-Harbor)"];return URLSession(configuration:c)}()
+    static let session:URLSession={let c=URLSessionConfiguration.ephemeral;c.timeoutIntervalForRequest=20;c.timeoutIntervalForResource=180;c.httpAdditionalHeaders=["User-Agent":"MC-Harbor/1.6.2 (+https://github.com/ADsurfboard/MC-Harbor)"];return URLSession(configuration:c)}()
     static func loader(_ game:GameInstance)->String{game.loader == "Legacy Fabric" ? "fabric":game.loader == "Cleanroom" ? "forge":game.loader.lowercased()}
     static func request<T:Decodable>(_ path:String,query:[URLQueryItem]=[])async throws->T{
         var last:Error=FileTransactions.error("资源来源暂不可用。")

@@ -1,8 +1,8 @@
 # MC Harbor
 
-1.6.1 · Apple Silicon / Intel 双版本
+1.6.2 · Apple Silicon / Intel 双版本
 
-[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/tag/v1.6.1) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.6.1/MC-Harbor-Introduction-1.6.1.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)
+[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/tag/v1.6.2) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.6.2/MC-Harbor-Introduction-1.6.2.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)
 
 以下正文与随包 PDF 同版。
 
@@ -10,7 +10,7 @@
 保留 HMCL 的游戏能力，采用真实 WinHarbor 原生界面，
 把账号、下载、实例资源与汉化工作集中在一个窗口。
 
-1.6.1 · Apple Silicon / Intel 双版本
+1.6.2 · Apple Silicon / Intel 双版本
 Apple Silicon：macOS 26 起；Intel：macOS 12 起
 
 ## 日常操作，一处完成。
@@ -283,42 +283,24 @@ Intel 版已在 Rosetta 下校验并启动官方陶瓦、退出房间，并验�
 
 参考交互：Inspora / damienghader 的 interactive folder cards。素材使用真实模组图标，风景备用图保留 Minecraft 原图；不把参考帖的示例图片当作本项目图标。
 
-## 开发者与平台分工
-
-MC Harbor 由 [ADsurfboard](https://github.com/ADsurfboard) 发起、设计并持续维护。**macOS、iOS 及除 Windows 外的版本继续由 ADsurfboard 独立开发。**
-
-<img src="Assets/Contributors/shiziyueyuan.png" width="72" height="72" alt="时咨月. 头像">
-
-**[时咨月.](https://github.com/shiziyueyuan)** 为项目正式授权的 **Windows 版本开发者与移植负责人**，在本仓库的 [`windows`](https://github.com/ADsurfboard/MC-Harbor/tree/windows) 分支开展后续移植、适配、测试与维护。此授权仅说明 Windows 官方开发分工，Windows 版本尚未作为正式成品发布。
-
-[开发分工与权限](GOVERNANCE.md) · [Windows 开发入口](docs/WINDOWS_PORT.md)
-
 ## 每条反馈，都有明确署名。
 
 作者设计与社区建议分开记录，贡献名单同时保留在应用、源码说明与此文档中。
 
 ### jiekee❄
 
-<img src="Assets/Contributors/jiekee.png" width="72" height="72" alt="jiekee❄ 头像">
+<img src="Assets/Contributors/jiekee.png" width="64" height="64" alt="jiekee❄" style="border-radius:50%">
 
 问题反馈与复现：提供 Intel 与不同 macOS 版本下的加载器下载超时、实例删除、程序坞窗口恢复、模组列表遮挡、游戏运行时资源下载受阻、翻页汉化失效及快捷方式误开浏览器和未启动游戏的线索。
 功能与交互建议：提出外置认证、模组推荐、中英文搜索、简介及语言文件汉化、实例快捷方式、关闭游戏、拖入整合包、按内容导出及实例资源批量管理；补充国内来源、搜索和授权体验方面的反馈。
 
 ### 花圆银行
 
-<img src="Assets/Contributors/flowerbank.png" width="72" height="72" alt="花圆银行 头像">
+<img src="Assets/Contributors/flowerbank.png" width="64" height="64" alt="花圆银行" style="border-radius:50%">
 
 导入进度展示建议：提出整合包导入时展示当前处理阶段与下载进度，替代仅显示加载转圈，让玩家了解任务状态并判断是否停滞。
 
-### 时咨月.
-
-<img src="Assets/Contributors/shiziyueyuan.png" width="72" height="72" alt="时咨月. 头像">
-
-负责后续 Windows 移植方向的官方开发工作。平台职责与实际完成的代码贡献分别记录，macOS、iOS 等版本的作者署名仍为 ADsurfboard。
-
 ### 作者的模组夹设计
-
-<img src="https://avatars.githubusercontent.com/u/178861180?v=4" width="72" height="72" alt="ADsurfboard 头像">
 
 模组夹、命名与轻染色材质、自动图标预览及展开交互由 ADsurfboard 提出；不混入社区问题反馈的署名。
 
@@ -327,6 +309,35 @@ MC Harbor 由 [ADsurfboard](https://github.com/ADsurfboard) 发起、设计并�
 发布前分别构建两种架构并运行回归；原生系统、窗口行为、事务和网络可用性需要分别验证。第三方镜像、翻译、认证与联机节点均可能变化；阿里翻译需自备有效密钥。自动测试不能代表所有模组组合、所有 macOS 小版本或所有地区网络已穷尽验证。
 
 来源：MCIM / mcimirror.top；B站 / github.com/bilibili/Index-Translate；阿里 / help.aliyun.com/zh/model-studio/qwen-mt-api；MyMemory / mymemory.translated.net/doc/spec.php；Google 公共接口为非官方备选，无稳定性保证。
+
+## 清晰分工，持续维护。
+
+Windows 授权开发职责与现有实现贡献分别记录；平台维护分工不改变项目 GPL 许可。
+
+<img src="https://github.com/ADsurfboard.png?size=128" width="64" height="64" alt="ADsurfboard" style="border-radius:50%">
+
+### 作者与维护负责人 · ADsurfboard
+
+项目发起、产品方向、主要开发与发布维护。Apple Silicon macOS、Intel macOS、iOS / iPadOS 及其他非 Windows 官方版本继续由 ADsurfboard 独立开发与维护。
+
+### 时咨月.
+
+<img src="Assets/Contributors/shiziyueyuan.png" width="64" height="64" alt="时咨月." style="border-radius:50%">
+
+经项目作者 ADsurfboard 正式授权，负责 MC Harbor 后续 Windows 版本的移植开发、兼容性适配、测试与维护，工作在本仓库 windows 分支进行。
+授权范围为 Windows 版本；macOS、iOS 及其他版本继续由 ADsurfboard 独立开发与维护。当前署名记录其开发职责，不代表 Windows 移植已完成。
+
+### 开发分支与当前阶段
+
+Windows 移植在同一仓库 windows 分支开展，工作由时咨月. 负责；iOS / iPadOS 在 codex/ios-port 分支独立推进。此版本交付的是两种 macOS 安装包，iOS 工程和原生运行验证仍在继续，不以界面演示或构建成功替代 Minecraft 实玩结论。
+
+### 反馈与维护
+
+问题和功能建议统一通过 GitHub Issues 提交。请注明芯片、系统、软件与游戏版本、加载器、复现步骤，并清除日志中的令牌和私人信息。确认的贡献会继续保留明确署名。
+
+[平台分工与维护范围](https://github.com/ADsurfboard/MC-Harbor/blob/main/GOVERNANCE.md)
+
+[iOS / iPadOS 开发分支](https://github.com/ADsurfboard/MC-Harbor/tree/codex/ios-port) · [Windows 开发分支](https://github.com/ADsurfboard/MC-Harbor/tree/windows)
 
 ## 构建与许可
 
