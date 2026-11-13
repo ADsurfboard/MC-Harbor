@@ -15,6 +15,7 @@ REPORT = OUT / 'result.json'
 report = {'kind': 'complete-native-app-cold-launch', 'passed': False,
           'minecraftGameplayVerified': False, 'cleanupErrors': []}
 udid = None
+home = None
 started = time.time()
 
 def run(arguments, timeout=90, **kwargs):
@@ -89,6 +90,28 @@ except Exception as error:
         (OUT / 'failed-command.log').write_text((error.stdout or '') + (error.stderr or ''))
     raise
 finally:
+    # Inspect only CI-created profile identity/display fields, never accounts,
+    # tokens, JVM arguments or a developer's local App data.
+    if os.environ.get('GITHUB_ACTIONS') == 'true' and home:
+        try:
+            profiles = home / 'instances/default/launcher_profiles.json'
+            if profiles.is_file() and profiles.stat().st_size <= 4 * 1024 * 1024:
+                value = json.loads(profiles.read_text())
+                entries = value.get('profiles', {})
+                summary = {'selected': value.get('selectedProfile'), 'profiles': [
+                    {'id': key, 'name': item.get('name')} for key, item in list(entries.items())[:50]
+                    if isinstance(item, dict)]}
+                (OUT / 'ci-profile-state.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2))
+        except Exception as error:
+            report['cleanupErrors'].append('CI profile inspection: ' + type(error).__name__)
+    result = OUT / 'native-profile.xcresult'
+    if result.is_dir():
+        exported = OUT / 'native-ui-attachments'
+        diagnostic('attachment-export.log', ['xcrun', 'xcresulttool', 'export', 'attachments',
+                   '--path', str(result), '--output-path', str(exported)], timeout=60)
+        # The original recording remains in xcresult; avoid uploading a second copy.
+        for movie in exported.glob('*.mp4'):
+            movie.unlink()
     if udid:
         diagnostic('native-unified.log', ['xcrun', 'simctl', 'spawn', udid, 'log', 'show', '--last', '3m',
                    '--style', 'compact', '--predicate', 'process == "AngelAuraAmethyst" OR eventMessage CONTAINS "net.morben.harbor.ios"'])

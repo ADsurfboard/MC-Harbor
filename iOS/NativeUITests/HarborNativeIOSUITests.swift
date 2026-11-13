@@ -1,4 +1,5 @@
 import XCTest
+import CoreGraphics
 
 /// Targets the installed full JVM/graphics App, never the fixture harness.
 @MainActor final class HarborNativeIOSUITests: XCTestCase {
@@ -35,10 +36,14 @@ import XCTest
 
     private func replace(_ field: XCUIElement, with text: String) {
         field.tap()
+        // Native preference fields align text to the right. A centre tap can
+        // leave the caret before the old name, so move to the visible end first.
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.99, dy: 0.5)).tap()
         if let old = field.value as? String {
             field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: old.count))
         }
         field.typeText(text)
+        XCTAssertEqual(field.value as? String, text)
     }
 
     func testResourceImportOpensRealJarPicker() throws {

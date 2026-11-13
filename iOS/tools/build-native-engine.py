@@ -35,7 +35,7 @@ def replace(relative,old,new,count=1):
     p=ENGINE/relative;s=p.read_text();assert s.count(old)==count,(relative,s.count(old),old[:80])
     p.write_text(s.replace(old,new));patches.append({'file':relative,'replacements':count})
 
-for name in ['HarborEngineAdapter.h','HarborEngineAdapter.m','HarborArchiveGuard.h','HarborArchiveGuard.m','HarborAccountTokenStore.h','HarborAccountTokenStore.m']:
+for name in ['HarborEngineAdapter.h','HarborEngineAdapter.m','HarborArchiveGuard.h','HarborArchiveGuard.m','HarborAccountTokenStore.h','HarborAccountTokenStore.m','HarborModpackMetadata.h','HarborModpackMetadata.m']:
     shutil.copy2(IOS/'Native'/name,ENGINE/'Natives'/name)
 replace('Natives/ios_uikit_bridge.m','#import "SurfaceViewController.h"','#import "SurfaceViewController.h"\n#import "HarborEngineAdapter.h"')
 replace('Natives/ios_uikit_bridge.m','void launchInitialViewController(UIWindow *window) {\n    window.rootViewController = [[LauncherSplitViewController alloc] initWithStyle:UISplitViewControllerStyleDoubleColumn];','void launchInitialViewController(UIWindow *window) {\n    HBRInstallRoot(window);')
@@ -70,6 +70,15 @@ replace('Natives/LauncherProfileEditorViewController.m',
 replace('Natives/LauncherProfileEditorViewController.m',
         '    self.navigationController.modalInPresentation = YES;',
         '    self.navigationItem.leftBarButtonItem.accessibilityIdentifier = @"native.profile.save";\n    self.navigationItem.rightBarButtonItem.accessibilityIdentifier = @"native.profile.cancel";\n    self.navigationController.modalInPresentation = YES;')
+replace('Natives/LauncherProfileEditorViewController.m', '''    // We might be saving without ending editing, so make sure textFieldDidEndEditing is always called
+    UITextField *currentTextField = [self performSelector:@selector(_firstResponder)];
+    if ([currentTextField isKindOfClass:UITextField.class] && [currentTextField isDescendantOfView:self.tableView]) {
+        [self textFieldDidEndEditing:currentTextField];
+    }''', '''    // Commit the active public text input before serializing the profile.
+    [self.view endEditing:YES];''')
+replace('Natives/LauncherMenuViewController.m',
+        '[self.accountButton setAttributedTitle:(NSAttributedString *)@"" forState:UIControlStateNormal];',
+        '[self.accountButton setAttributedTitle:[[NSAttributedString alloc] initWithString:@""] forState:UIControlStateNormal];', count=2)
 
 # Preserve the existing Keychain namespace, secure decoding and all JIT / account
 # checks. A failed update must not delete a player's previous working tokens.
@@ -100,20 +109,90 @@ content=content.replace('[self acquireAccessToken:self.tokenData[@"refreshToken"
 auth.write_text(content);patches.append({'file':'Natives/authenticator/MicrosoftAuthenticator.m','nonDestructiveKeychainUpdates':True})
 
 # Validate complete manifests before any downloaded / extracted payload is written.
-replace('Natives/installer/modpack/ModrinthAPI.m','#import "PLProfiles.h"','#import "PLProfiles.h"\n#import "HarborArchiveGuard.h"')
+replace('Natives/installer/modpack/ModrinthAPI.m','#import "PLProfiles.h"','#import "PLProfiles.h"\n#import "HarborArchiveGuard.h"\n#import "HarborModpackMetadata.h"')
 replace('Natives/installer/modpack/ModrinthAPI.m','    NSData *indexData = [archive extractDataFromFile:',
     '    if (!HBRValidateArchive(archive, destPath, &error)) { [downloader finishDownloadWithErrorString:error.localizedDescription]; return; }\n    NSData *indexData = [archive extractDataFromFile:')
+replace('Natives/installer/modpack/ModrinthAPI.m',
+        '    NSDictionary* indexDict = [NSJSONSerialization JSONObjectWithData:indexData options:kNilOptions error:&error];',
+        '    NSDictionary* indexDict = HBRParseModpackIndex(indexData, &error);')
 replace('Natives/installer/modpack/ModrinthAPI.m','    if (error) {\n        [downloader finishDownloadWithErrorString:[NSString stringWithFormat:@"Failed to parse modrinth.index.json: %@", error.localizedDescription]];',
     '    if (error || ![indexDict isKindOfClass:NSDictionary.class]) {\n        [downloader finishDownloadWithErrorString:[NSString stringWithFormat:@"Invalid modrinth.index.json: %@", error.localizedDescription ?: @"Expected an object"]];')
 replace('Natives/installer/modpack/ModrinthAPI.m','    downloader.progress.totalUnitCount = [indexDict[@"files"] count];',
-    '    if (!HBRValidateRemoteFiles(indexDict[@"files"], destPath, &error)) { [downloader finishDownloadWithErrorString:error.localizedDescription]; return; }\n    downloader.progress.totalUnitCount = [indexDict[@"files"] count];')
+    '''    NSString *versions = [@(getenv("GAME_DIR")) stringByAppendingPathComponent:@"versions"];
+    if (!HBRValidateModpackName(indexDict[@"name"], &error) || !HBRResolveModpackDependencies(indexDict[@"dependencies"], versions, &error) ||
+        !HBRValidateRemoteFiles(indexDict[@"files"], destPath, &error)) {
+        [downloader finishDownloadWithErrorString:error.localizedDescription]; return;
+    }
+    downloader.progress.totalUnitCount = [indexDict[@"files"] count];''')
+replace('Natives/installer/modpack/ModrinthAPI.m', '    for (NSDictionary *indexFile in indexDict[@"files"]) {',
+        '    for (NSDictionary *indexFile in indexDict[@"files"]) {\n        if (!HBRModpackFileSupportsClient(indexFile)) { downloader.progress.completedUnitCount++; continue; }')
+# Every import has independent storage, regardless of project-supplied titles.
+replace('Natives/MinecraftResourceDownloadTask.m','#import "MinecraftResourceDownloadTask.h"',
+        '#import "MinecraftResourceDownloadTask.h"\n#import "HarborModpackMetadata.h"')
+replace('Natives/MinecraftResourceDownloadTask.m', '''    NSString *name = [[modDetail[@"title"] lowercaseString] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
+    name = [name stringByReplacingOccurrencesOfString:@" " withString:@"_"];''',
+        '    NSString *name = HBRNewModpackStorageName();')
+replace('Natives/installer/modpack/ModrinthAPI.m', '        NSString *sha = indexFile[@"hashes"][@"sha1"];',
+        '        NSString *sha = [@"sha512:" stringByAppendingString:indexFile[@"hashes"][@"sha512"]];')
+replace('Natives/MinecraftResourceDownloadTask.m', '    if (getPrefBool(@"general.check_sha")) {',
+        '    if (([sha isKindOfClass:NSString.class] && [sha hasPrefix:@"sha512:"]) || getPrefBool(@"general.check_sha")) {')
+download=ENGINE/'Natives/MinecraftResourceDownloadTask.m';content=download.read_text()
+a=content.index('- (BOOL)checkSHAIgnorePref:');b=content.index('\n- (BOOL)checkSHA:',a)
+content=content[:a]+'''- (BOOL)checkSHAIgnorePref:(NSString *)sha forFile:(NSString *)path altName:(NSString *)altName logSuccess:(BOOL)logSuccess {
+    if (sha && ![sha isKindOfClass:NSString.class]) return NO;
+    if (!sha.length) return [NSFileManager.defaultManager fileExistsAtPath:path];
+    BOOL strong=[sha hasPrefix:@"sha512:"];
+    NSString *expected=strong ? [sha substringFromIndex:7] : sha;
+    NSString *actual=HBRFileDigest(path, strong, nil);
+    BOOL valid=actual && [actual isEqualToString:expected.lowercaseString];
+    if (!valid || (getPrefBool(@"general.debug_logging") && logSuccess)) {
+        NSLog(@"[MCDL] %@ %@ for %@", strong ? @"SHA512":@"SHA1", valid ? @"passed":@"failed", altName ?: path.lastPathComponent);
+    }
+    return valid;
+}
+'''+content[b:]
+download.write_text(content)
+modrinth=ENGINE/'Natives/installer/modpack/ModrinthAPI.m';content=modrinth.read_text()
+a=content.index('    // Create profile\n');b=content.index('\n}\n\n@end',a)
+content=content[:a]+'''    // Preserve existing profiles and worlds when a project/version is imported again.
+    if (![depInfo[@"id"] isKindOfClass:NSString.class] || ![depInfo[@"id"] length]) {
+        [downloader finishDownloadWithErrorString:@"加载器状态已变化，请重新检查后导入。"]; return;
+    }
+    NSString *profileName = HBRUniqueModpackName(indexDict[@"name"], PLProfiles.current.profiles);
+    NSMutableDictionary *profile = @{
+        @"gameDir":[NSString stringWithFormat:@"./custom_gamedir/%@", destPath.lastPathComponent],
+        @"name":profileName, @"lastVersionId":depInfo[@"id"]
+    }.mutableCopy;
+    NSString *iconPath = [NSTemporaryDirectory() stringByAppendingPathComponent:@"icon.png"];
+    NSDictionary *attributes = [NSFileManager.defaultManager attributesOfItemAtPath:iconPath error:nil];
+    if (attributes && [attributes[NSFileSize] unsignedLongLongValue] <= 512*1024) {
+        NSData *icon = [NSData dataWithContentsOfFile:iconPath];
+        if (icon.length) profile[@"icon"] = [@"data:image/png;base64," stringByAppendingString:[icon base64EncodedStringWithOptions:0]];
+    }
+    PLProfiles.current.profiles[profileName] = profile;
+    PLProfiles.current.selectedProfileName = profileName;'''+content[b:]
+modrinth.write_text(content)
 utils=ENGINE/'Natives/installer/modpack/ModpackUtils.m';content=utils.read_text()
 a=content.index('+ (void)archive:');b=content.index('\n+ (NSDictionary *)infoForDependencies:',a)
 content=content[:a]+''' + (void)archive:(UZKArchive *)archive extractDirectory:(NSString *)dir toPath:(NSString *)path error:(NSError *__autoreleasing*)error {
     HBRExtractDirectory(archive, dir, path, error);
 }
 '''+content[b:]
-utils.write_text('#import "HarborArchiveGuard.h"\n'+content)
+a=content.index('+ (NSDictionary *)infoForDependencies:');b=content.index('\n@end',a)
+content=content[:a]+''' + (NSDictionary *)infoForDependencies:(NSDictionary *)dependency {
+    NSString *versions = [@(getenv("GAME_DIR")) stringByAppendingPathComponent:@"versions"];
+    NSMutableDictionary *info = [HBRResolveModpackDependencies(dependency, versions, nil) mutableCopy];
+    if (!info) return @{};
+    NSString *minecraftVersion = dependency[@"minecraft"];
+    if (dependency[@"fabric-loader"]) {
+        info[@"json"] = [NSString stringWithFormat:FabricUtils.endpoints[@"Fabric"][@"json"], minecraftVersion, dependency[@"fabric-loader"]];
+    } else if (dependency[@"quilt-loader"]) {
+        info[@"json"] = [NSString stringWithFormat:FabricUtils.endpoints[@"Quilt"][@"json"], minecraftVersion, dependency[@"quilt-loader"]];
+    }
+    return info;
+}
+'''+content[b:]
+utils.write_text('#import "HarborArchiveGuard.h"\n#import "HarborModpackMetadata.h"\n'+content)
 
 # Fix an upstream use-after-release / duplicate SecTask allocation before use
 # on actual devices. Keep entitlement checks intact rather than skipping them.
@@ -148,7 +227,7 @@ main=main[:start]+'''void init_setupHomeDirectory() {
 cmake=ENGINE/'Natives/CMakeLists.txt';s=cmake.read_text()
 target='arm64-apple-ios16.0' + ('-simulator' if args.platform=='simulator' else '')
 s=s.replace('-target arm64-apple-ios -mcpu=apple-a8','-target '+target)
-s+='''\n# MC Harbor native UI and real input adapter\ntarget_sources(AngelAuraAmethyst PRIVATE HarborEngineAdapter.m HarborArchiveGuard.m HarborAccountTokenStore.m)\ntarget_compile_options(AngelAuraAmethyst PRIVATE "-F${CMAKE_CURRENT_LIST_DIR}/resources/Frameworks")\ntarget_link_libraries(AngelAuraAmethyst PUBLIC "-framework HarborIOSUI" "-framework HarborCore" "-framework Security")\n'''
+s+='''\n# MC Harbor native UI and real input adapter\ntarget_sources(AngelAuraAmethyst PRIVATE HarborEngineAdapter.m HarborArchiveGuard.m HarborAccountTokenStore.m HarborModpackMetadata.m)\ntarget_compile_options(AngelAuraAmethyst PRIVATE "-F${CMAKE_CURRENT_LIST_DIR}/resources/Frameworks")\ntarget_link_libraries(AngelAuraAmethyst PUBLIC "-framework HarborIOSUI" "-framework HarborCore" "-framework Security")\n'''
 cmake.write_text(s)
 make=ENGINE/'Makefile';s=make.read_text().replace('-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0','-DCMAKE_OSX_DEPLOYMENT_TARGET=16.0')
 s=s.replace('-DCMAKE_C_FLAGS="-arch arm64"', '-DCMAKE_C_FLAGS="-arch arm64 -target '+target+'"')

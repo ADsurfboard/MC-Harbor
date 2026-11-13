@@ -1,4 +1,5 @@
 #import "HarborArchiveGuard.h"
+#import "HarborModpackMetadata.h"
 #import <UIKit/UIKit.h>
 #import <HarborIOSUI/HarborIOSUI-Swift.h>
 #import "UZKArchive.h"
@@ -40,10 +41,9 @@ BOOL HBRValidateRemoteFiles(NSArray *files, NSString *destination, NSError **err
     if (![files isKindOfClass:NSArray.class] || files.count>100000) return HBRReject(error,@"整合包的下载清单无效。");
     NSMutableArray *entries=[NSMutableArray arrayWithCapacity:files.count];
     for (id file in files) {
-        if (![file isKindOfClass:NSDictionary.class] || ![file[@"fileSize"] isKindOfClass:NSNumber.class] || [file[@"fileSize"] doubleValue]<0 || !HBRValidateDestination(file[@"path"],destination,error)) return HBRReject(error,@"整合包的下载条目无效。");
+        if (!HBRValidateModpackRemoteFile(file,error) || !HBRValidateDestination(file[@"path"],destination,error)) return NO;
+        if (!HBRModpackFileSupportsClient(file)) continue;
         [entries addObject:@{@"path":file[@"path"],@"compressedBytes":file[@"fileSize"],@"expandedBytes":file[@"fileSize"],@"symbolicLink":@NO}];
-        NSArray *urls=file[@"downloads"]; NSURL *url=[urls isKindOfClass:NSArray.class] && urls.count && [urls[0] isKindOfClass:NSString.class] ? [NSURL URLWithString:urls[0]] : nil;
-        if (![url.scheme.lowercaseString isEqual:@"https"] || !url.host.length || url.user.length || url.password.length) return HBRReject(error,@"整合包包含无效的下载地址。");
     }
     NSData *json=[NSJSONSerialization dataWithJSONObject:entries options:0 error:error];
     return json && [HarborArchiveSafety validateEntriesJSON:json availableBytes:HBRFreeSpace(destination) error:error];

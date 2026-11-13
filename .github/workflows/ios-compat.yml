@@ -16,6 +16,10 @@ jobs:
     timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
+        timeout-minutes: 12
+        env:
+          GIT_HTTP_LOW_SPEED_LIMIT: '1024'
+          GIT_HTTP_LOW_SPEED_TIME: '120'
         with:
           submodules: recursive
       - name: Inspect Apple toolchain
@@ -27,6 +31,8 @@ jobs:
         run: swift test --jobs 3
       - name: Test production account-token storage without real Keychain access
         run: python3 iOS/tools/test-account-tokens.py
+      - name: Test modpack metadata and preservation with isolated fixtures
+        run: python3 iOS/tools/test-modpack-metadata.py
       - uses: actions/setup-java@v4
         with:
           distribution: zulu
@@ -57,6 +63,10 @@ jobs:
     timeout-minutes: 65
     steps:
       - uses: actions/checkout@v4
+        timeout-minutes: 12
+        env:
+          GIT_HTTP_LOW_SPEED_LIMIT: '1024'
+          GIT_HTTP_LOW_SPEED_TIME: '120'
         with:
           submodules: recursive
       - name: Prepare reproducible Xcode project
