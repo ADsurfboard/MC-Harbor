@@ -6,6 +6,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: ios-port-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   touch-and-storage:
     runs-on: macos-26
