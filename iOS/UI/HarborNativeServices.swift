@@ -102,28 +102,10 @@ struct HarborPhoneRoot: View {
                             }.accessibilityIdentifier("library.install.empty")
                         }
                         ForEach(library.instances) { instance in
-                            VStack(alignment: .leading, spacing: 16) {
-                                HStack(spacing: 14) {
-                                    HarborLoaderArtwork(loader: instance.loader).frame(width: 48, height: 48)
-                                    VStack(alignment: .leading, spacing: 5) {
-                                        Text(instance.name).font(.headline).fixedSize(horizontal: false, vertical: true)
-                                        Text([instance.version, instance.loader].filter { !$0.isEmpty }.joined(separator: " · "))
-                                            .font(.subheadline).foregroundStyle(.secondary)
-                                    }
-                                    Spacer(minLength: 0)
-                                    Menu {
-                                        Button { page = .init(name: "instance", profile: instance.id) } label: { Label("实例管理", systemImage: "slider.horizontal.3") }
-                                        Button { touchProfile = instance.id; showsTouchEditor = true } label: { Label("触控布局", systemImage: "hand.draw") }
-                                    } label: {
-                                        Image(systemName: "ellipsis").font(.headline).frame(width: 44, height: 44)
-                                            .background(.thinMaterial, in: Circle()).contentShape(Circle())
-                                    }.accessibilityLabel(instance.name + "，更多操作")
-                                }
-                                Button { page = .init(name: "launch", profile: instance.id) } label: {
-                                    Label("启动游戏", systemImage: "play.fill").font(.headline)
-                                        .frame(maxWidth: .infinity, minHeight: 46).contentShape(Rectangle())
-                                }.buttonStyle(.borderedProminent).accessibilityIdentifier("instance.launch." + instance.id)
-                            }.padding(.vertical, 12)
+                            HarborInstanceCard(instance: instance, compact: verticalSizeClass == .compact,
+                                launch: { page = .init(name: "launch", profile: instance.id) },
+                                manage: { page = .init(name: "instance", profile: instance.id) },
+                                controls: { touchProfile = instance.id; showsTouchEditor = true })
                         }
                     }
                 }
