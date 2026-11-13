@@ -75,6 +75,7 @@ struct HarborPhoneRoot: View {
     @State private var touchProfile: String?
     @State private var showsTouchEditor = false
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     init(services: HarborNativeServices) {
         self.services = services
         _library = StateObject(wrappedValue: PhoneLibrary(services))
@@ -87,10 +88,10 @@ struct HarborPhoneRoot: View {
                         HStack(alignment: .center, spacing: 16) {
                             HarborBrandArtwork().frame(width: 46, height: 46)
                             VStack(alignment: .leading, spacing: 5) {
-                                Text("MC Harbor").font(.largeTitle.bold())
-                                Text("Minecraft，随身出发。").font(.subheadline).foregroundStyle(.secondary)
+                                Text("MC Harbor").font(verticalSizeClass == .compact ? .title2.bold() : .largeTitle.bold())
+                                if verticalSizeClass != .compact { Text("Minecraft，随身出发。").font(.subheadline).foregroundStyle(.secondary) }
                             }
-                        }.padding(.vertical, 18).listRowBackground(Color.clear)
+                        }.padding(.vertical, verticalSizeClass == .compact ? 2 : 18).listRowBackground(Color.clear)
                     }
                     Section("游戏库") {
                         if let error = library.error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
@@ -126,7 +127,7 @@ struct HarborPhoneRoot: View {
                         }
                     }
                 }
-                .navigationTitle("游戏")
+                .navigationTitle("游戏").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button { page = .init(name: "accounts") } label: { Image(systemName: "person.crop.circle").frame(width: 44, height: 44).contentShape(Rectangle()) }
@@ -158,6 +159,7 @@ struct HarborPhoneRoot: View {
                     Section("运行") { nativeRow("Java、渲染与性能", symbol: "speedometer", pageName: "settings") }
                     Section("关于") {
                         LabeledContent("作者", value: "ADsurfboard")
+                        NavigationLink { HarborPeopleView() } label: { Label("开发者与贡献名单", systemImage: "person.2").frame(minHeight: 44) }
                         Text(services.runtimeDescription).font(.footnote).foregroundStyle(.secondary)
                         Link("GitHub 项目", destination: URL(string: "https://github.com/ADsurfboard/MC-Harbor")!)
                         Link("提交问题或建议", destination: URL(string: "https://github.com/ADsurfboard/MC-Harbor/issues")!)

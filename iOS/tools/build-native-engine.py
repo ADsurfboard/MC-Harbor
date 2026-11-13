@@ -111,6 +111,12 @@ def macho_files(root):
         with file.open('rb') as stream:header=stream.read(4)
         if header in magic:yield file
 if args.platform=='simulator':
+    import importlib.util
+    spec=importlib.util.spec_from_file_location('simulator_archives',IOS/'tools/simulator-archives.py')
+    archives=importlib.util.module_from_spec(spec);spec.loader.exec_module(archives)
+    library_directory=ENGINE/'Natives/external/MobileGlues/src/main/cpp/libraries/ios'
+    archive_report=[archives.retarget_archive(path) for path in sorted(library_directory.glob('*.a'))]
+    (EVIDENCE/'native-simulator-archive-adaptation.json').write_text(json.dumps(archive_report,indent=2))
     for binary in list(macho_files(frameworks))+list(macho_files(ENGINE/'Natives/external/MobileGlues/src/main/cpp/libraries/ios')):
         run(['xcrun','vtool','-arch','arm64','-set-build-version','7','16.0','26.0','-replace','-output',binary,binary])
 sdkpath=subprocess.check_output(['xcrun','--sdk',sdk,'--show-sdk-path'],text=True).strip()

@@ -17,9 +17,9 @@ struct TouchLayoutEditor: View {
         NavigationStack {
             Form {
                 Section {
+                    TextField("布局名称", text: $layout.name).accessibilityIdentifier("touch.layout.name")
                     TouchLayoutCanvas(layout: $layout, selected: $selected).aspectRatio(2, contentMode: .fit)
                     Text("拖动按键和摇杆调整位置；下方可精确设置。实际游戏会按屏幕安全区自动适配。").font(.footnote).foregroundStyle(.secondary)
-                    TextField("布局名称", text: $layout.name)
                     Button { layout.mirrorHorizontally() } label: { Label("左右手镜像", systemImage: "arrow.left.and.right").frame(minHeight: 44) }
                 } header: { Text(profile == nil ? "默认布局" : "此实例的布局") }
                 Section("摇杆") {
