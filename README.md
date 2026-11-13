@@ -299,18 +299,26 @@ MC Harbor 由 [ADsurfboard](https://github.com/ADsurfboard) 发起、设计并�
 
 ### jiekee❄
 
+<img src="Assets/Contributors/jiekee.png" width="72" height="72" alt="jiekee❄ 头像">
+
 问题反馈与复现：提供 Intel 与不同 macOS 版本下的加载器下载超时、实例删除、程序坞窗口恢复、模组列表遮挡、游戏运行时资源下载受阻、翻页汉化失效及快捷方式误开浏览器和未启动游戏的线索。
 功能与交互建议：提出外置认证、模组推荐、中英文搜索、简介及语言文件汉化、实例快捷方式、关闭游戏、拖入整合包、按内容导出及实例资源批量管理；补充国内来源、搜索和授权体验方面的反馈。
 
 ### 花圆银行
 
+<img src="Assets/Contributors/flowerbank.png" width="72" height="72" alt="花圆银行 头像">
+
 导入进度展示建议：提出整合包导入时展示当前处理阶段与下载进度，替代仅显示加载转圈，让玩家了解任务状态并判断是否停滞。
 
 ### 时咨月.
 
+<img src="Assets/Contributors/shiziyueyuan.png" width="72" height="72" alt="时咨月. 头像">
+
 负责后续 Windows 移植方向的官方开发工作。平台职责与实际完成的代码贡献分别记录，macOS、iOS 等版本的作者署名仍为 ADsurfboard。
 
 ### 作者的模组夹设计
+
+<img src="https://avatars.githubusercontent.com/u/178861180?v=4" width="72" height="72" alt="ADsurfboard 头像">
 
 模组夹、命名与轻染色材质、自动图标预览及展开交互由 ADsurfboard 提出；不混入社区问题反馈的署名。
 
