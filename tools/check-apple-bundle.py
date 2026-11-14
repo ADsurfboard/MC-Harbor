@@ -1,7 +1,7 @@
 from pathlib import Path
 import hashlib,os,plistlib,subprocess,zipfile
 r=Path(__file__).resolve().parent.parent;a=r/'build/MC Harbor.app';res=a/'Contents/Resources';info=plistlib.loads((a/'Contents/Info.plist').read_bytes())
-assert info['CFBundleShortVersionString']=='1.6.2' and info['LSMinimumSystemVersion']=='26.0'
+assert info['CFBundleShortVersionString']=='1.7.0' and info['LSMinimumSystemVersion']=='26.0'
 for p in [a/'Contents/MacOS/MCHarbor',res/'Runtime/bin/java',res/'InstanceShortcut']:
  assert subprocess.check_output(['lipo','-archs',str(p)],text=True).strip()=='arm64'
 subprocess.run(['codesign','--verify','--deep','--strict',str(a)],check=True)
