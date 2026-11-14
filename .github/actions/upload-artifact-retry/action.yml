@@ -1,0 +1,66 @@
+name: Upload verified artifacts with bounded retries
+description: Retry transient GitHub artifact-service failures; the final failed attempt still fails the caller.
+inputs:
+  name:
+    description: Unique artifact name within the current workflow run.
+    required: true
+  path:
+    description: Files or directories to upload.
+    required: true
+  compression-level:
+    description: ZIP compression level, zero for already-compressed IPA and ZIP payloads.
+    default: '6'
+outputs:
+  artifact-id:
+    description: ID of the successfully finalized artifact.
+    value: ${{ steps.first.outputs.artifact-id || steps.second.outputs.artifact-id || steps.last.outputs.artifact-id }}
+  artifact-url:
+    description: Download page of the successfully finalized artifact.
+    value: ${{ steps.first.outputs.artifact-url || steps.second.outputs.artifact-url || steps.last.outputs.artifact-url }}
+  artifact-digest:
+    description: SHA-256 returned by GitHub for the finalized artifact.
+    value: ${{ steps.first.outputs.artifact-digest || steps.second.outputs.artifact-digest || steps.last.outputs.artifact-digest }}
+runs:
+  using: composite
+  steps:
+    - name: Upload artifact
+      id: first
+      continue-on-error: true
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # official v4.6.2
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+        compression-level: ${{ inputs.compression-level }}
+        retention-days: 7
+        if-no-files-found: error
+    - name: Wait before retrying the artifact service
+      if: ${{ always() && steps.first.outcome == 'failure' }}
+      shell: bash
+      run: sleep 10
+    - name: Retry artifact upload
+      id: second
+      if: ${{ always() && steps.first.outcome == 'failure' }}
+      continue-on-error: true
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+        compression-level: ${{ inputs.compression-level }}
+        retention-days: 7
+        if-no-files-found: error
+        overwrite: true
+    - name: Wait before the final artifact attempt
+      if: ${{ always() && steps.first.outcome == 'failure' && steps.second.outcome == 'failure' }}
+      shell: bash
+      run: sleep 10
+    - name: Final artifact upload attempt
+      id: last
+      if: ${{ always() && steps.first.outcome == 'failure' && steps.second.outcome == 'failure' }}
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+        compression-level: ${{ inputs.compression-level }}
+        retention-days: 7
+        if-no-files-found: error
+        overwrite: true
