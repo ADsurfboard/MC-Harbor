@@ -35,7 +35,8 @@ struct HarborPeopleView: View {
             Section("贡献名单") {
                 ForEach(entries) { entry in person(entry, includeContributions: true) }
             }
-        }.navigationTitle("开发者与贡献").navigationBarTitleDisplayMode(.inline)
+        }.harborPageBackground().harborMotionPolicy()
+            .navigationTitle("开发者与贡献").navigationBarTitleDisplayMode(.inline)
     }
     private func person(_ entry: PhoneCredit, includeContributions: Bool) -> some View {
         HStack(alignment: .top, spacing: 12) {

@@ -72,11 +72,13 @@ struct NativePresentationContent: View {
     let services: HarborNativeServices
     let page: NativePage
     var body: some View {
-        if page.name == "touch" {
-            TouchLayoutEditor(home: services.harborHomeURL, profile: page.profile)
-        } else {
-            NativePageHost(services: services, page: page).ignoresSafeArea()
-        }
+        Group {
+            if page.name == "touch" {
+                TouchLayoutEditor(home: services.harborHomeURL, profile: page.profile)
+            } else {
+                NativePageHost(services: services, page: page).ignoresSafeArea()
+            }
+        }.harborMotionPolicy()
     }
 }
 
@@ -122,6 +124,7 @@ struct HarborPhoneRoot: View {
                         }
                     }
                 }
+                .harborPageBackground()
                 .navigationTitle("游戏").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
@@ -146,12 +149,12 @@ struct HarborPhoneRoot: View {
                         nativeRow("Fabric 与 Quilt", symbol: "square.stack.3d.down.right", pageName: "fabric")
                         nativeRow("Forge 与 NeoForge", symbol: "square.stack.3d.down.right", pageName: "forge")
                         nativeRow("打开 JAR 安装器", symbol: "square.and.arrow.down", pageName: "import")
-                    }
+                    }.listRowBackground(HarborGlassRowBackground())
                     Section {
                         Text("本地导入支持 .mrpack，以及包含 modrinth.index.json 的 ZIP。原文件会保留；下载与校验完成后才创建实例。Forge / NeoForge 整合包需要先安装对应的加载器。")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
-                }.navigationTitle("资源")
+                }.harborPageBackground().navigationTitle("资源")
             }.tabItem { Label("资源", systemImage: "arrow.down.circle") }
             NavigationStack {
                 List {
@@ -160,8 +163,10 @@ struct HarborPhoneRoot: View {
                             Label("触控与摇杆", systemImage: "hand.draw").frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
                         }.accessibilityIdentifier("settings.touch")
                         nativeRow("手柄、键鼠与原生控制设置", symbol: "gamecontroller", pageName: "controls")
-                    }
+                    }.listRowBackground(HarborGlassRowBackground())
                     Section("运行") { nativeRow("Java、渲染与性能", symbol: "speedometer", pageName: "settings") }
+                        .listRowBackground(HarborGlassRowBackground())
+                    HarborPerformanceSettings()
                     Section("关于") {
                         LabeledContent("作者", value: "ADsurfboard")
                         NavigationLink { HarborPeopleView() } label: { Label("开发者与贡献名单", systemImage: "person.2").frame(minHeight: 44) }
@@ -169,13 +174,13 @@ struct HarborPhoneRoot: View {
                         Link("GitHub 项目", destination: URL(string: "https://github.com/ADsurfboard/MC-Harbor")!)
                         Link("提交问题或建议", destination: URL(string: "https://github.com/ADsurfboard/MC-Harbor/issues")!)
                     }
-                }.navigationTitle("设置")
+                }.harborPageBackground().navigationTitle("设置")
             }.tabItem { Label("设置", systemImage: "slider.horizontal.3") }
         }
         .tint(Color(red: 0.12, green: 0.52, blue: 0.36))
         .sheet(item: $page, onDismiss: { library.refresh() }) { selected in
             NativePresentationContent(services: services, page: selected)
-        }
+        }.harborMotionPolicy()
         .onChange(of: scenePhase) { phase in if phase == .active { library.refresh() } }
         .onAppear {
             if ProcessInfo.processInfo.environment["HARBOR_SMOKE_TEST"] == "1" {

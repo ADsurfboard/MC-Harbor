@@ -31,6 +31,8 @@ jobs:
         run: swift test --jobs 3
       - name: Test production account-token storage without real Keychain access
         run: python3 iOS/tools/test-account-tokens.py
+      - name: Test opt-in native motion policy without persistent preference changes
+        run: python3 iOS/tools/test-motion-policy.py
       - name: Test modpack metadata and preservation with isolated fixtures
         run: python3 iOS/tools/test-modpack-metadata.py
       - name: Test asynchronous modpack transactions without player data

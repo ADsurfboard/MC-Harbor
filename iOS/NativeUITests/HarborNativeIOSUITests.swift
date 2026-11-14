@@ -3,6 +3,42 @@ import CoreGraphics
 
 /// Targets the installed full JVM/graphics App, never the fixture harness.
 @MainActor final class HarborNativeIOSUITests: XCTestCase {
+    func testExclusiveOptimizationPersistsInCompleteNativeApp() throws {
+        continueAfterFailure = false
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication(bundleIdentifier: "net.morben.harbor.ios")
+        app.launch()
+        func openSettings() {
+            let settings = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "设置")).firstMatch
+            XCTAssertTrue(settings.waitForExistence(timeout: 15))
+            settings.tap()
+        }
+        func setting() -> XCUIElement {
+            let toggle = app.switches["settings.performance.exclusive"]
+            for _ in 0..<4 {
+                if toggle.exists && toggle.isHittable { return toggle }
+                app.swipeUp()
+            }
+            XCTAssertTrue(toggle.isHittable)
+            return toggle
+        }
+        openSettings()
+        let toggle = setting()
+        if toggle.value as? String == "1" { toggle.tap() }
+        toggle.tap()
+        XCTAssertEqual(toggle.value as? String, "1")
+        app.terminate()
+        app.launch()
+        openSettings()
+        let restored = setting()
+        XCTAssertEqual(restored.value as? String, "1")
+        restored.tap()
+        XCTAssertEqual(restored.value as? String, "0")
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "complete-native-glass-and-optimization"
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
     func testRealProfileEditorCancelAndSaveFromSwiftUI() throws {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = .portrait

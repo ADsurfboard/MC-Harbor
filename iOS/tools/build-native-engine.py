@@ -44,7 +44,7 @@ replace('JavaApp/Makefile', '# Prerequisite variables',
 replace('JavaApp/Makefile', 'check_empty_classes:',
         'check_empty_classes: $(CLASSES)')
 
-for name in ['HarborEngineAdapter.h','HarborEngineAdapter.m','HarborArchiveGuard.h','HarborArchiveGuard.m','HarborAccountTokenStore.h','HarborAccountTokenStore.m','HarborModpackMetadata.h','HarborModpackMetadata.m','HarborModpackTransaction.h','HarborModpackTransaction.m']:
+for name in ['HarborEngineAdapter.h','HarborEngineAdapter.m','HarborArchiveGuard.h','HarborArchiveGuard.m','HarborAccountTokenStore.h','HarborAccountTokenStore.m','HarborModpackMetadata.h','HarborModpackMetadata.m','HarborModpackTransaction.h','HarborModpackTransaction.m','HarborMotion.h']:
     shutil.copy2(IOS/'Native'/name,ENGINE/'Natives'/name)
 replace('Natives/ios_uikit_bridge.m','#import "SurfaceViewController.h"','#import "SurfaceViewController.h"\n#import "HarborEngineAdapter.h"')
 replace('Natives/ios_uikit_bridge.m','void launchInitialViewController(UIWindow *window) {\n    window.rootViewController = [[LauncherSplitViewController alloc] initWithStyle:UISplitViewControllerStyleDoubleColumn];','void launchInitialViewController(UIWindow *window) {\n    HBRInstallRoot(window);')
@@ -311,7 +311,30 @@ p['NSMicrophoneUsageDescription']='仅在你使用支持语音聊天的模组时
 p['CFBundleURLTypes']=[{'CFBundleURLName':'net.morben.harbor.ios.launch','CFBundleURLSchemes':['mcharbor','amethyst']}]
 p['UTImportedTypeDeclarations']=[{'UTTypeIdentifier':'net.modrinth.mrpack','UTTypeDescription':'Modrinth Modpack','UTTypeConformsTo':['public.zip-archive'], 'UTTypeTagSpecification':{'public.filename-extension':['mrpack']}}]
 info.write_bytes(plistlib.dumps(p))
-(BUILD/'patch-proof.json').write_text(json.dumps({'upstream':UPSTREAM,'platform':args.platform,'patches':patches,'privateStorage':True,'runtimeLicensesRetained':True},indent=2))
+# Keep animation control in our owned copy and out of third-party frameworks.
+# Read the shared default-off preference at every native action boundary.
+motion_calls = 0
+for native in sorted((ENGINE/'Natives').rglob('*.m')):
+    if 'external' in native.relative_to(ENGINE/'Natives').parts:
+        continue
+    source = native.read_text()
+    source, transitions = re.subn(r'animated:\s*YES\b', 'animated:HBRAnimationsEnabled()', source)
+    source, durations = re.subn(r'animateWithDuration:([0-9.]+|duration)\b',
+                                r'animateWithDuration:HBRAnimationDuration(\1)', source)
+    if native.name == 'PLLogOutputView.m':
+        source, flips = re.subn(r'duration:([0-9.]+)\b', r'duration:HBRAnimationDuration(\1)', source)
+    else:
+        flips = 0
+    if transitions + durations + flips:
+        # Subdirectories need the relative include; CMake doesn't add the root
+        # to every existing source's header search path.
+        include = os.path.relpath(ENGINE/'Natives/HarborMotion.h', native.parent)
+        native.write_text('#import "' + include + '"\n' + source)
+        calls = transitions + durations + flips
+        patches.append({'file':str(native.relative_to(ENGINE)), 'motionPolicyCalls':calls})
+        motion_calls += calls
+assert motion_calls >= 45, 'Native motion policy missed expected presentation sites'
+(BUILD/'patch-proof.json').write_text(json.dumps({'upstream':UPSTREAM,'platform':args.platform,'patches':patches,'privateStorage':True,'runtimeLicensesRetained':True,'motionPolicyCalls':motion_calls},indent=2))
 if args.prepare_only:
     print('Prepared pinned native engine:',ENGINE,flush=True);sys.exit(0)
 

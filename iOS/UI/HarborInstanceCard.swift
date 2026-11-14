@@ -8,7 +8,7 @@ struct HarborInstanceCard: View {
     let controls: () -> Void
 
     var body: some View {
-        Group {
+        HarborGlassGroup {
             if compact {
                 HStack(spacing: 14) {
                     identity
@@ -22,7 +22,11 @@ struct HarborInstanceCard: View {
                     launchButton
                 }
             }
-        }.padding(.vertical, compact ? 8 : 12)
+        }.padding(compact ? 14 : 18)
+            .harborGlass(radius: 28)
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
     }
     private var identity: some View {
         HStack(spacing: 14) {
@@ -38,7 +42,7 @@ struct HarborInstanceCard: View {
         Button(action: launch) {
             Label("启动游戏", systemImage: "play.fill").font(.headline)
                 .frame(maxWidth: .infinity, minHeight: 46).contentShape(Rectangle())
-        }.buttonStyle(.borderedProminent).accessibilityIdentifier("instance.launch." + instance.id)
+        }.harborGlassButton(prominent: true).accessibilityIdentifier("instance.launch." + instance.id)
     }
     private var more: some View {
         Menu {
@@ -46,7 +50,7 @@ struct HarborInstanceCard: View {
             Button(action: controls) { Label("触控布局", systemImage: "hand.draw") }
         } label: {
             Image(systemName: "ellipsis").font(.headline).frame(width: 44, height: 44)
-                .background(.thinMaterial, in: Circle()).contentShape(Circle())
+                .harborGlass(radius: 22, interactive: true).contentShape(Circle())
         }.accessibilityLabel(instance.name + "，更多操作")
             .accessibilityIdentifier("instance.more." + instance.id)
     }

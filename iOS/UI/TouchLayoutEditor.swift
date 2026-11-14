@@ -84,6 +84,7 @@ struct TouchLayoutEditor: View {
                     Button("恢复经典布局", role: .destructive) { layout = .standard(); selected = nil }.frame(minHeight: 44)
                 }
             }
+            .harborPageBackground()
             .navigationTitle("触控与摇杆").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
@@ -100,7 +101,7 @@ struct TouchLayoutEditor: View {
                 } catch { self.error = error.localizedDescription }
             }
             .fileExporter(isPresented: $exporting, document: exportDocument, contentType: .json, defaultFilename: "MC-Harbor-Touch-Layout") { result in if case .failure(let error) = result { self.error = error.localizedDescription } }
-        }
+        }.harborMotionPolicy()
     }
     private func slider(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, unit: String = "") -> some View {
         VStack(alignment: .leading, spacing: 8) {
