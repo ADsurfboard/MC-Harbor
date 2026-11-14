@@ -21,7 +21,7 @@
 
 整合包后台校验已有 116 项仅使用临时文件的原生回归，覆盖损坏 / 缺失索引、依赖与名称、中文本地版本名、同名实例保留、HTTPS 域名、全部备用地址、哈希格式及客户端 / 服务端声明。新导入使用独立 UUID 目录，不再把项目标题拼进路径；显示名称冲突时保留旧实例并自动编号。索引按 [Modrinth 官方格式](https://support.modrinth.com/en/articles/8802351-modrinth-modpack-format-mrpack) 校验，文件数据使用 SHA-512，旧 Minecraft 元数据保留 SHA-1 兼容；校验分块为 64 KiB，避免整份 JAR 驻留内存。
 
-导入事务已有 193 项生产代码检查：最多三个文件同时下载，大小与 SHA-512 校验通过后才应用 overrides、client-overrides，最后原子移动目录并保存实例。断网、内容损坏、取消、重复回调、解压失败、保存失败都不能留下半成品实例或覆盖已有实例。生产 NSURLSession 下载器已实际下载并验证 FerriteCore 6.0.1 的 125,197 字节 Fabric 文件；这不代表已验证国内直连或所有网络环境。可用 `python3 iOS/tools/test-modpack-network.py` 显式重跑在线检查。
+导入事务已有 205 项生产代码检查：最多三个文件同时下载，大小与 SHA-512 校验通过后才应用 overrides、client-overrides，最后原子移动目录并保存实例。断网、内容损坏、取消、重复回调、解压失败、保存失败都不能留下半成品实例或覆盖已有实例。任务详情中提供“取消下载”，取消沿父级进度传递到导入事务并等待请求结束后清理。生产 NSURLSession 下载器已实际下载并验证 FerriteCore 6.0.1 的 125,197 字节 Fabric 文件；这不代表已验证国内直连或所有网络环境。可用 `python3 iOS/tools/test-modpack-network.py` 显式重跑在线检查。
 
 “游戏 → ＋”和“资源 → 从文件导入整合包”已连接系统 Files 选择器，支持 `.mrpack` 及含 `modrinth.index.json` 的 ZIP。读取采用安全作用域与文件协调，在独立临时目录中复制，保留所选原件；读取失败有明确提示，导入使用真实引擎的可取消进度。Files 打开 / 取消属于完整 App UI 回归；选择实际整合包、成功导入和启动游戏仍需分别验收，不用后台检查替代。
 

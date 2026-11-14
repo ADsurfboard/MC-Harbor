@@ -98,6 +98,17 @@ int main(void) { @autoreleasepool {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW,(int64_t)(0.01*NSEC_PER_SEC)),dispatch_get_main_queue(),^{[op cancel];});
         waitForCompletion();CHECK(result.code==NSURLErrorCancelled);CHECK(calls.count<=3);CHECK(![NSFileManager.defaultManager fileExistsAtPath:dest.path]);cleanStage();
 
+        // The native task button cancels the parent progress, not this object.
+        // Verify actual Foundation child propagation and settled cleanup.
+        dest=destination();calls=[NSMutableArray new];
+        op=operation(dest,@[file(@"mods/parent-cancel.jar")],noOp,^BOOL(NSURL *directory,NSError **error){CHECK(NO);return YES;});
+        op.fetch=transport(calls,NO,NO,NO);
+        NSProgress *parent=[NSProgress progressWithTotalUnitCount:op.progress.totalUnitCount];
+        [parent addChild:op.progress withPendingUnitCount:op.progress.totalUnitCount];[op start];
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW,(int64_t)(0.01*NSEC_PER_SEC)),dispatch_get_main_queue(),^{[parent cancel];});
+        waitForCompletion();CHECK(op.progress.cancelled);CHECK(result.code==NSURLErrorCancelled);
+        CHECK(![NSFileManager.defaultManager fileExistsAtPath:dest.path]);cleanStage();
+
         // Existing destinations and invalid plans remain untouched.
         dest=destination();[NSFileManager.defaultManager createDirectoryAtURL:dest withIntermediateDirectories:YES attributes:nil error:nil];
         NSURL *world=[dest URLByAppendingPathComponent:@"world.dat"];[payload writeToURL:world atomically:YES];

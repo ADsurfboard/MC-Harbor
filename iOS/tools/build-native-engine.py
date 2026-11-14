@@ -129,6 +129,24 @@ replace('Natives/MinecraftResourceDownloadTask.m', '    if (getPrefBool(@"genera
         '    if (([sha isKindOfClass:NSString.class] && [sha hasPrefix:@"sha512:"]) || getPrefBool(@"general.check_sha")) {')
 replace('Natives/MinecraftResourceDownloadTask.h','- (void)finishDownloadWithErrorString:', '- (NSURLSessionDownloadTask *)createDownloadTask:(NSString *)url size:(NSUInteger)size sha:(NSString *)sha altName:(NSString *)altName toPath:(NSString *)path success:(void (^)(void))success;\n- (void)finishDownloadWithErrorString:')
 replace('Natives/MinecraftResourceDownloadTask.h','@property NSProgress *progress, *textProgress;', '@property NSProgress *progress, *textProgress;\n@property BOOL harborLocalImport;\n- (void)importLocalModpackAtPath:(NSString *)path storageName:(NSString *)storage;')
+replace('Natives/MinecraftResourceDownloadTask.h','- (void)finishDownloadWithErrorString:', '- (void)cancelDownloads;\n- (void)finishDownloadWithErrorString:')
+replace('Natives/MinecraftResourceDownloadTask.m','- (void)finishDownloadWithErrorString:(NSString *)error {', '''- (void)cancelDownloads {
+    if (!NSThread.isMainThread) {dispatch_async(dispatch_get_main_queue(),^{[self cancelDownloads];});return;}
+    [self.progress cancel];
+    [self.manager invalidateSessionCancelingTasks:YES resetSession:YES];
+    if (self.handleError) self.handleError();
+}
+
+- (void)finishDownloadWithErrorString:(NSString *)error {''')
+replace('Natives/DownloadProgressViewController.m', '    self.tableView.allowsSelection = NO;', '''    self.tableView.allowsSelection = NO;
+    self.navigationItem.leftBarButtonItem=[[UIBarButtonItem alloc] initWithTitle:@"取消下载" style:UIBarButtonItemStylePlain target:self action:@selector(harborCancelDownload)];
+    self.navigationItem.leftBarButtonItem.accessibilityIdentifier=@"native.download.cancel";''')
+replace('Natives/DownloadProgressViewController.m','- (void)actionClose {', '''- (void)harborCancelDownload {
+    [self.task cancelDownloads];
+    [self.navigationController dismissViewControllerAnimated:YES completion:nil];
+}
+
+- (void)actionClose {''')
 download=ENGINE/'Natives/MinecraftResourceDownloadTask.m';content=download.read_text()
 content='#import "installer/modpack/ModrinthAPI.h"\n'+content
 position=content.index('\n#pragma mark - Utilities')
@@ -202,12 +220,12 @@ replace('Natives/LauncherNavigationController.m', '- (void)receiveNotification:(
 replace('Natives/LauncherNavigationController.m', '    // Calculate download speed and ETA', '''    if (!NSThread.isMainThread) {
         dispatch_async(dispatch_get_main_queue(),^{[self observeValueForKeyPath:keyPath ofObject:object change:change context:context];});return;
     }
-    if (object!=self.harborObservedProgress || !self.task) return;
+    if (object!=self.harborObservedProgress || !self.task || self.task.progress.cancelled) return;
     // Calculate download speed and ETA''')
 replace('Natives/LauncherNavigationController.m', '        progress.estimatedTimeRemaining = @((progress.totalUnitCount - completedUnitCount) / throughput);', '        progress.estimatedTimeRemaining = throughput>0 ? @((progress.totalUnitCount - completedUnitCount) / throughput):nil;')
 replace('Natives/LauncherNavigationController.m', '''    dispatch_async(dispatch_get_main_queue(), ^{
         self.progressText.text = progress.localizedAdditionalDescription;''', '''    dispatch_async(dispatch_get_main_queue(), ^{
-        if (object!=self.harborObservedProgress || !self.task) return;
+        if (object!=self.harborObservedProgress || !self.task || self.task.progress.cancelled) return;
         self.progressText.text = progress.localizedAdditionalDescription;''')
 replace('Natives/LauncherNavigationController.m', '        self.progressViewMain.observedProgress = nil;', '        [self harborObserveProgress:nil];')
 modrinth=ENGINE/'Natives/installer/modpack/ModrinthAPI.m';content=modrinth.read_text()
