@@ -12,6 +12,8 @@ final class CoverFlowGeometryTests: XCTestCase {
             XCTAssertEqual(middle.centerX - offset, width / 2, accuracy: 0.001)
             XCTAssertLessThan(left.centerX - offset, width / 2 - layout.cardWidth / 2)
             XCTAssertGreaterThan(right.centerX - offset, width / 2 + layout.cardWidth / 2)
+            XCTAssertGreaterThanOrEqual(left.centerX - offset, 8, "The neighbor's center should stay inside the phone")
+            XCTAssertLessThanOrEqual(right.centerX - offset, width - 8)
             let half = layout.cardWidth * cos(abs(left.angle)) * left.scale / 2
             // The edge may clip part of a neighbor on a narrow phone, but a
             // useful part must remain visible rather than an unreadable sliver.

@@ -199,5 +199,7 @@ import XCTest
         XCTAssertGreaterThanOrEqual(right.minX - center.maxX, 8, "Right cover needs breathing room", file: file, line: line)
         XCTAssertGreaterThanOrEqual(left.intersection(viewport).width, 24, file: file, line: line)
         XCTAssertGreaterThanOrEqual(right.intersection(viewport).width, 24, file: file, line: line)
+        XCTAssertGreaterThan(left.midX, viewport.minX, file: file, line: line)
+        XCTAssertLessThan(right.midX, viewport.maxX, file: file, line: line)
     }
 }
