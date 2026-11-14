@@ -59,9 +59,9 @@ import XCTest
         // Move one physical cover pitch, independent of iPhone/iPad width.
         // The end hold removes fling ambiguity when a two-instance ring wraps.
         let centered = try XCTUnwrap(flow.cells.allElementsBoundByIndex.min { abs($0.frame.midX - flow.frame.midX) < abs($1.frame.midX - flow.frame.midX) })
-        let travel = centered.frame.width * 0.56 / flow.frame.width
-        flow.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.5)).press(forDuration: 0.08,
-            thenDragTo: flow.coordinate(withNormalizedOffset: CGVector(dx: 0.65 - travel, dy: 0.5)),
+        let travel = centered.frame.width * 0.90 / flow.frame.width
+        flow.coordinate(withNormalizedOffset: CGVector(dx: 0.80, dy: 0.5)).press(forDuration: 0.08,
+            thenDragTo: flow.coordinate(withNormalizedOffset: CGVector(dx: 0.80 - travel, dy: 0.5)),
             withVelocity: .slow, thenHoldForDuration: 0.3)
         let predicate = NSPredicate(format: "label == %@", "2 / 2")
         XCTAssertTrue(app.staticTexts.matching(predicate).firstMatch.waitForExistence(timeout: 10))
@@ -190,5 +190,14 @@ import XCTest
         let visible = flow.cells.allElementsBoundByIndex.map(\.frame).filter { $0.intersection(viewport).width >= 12 }
         XCTAssertTrue(visible.contains { $0.midX < viewport.midX - 30 }, "A real cover must remain visible on the left", file: file, line: line)
         XCTAssertTrue(visible.contains { $0.midX > viewport.midX + 30 }, "A real cover must remain visible on the right", file: file, line: line)
+        guard let center = visible.min(by: { abs($0.midX - viewport.midX) < abs($1.midX - viewport.midX) }),
+              let left = visible.filter({ $0.midX < center.midX - 30 }).max(by: { $0.midX < $1.midX }),
+              let right = visible.filter({ $0.midX > center.midX + 30 }).min(by: { $0.midX < $1.midX }) else {
+            return XCTFail("The focused cover needs two visible neighbors", file: file, line: line)
+        }
+        XCTAssertGreaterThanOrEqual(center.minX - left.maxX, 8, "Left cover needs breathing room", file: file, line: line)
+        XCTAssertGreaterThanOrEqual(right.minX - center.maxX, 8, "Right cover needs breathing room", file: file, line: line)
+        XCTAssertGreaterThanOrEqual(left.intersection(viewport).width, 24, file: file, line: line)
+        XCTAssertGreaterThanOrEqual(right.intersection(viewport).width, 24, file: file, line: line)
     }
 }

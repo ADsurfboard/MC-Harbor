@@ -11,7 +11,9 @@ public struct CoverFlowGeometry: Sendable {
         self.width = max(1, width); self.height = max(1, height); self.count = max(0, min(10_000, count))
         cardHeight = max(1, height - 28)
         cardWidth = max(1, min(width * 0.58, height * 0.91, 330))
-        pitch = cardWidth * 0.56
+        // Leave visible air between the focused cover and its tilted neighbors.
+        // Phone edges intentionally reveal a partial cover on either side.
+        pitch = cardWidth * 0.90
     }
     public func logical(_ slot: Int) -> Int { count > 0 ? ((slot % count) + count) % count : 0 }
     public func middle(_ logical: Int) -> Int { count > 1 ? count + self.logical(logical) : 0 }
@@ -34,12 +36,17 @@ public struct CoverFlowGeometry: Sendable {
         public let zIndex: Int
     }
     public func pose(slot: Int, offset: Double, continuous: Bool) -> Pose {
-        let distance = (Double(slot) * pitch - offset) / pitch
+        let distance = continuous ? (Double(slot) * pitch - offset) / pitch : Double(slot - nearest(offset))
         let sign = distance < 0 ? -1.0 : 1.0
-        let side = continuous ? min(1, abs(distance)) : (slot == nearest(offset) ? 0.0 : 1.0)
+        let progress = min(1, abs(distance))
+        let side = progress * progress * (3 - 2 * progress)
         let extra = max(0, abs(distance) - 1)
+        // The nearest covers turn inward. Further covers ease back toward the
+        // player instead of all forming the same rigid, edge-on stack. Both
+        // sides of the peak have zero slope, so crossing it stays smooth.
+        let turn = side * exp(-0.60 * extra * extra)
         return .init(centerX: Double(slot) * pitch + width / 2, centerY: height / 2 + side * 6,
-                     angle: -sign * side * 1.03, depth: -side * 44 - min(2, extra) * 20,
+                     angle: -sign * turn * 1.03, depth: -side * 44 - min(2, extra) * 20,
                      scale: 1 - side * 0.08, opacity: max(0.32, 1 - side * 0.15 - extra * 0.15),
                      zIndex: 1000 - Int(abs(distance) * 100))
     }
