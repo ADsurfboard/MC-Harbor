@@ -1,8 +1,8 @@
 # MC Harbor
 
-1.6.2 · Apple Silicon / Intel 双版本
+1.7.0 · Apple Silicon / Intel 双版本
 
-[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/tag/v1.6.2) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.6.2/MC-Harbor-Introduction-1.6.2.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)
+[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/tag/v1.7.0) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.7.0/MC-Harbor-Introduction-1.7.0.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)
 
 以下正文与随包 PDF 同版。
 
@@ -10,7 +10,7 @@
 保留 HMCL 的游戏能力，采用真实 WinHarbor 原生界面，
 把账号、下载、实例资源与汉化工作集中在一个窗口。
 
-1.6.2 · Apple Silicon / Intel 双版本
+1.7.0 · Apple Silicon / Intel 双版本
 Apple Silicon：macOS 26 起；Intel：macOS 12 起
 
 ## 日常操作，一处完成。
@@ -189,7 +189,7 @@ Java 任务按需启动；原壁纸和缩略图按文件修订缓存，资源索
 
 ### 命名、预览、切换壁纸
 
-壁纸库支持批量导入图片 / 视频，逐张命名、预览和切换。视频缩略图右下角显示视频标记，预览默认静音；原有背景登记到库中。新导入内容使用受管理的副本，移除不会删除原始文件。
+壁纸库支持批量导入图片 / 视频，逐张命名、预览和切换。视频缩略图右下角显示视频标记，预览默认静音；修复部分系统打开壁纸库时的预览组件崩溃，关闭或切换时停止旧视频。原有背景登记到库中。新导入内容使用受管理的副本，移除不会删除原始文件。
 
 七个默认游戏 / 加载器图标已用 imagegen 重绘成高清透明素材；自定义实例图标与实例资源自带图标继续优先。浅色界面使用黑色折面 h，深色界面保留白色 h。实例设置新增文件大小与磁盘分配空间统计，跳过符号链接并对硬链接去重；APFS 共享块以文件系统分配统计为准。
 
