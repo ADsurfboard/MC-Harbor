@@ -17,9 +17,12 @@ public struct CoverFlowGeometry: Sendable {
     public func middle(_ logical: Int) -> Int { count > 1 ? count + self.logical(logical) : 0 }
     public func nearest(_ offset: Double) -> Int { max(0, min(slots - 1, Int((offset / pitch).rounded()))) }
     public func offset(_ slot: Int) -> Double { Double(max(0, min(slots - 1, slot))) * pitch }
-    public func closestSlot(for logical: Int, around slot: Int) -> Int {
+    public func closestSlot(for logical: Int, around slot: Int, direction: Int = 0) -> Int {
         guard count > 1 else { return 0 }
-        return [logical, logical + count, logical + 2 * count].min { abs($0 - slot) < abs($1 - slot) } ?? middle(logical)
+        return [logical, logical + count, logical + 2 * count].min {
+            if abs($0 - slot) != abs($1 - slot) { return abs($0 - slot) < abs($1 - slot) }
+            return direction > 0 ? $0 > $1 : $0 < $1
+        } ?? middle(logical)
     }
     public func visible(around offset: Double) -> ClosedRange<Int>? {
         guard slots > 0 else { return nil }

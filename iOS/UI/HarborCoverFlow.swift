@@ -118,6 +118,7 @@ private struct NativeCoverFlow: UIViewRepresentable {
     let instances: [PhoneInstance]
     @Binding var focused: String
     let spatialEffects: Bool
+    let requestedDirection: Int
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeUIView(context: Context) -> UICollectionView {
         let layout = HarborCoverFlowLayout()
@@ -150,7 +151,7 @@ private struct NativeCoverFlow: UIViewRepresentable {
             coordinator.suppress = false
         } else if !coordinator.dragging, !view.isDecelerating,
                   let position = coordinator.items.firstIndex(where: { $0.id == focused }), position != coordinator.current {
-            let target = layout.geometry.closestSlot(for: position, around: coordinator.virtualIndex)
+            let target = layout.geometry.closestSlot(for: position, around: coordinator.virtualIndex, direction: requestedDirection)
             coordinator.feedback.tick()
             coordinator.center(target, in: view, animated: spatialEffects)
         }
@@ -229,6 +230,7 @@ struct HarborCoverFlowLibrary: View {
     let manage: (PhoneInstance) -> Void
     let controls: (PhoneInstance) -> Void
     @AppStorage(HarborLibraryOptions.focused) private var focused = ""
+    @State private var direction = 1
     @AppStorage(HarborAppearance.exclusiveOptimizationKey) private var exclusive = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.verticalSizeClass) private var verticalSizeClass
@@ -249,7 +251,7 @@ struct HarborCoverFlowLibrary: View {
             .listRowBackground(Color.clear).listRowSeparator(.hidden)
     }
     private var carousel: some View {
-        NativeCoverFlow(instances: instances, focused: $focused, spatialEffects: !exclusive && !reduceMotion)
+        NativeCoverFlow(instances: instances, focused: $focused, spatialEffects: !exclusive && !reduceMotion, requestedDirection: direction)
     }
     @ViewBuilder private var controls: some View {
         if !instances.isEmpty {
@@ -286,8 +288,10 @@ struct HarborCoverFlowLibrary: View {
         }
     }
     private func step(_ delta: Int) {
+        guard !instances.isEmpty else { return }
         let next = (position + delta + instances.count) % instances.count
         guard instances.indices.contains(next) else { return }
+        direction = delta
         focused = instances[next].id
     }
 }

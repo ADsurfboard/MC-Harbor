@@ -25,6 +25,8 @@ final class CoverFlowGeometryTests: XCTestCase {
         XCTAssertEqual(layout.logical(layout.middle(0) - 1), 1)
         XCTAssertEqual(layout.logical(layout.middle(1) + 1), 0)
         XCTAssertEqual(layout.closestSlot(for: 0, around: 3), 2)
+        XCTAssertEqual(layout.closestSlot(for: 0, around: 3, direction: 1), 4)
+        XCTAssertEqual(layout.closestSlot(for: 0, around: 3, direction: -1), 2)
         XCTAssertEqual(layout.nearest(-100), 0)
         XCTAssertEqual(layout.nearest(100_000), 5)
         XCTAssertNil(CoverFlowGeometry(width: 390, height: 268, count: 0).visible(around: 0))
