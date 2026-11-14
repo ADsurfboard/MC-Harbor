@@ -2,7 +2,7 @@ name: iOS port verification
 on:
   push:
     branches: ["codex/ios-port"]
-    paths: ["iOS/**", ".github/workflows/ios-compat.yml"]
+    paths: ["iOS/**", ".github/workflows/ios-compat.yml", ".github/actions/upload-artifact-retry/**"]
   workflow_dispatch:
 permissions:
   contents: read
@@ -53,9 +53,10 @@ jobs:
         run: python3 iOS/tools/build-native-engine.py --platform device
       - name: Retain device package and diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: ./.github/actions/upload-artifact-retry
         with:
           name: ios-native-engine-verification-device
+          compression-level: 0
           path: |
             iOS/evidence/native-*.json
             iOS/build/*.ipa
@@ -90,7 +91,7 @@ jobs:
         run: python3 tools/test-simulator-ui.py
       - name: Retain build diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: ./.github/actions/upload-artifact-retry
         with:
           name: ios-ui-build-diagnostics
           path: |
@@ -132,9 +133,10 @@ jobs:
         run: python3 iOS/tools/smoke-native-simulator.py
       - name: Retain native engine and diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: ./.github/actions/upload-artifact-retry
         with:
           name: ios-native-engine-verification-simulator
+          compression-level: 0
           path: |
             iOS/evidence/native-*.json
             iOS/evidence/native-simulator-smoke
