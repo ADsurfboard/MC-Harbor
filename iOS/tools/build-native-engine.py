@@ -44,7 +44,7 @@ replace('JavaApp/Makefile', '# Prerequisite variables',
 replace('JavaApp/Makefile', 'check_empty_classes:',
         'check_empty_classes: $(CLASSES)')
 
-for name in ['HarborEngineAdapter.h','HarborEngineAdapter.m','HarborArchiveGuard.h','HarborArchiveGuard.m','HarborAccountTokenStore.h','HarborAccountTokenStore.m','HarborModpackMetadata.h','HarborModpackMetadata.m']:
+for name in ['HarborEngineAdapter.h','HarborEngineAdapter.m','HarborArchiveGuard.h','HarborArchiveGuard.m','HarborAccountTokenStore.h','HarborAccountTokenStore.m','HarborModpackMetadata.h','HarborModpackMetadata.m','HarborModpackTransaction.h','HarborModpackTransaction.m']:
     shutil.copy2(IOS/'Native'/name,ENGINE/'Natives'/name)
 replace('Natives/ios_uikit_bridge.m','#import "SurfaceViewController.h"','#import "SurfaceViewController.h"\n#import "HarborEngineAdapter.h"')
 replace('Natives/ios_uikit_bridge.m','void launchInitialViewController(UIWindow *window) {\n    window.rootViewController = [[LauncherSplitViewController alloc] initWithStyle:UISplitViewControllerStyleDoubleColumn];','void launchInitialViewController(UIWindow *window) {\n    HBRInstallRoot(window);')
@@ -118,34 +118,30 @@ content=content.replace('[self acquireAccessToken:self.tokenData[@"refreshToken"
 auth.write_text(content);patches.append({'file':'Natives/authenticator/MicrosoftAuthenticator.m','nonDestructiveKeychainUpdates':True})
 
 # Validate complete manifests before any downloaded / extracted payload is written.
-replace('Natives/installer/modpack/ModrinthAPI.m','#import "PLProfiles.h"','#import "PLProfiles.h"\n#import "HarborArchiveGuard.h"\n#import "HarborModpackMetadata.h"')
-replace('Natives/installer/modpack/ModrinthAPI.m','    NSData *indexData = [archive extractDataFromFile:',
-    '    if (!HBRValidateArchive(archive, destPath, &error)) { [downloader finishDownloadWithErrorString:error.localizedDescription]; return; }\n    NSData *indexData = [archive extractDataFromFile:')
-replace('Natives/installer/modpack/ModrinthAPI.m',
-        '    NSDictionary* indexDict = [NSJSONSerialization JSONObjectWithData:indexData options:kNilOptions error:&error];',
-        '    NSDictionary* indexDict = HBRParseModpackIndex(indexData, &error);')
-replace('Natives/installer/modpack/ModrinthAPI.m','    if (error) {\n        [downloader finishDownloadWithErrorString:[NSString stringWithFormat:@"Failed to parse modrinth.index.json: %@", error.localizedDescription]];',
-    '    if (error || ![indexDict isKindOfClass:NSDictionary.class]) {\n        [downloader finishDownloadWithErrorString:[NSString stringWithFormat:@"Invalid modrinth.index.json: %@", error.localizedDescription ?: @"Expected an object"]];')
-replace('Natives/installer/modpack/ModrinthAPI.m','    downloader.progress.totalUnitCount = [indexDict[@"files"] count];',
-    '''    NSString *versions = [@(getenv("GAME_DIR")) stringByAppendingPathComponent:@"versions"];
-    if (!HBRValidateModpackName(indexDict[@"name"], &error) || !HBRResolveModpackDependencies(indexDict[@"dependencies"], versions, &error) ||
-        !HBRValidateRemoteFiles(indexDict[@"files"], destPath, &error)) {
-        [downloader finishDownloadWithErrorString:error.localizedDescription]; return;
-    }
-    downloader.progress.totalUnitCount = [indexDict[@"files"] count];''')
-replace('Natives/installer/modpack/ModrinthAPI.m', '    for (NSDictionary *indexFile in indexDict[@"files"]) {',
-        '    for (NSDictionary *indexFile in indexDict[@"files"]) {\n        if (!HBRModpackFileSupportsClient(indexFile)) { downloader.progress.completedUnitCount++; continue; }')
+replace('Natives/installer/modpack/ModrinthAPI.m','#import "PLProfiles.h"','#import "PLProfiles.h"\n#import "HarborArchiveGuard.h"\n#import "HarborModpackMetadata.h"\n#import "HarborModpackTransaction.h"')
 # Every import has independent storage, regardless of project-supplied titles.
 replace('Natives/MinecraftResourceDownloadTask.m','#import "MinecraftResourceDownloadTask.h"',
         '#import "MinecraftResourceDownloadTask.h"\n#import "HarborModpackMetadata.h"')
 replace('Natives/MinecraftResourceDownloadTask.m', '''    NSString *name = [[modDetail[@"title"] lowercaseString] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
     name = [name stringByReplacingOccurrencesOfString:@" " withString:@"_"];''',
         '    NSString *name = HBRNewModpackStorageName();')
-replace('Natives/installer/modpack/ModrinthAPI.m', '        NSString *sha = indexFile[@"hashes"][@"sha1"];',
-        '        NSString *sha = [@"sha512:" stringByAppendingString:indexFile[@"hashes"][@"sha512"]];')
 replace('Natives/MinecraftResourceDownloadTask.m', '    if (getPrefBool(@"general.check_sha")) {',
         '    if (([sha isKindOfClass:NSString.class] && [sha hasPrefix:@"sha512:"]) || getPrefBool(@"general.check_sha")) {')
+replace('Natives/MinecraftResourceDownloadTask.h','- (void)finishDownloadWithErrorString:', '- (NSURLSessionDownloadTask *)createDownloadTask:(NSString *)url size:(NSUInteger)size sha:(NSString *)sha altName:(NSString *)altName toPath:(NSString *)path success:(void (^)(void))success;\n- (void)finishDownloadWithErrorString:')
+replace('Natives/MinecraftResourceDownloadTask.h','@property NSProgress *progress, *textProgress;', '@property NSProgress *progress, *textProgress;\n@property BOOL harborLocalImport;\n- (void)importLocalModpackAtPath:(NSString *)path storageName:(NSString *)storage;')
 download=ENGINE/'Natives/MinecraftResourceDownloadTask.m';content=download.read_text()
+content='#import "installer/modpack/ModrinthAPI.h"\n'+content
+position=content.index('\n#pragma mark - Utilities')
+content=content[:position]+'''\n- (void)importLocalModpackAtPath:(NSString *)path storageName:(NSString *)storage {
+    [self prepareForDownload];self.harborLocalImport=YES;
+    NSString *expected=[NSTemporaryDirectory() stringByAppendingPathComponent:[storage stringByAppendingString:@".zip"]];
+    if (!HBRIsModpackStorageName(storage) || ![path.stringByStandardizingPath isEqual:expected.stringByStandardizingPath]) {
+        dispatch_async(dispatch_get_main_queue(),^{[self finishDownloadWithErrorString:@"本地导入缓存路径无效，原文件未修改。\"];});return;
+    }
+    NSString *destination=[NSString stringWithFormat:@"%s/custom_gamedir/%@",getenv("GAME_DIR"),storage];
+    [[ModrinthAPI new] downloader:self submitDownloadTasksFromPackage:path toPath:destination];
+}
+''' +content[position:]
 a=content.index('- (BOOL)checkSHAIgnorePref:');b=content.index('\n- (BOOL)checkSHA:',a)
 content=content[:a]+'''- (BOOL)checkSHAIgnorePref:(NSString *)sha forFile:(NSString *)path altName:(NSString *)altName logSuccess:(BOOL)logSuccess {
     if (sha && ![sha isKindOfClass:NSString.class]) return NO;
@@ -161,25 +157,62 @@ content=content[:a]+'''- (BOOL)checkSHAIgnorePref:(NSString *)sha forFile:(NSStr
 }
 '''+content[b:]
 download.write_text(content)
+# Reuse the real engine's cancellable progress screen for Files imports. A busy
+# launcher cannot replace its active downloader / KVO ownership with another.
+replace('Natives/LauncherNavigationController.m', '    if ([BaseAuthenticator.current isKindOfClass:MicrosoftAuthenticator.class]) {', '''    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(receiveNotification:) name:@"HarborInstallLocalModpack" object:nil];
+
+    if ([BaseAuthenticator.current isKindOfClass:MicrosoftAuthenticator.class]) {''')
+replace('Natives/LauncherNavigationController.m', '''    if (![notification.name isEqualToString:@"InstallModpack"]) {
+        return;
+    }
+    [self setInteractionEnabled:NO forDownloading:YES];''', '''    BOOL local=[notification.name isEqualToString:@"HarborInstallLocalModpack"];
+    if (!local && ![notification.name isEqualToString:@"InstallModpack"]) return;
+    if (self.task) {
+        if (local) {
+            NSString *storage=notification.userInfo[@"storage"], *path=notification.userInfo[@"path"];
+            NSString *expected=[NSTemporaryDirectory() stringByAppendingPathComponent:[storage stringByAppendingString:@".zip"]];
+            if (HBRIsModpackStorageName(storage) && [path.stringByStandardizingPath isEqual:expected.stringByStandardizingPath])
+                [NSFileManager.defaultManager removeItemAtPath:path error:nil];
+        }
+        showDialog(@"已有任务正在运行", @"请等待当前下载完成，或先在任务窗口取消，再导入整合包。\");return;
+    }
+    [self setInteractionEnabled:NO forDownloading:YES];''')
+replace('Natives/LauncherNavigationController.m', '#import "MinecraftResourceDownloadTask.h"', '#import "MinecraftResourceDownloadTask.h"\n#import "HarborModpackMetadata.h"')
+replace('Natives/LauncherNavigationController.m', '        [self.task downloadModpackFromAPI:notification.object detail:userInfo[@"detail"] atIndex:[userInfo[@"index"] unsignedLongValue]];', '''        if (local) [self.task importLocalModpackAtPath:userInfo[@"path"] storageName:userInfo[@"storage"]];
+        else [self.task downloadModpackFromAPI:notification.object detail:userInfo[@"detail"] atIndex:[userInfo[@"index"] unsignedLongValue]];''')
+# Explicit KVO ownership prevents a finished/cancelled task's queued progress
+# callbacks from completing a later import or observing a released object.
+replace('Natives/LauncherNavigationController.m','@interface LauncherNavigationController ()', '@interface LauncherNavigationController ()\n@property NSProgress *harborObservedProgress;')
+replace('Natives/LauncherNavigationController.m', '''            self.progressViewMain.observedProgress = self.task.progress;
+            [self.task.progress addObserver:self
+                forKeyPath:@"fractionCompleted"
+                options:NSKeyValueObservingOptionInitial
+                context:ProgressObserverContext];''', '            [self harborObserveProgress:self.task.progress];', count=2)
+replace('Natives/LauncherNavigationController.m', '                [weakSelf setInteractionEnabled:YES forDownloading:YES];', '                [weakSelf harborObserveProgress:nil];\n                [weakSelf setInteractionEnabled:YES forDownloading:YES];', count=2)
+replace('Natives/LauncherNavigationController.m', '- (void)receiveNotification:(NSNotification *)notification {', '''- (void)harborObserveProgress:(NSProgress *)progress {
+    if (self.harborObservedProgress) [self.harborObservedProgress removeObserver:self forKeyPath:@"fractionCompleted" context:ProgressObserverContext];
+    self.harborObservedProgress=progress;self.progressViewMain.observedProgress=progress;
+    if (progress) [progress addObserver:self forKeyPath:@"fractionCompleted" options:NSKeyValueObservingOptionInitial context:ProgressObserverContext];
+}
+- (void)dealloc {
+    if (_harborObservedProgress) [_harborObservedProgress removeObserver:self forKeyPath:@"fractionCompleted" context:ProgressObserverContext];
+    [NSNotificationCenter.defaultCenter removeObserver:self];
+}
+- (void)receiveNotification:(NSNotification *)notification {''')
+replace('Natives/LauncherNavigationController.m', '    // Calculate download speed and ETA', '''    if (!NSThread.isMainThread) {
+        dispatch_async(dispatch_get_main_queue(),^{[self observeValueForKeyPath:keyPath ofObject:object change:change context:context];});return;
+    }
+    if (object!=self.harborObservedProgress || !self.task) return;
+    // Calculate download speed and ETA''')
+replace('Natives/LauncherNavigationController.m', '        progress.estimatedTimeRemaining = @((progress.totalUnitCount - completedUnitCount) / throughput);', '        progress.estimatedTimeRemaining = throughput>0 ? @((progress.totalUnitCount - completedUnitCount) / throughput):nil;')
+replace('Natives/LauncherNavigationController.m', '''    dispatch_async(dispatch_get_main_queue(), ^{
+        self.progressText.text = progress.localizedAdditionalDescription;''', '''    dispatch_async(dispatch_get_main_queue(), ^{
+        if (object!=self.harborObservedProgress || !self.task) return;
+        self.progressText.text = progress.localizedAdditionalDescription;''')
+replace('Natives/LauncherNavigationController.m', '        self.progressViewMain.observedProgress = nil;', '        [self harborObserveProgress:nil];')
 modrinth=ENGINE/'Natives/installer/modpack/ModrinthAPI.m';content=modrinth.read_text()
-a=content.index('    // Create profile\n');b=content.index('\n}\n\n@end',a)
-content=content[:a]+'''    // Preserve existing profiles and worlds when a project/version is imported again.
-    if (![depInfo[@"id"] isKindOfClass:NSString.class] || ![depInfo[@"id"] length]) {
-        [downloader finishDownloadWithErrorString:@"加载器状态已变化，请重新检查后导入。"]; return;
-    }
-    NSString *profileName = HBRUniqueModpackName(indexDict[@"name"], PLProfiles.current.profiles);
-    NSMutableDictionary *profile = @{
-        @"gameDir":[NSString stringWithFormat:@"./custom_gamedir/%@", destPath.lastPathComponent],
-        @"name":profileName, @"lastVersionId":depInfo[@"id"]
-    }.mutableCopy;
-    NSString *iconPath = [NSTemporaryDirectory() stringByAppendingPathComponent:@"icon.png"];
-    NSDictionary *attributes = [NSFileManager.defaultManager attributesOfItemAtPath:iconPath error:nil];
-    if (attributes && [attributes[NSFileSize] unsignedLongLongValue] <= 512*1024) {
-        NSData *icon = [NSData dataWithContentsOfFile:iconPath];
-        if (icon.length) profile[@"icon"] = [@"data:image/png;base64," stringByAppendingString:[icon base64EncodedStringWithOptions:0]];
-    }
-    PLProfiles.current.profiles[profileName] = profile;
-    PLProfiles.current.selectedProfileName = profileName;'''+content[b:]
+a=content.index('- (void)downloader:');b=content.index('\n@end',a)
+content=content[:a]+(IOS/'Native/HarborModrinthInstall.inc').read_text()+content[b:]
 modrinth.write_text(content)
 utils=ENGINE/'Natives/installer/modpack/ModpackUtils.m';content=utils.read_text()
 a=content.index('+ (void)archive:');b=content.index('\n+ (NSDictionary *)infoForDependencies:',a)
@@ -236,7 +269,7 @@ main=main[:start]+'''void init_setupHomeDirectory() {
 cmake=ENGINE/'Natives/CMakeLists.txt';s=cmake.read_text()
 target='arm64-apple-ios16.0' + ('-simulator' if args.platform=='simulator' else '')
 s=s.replace('-target arm64-apple-ios -mcpu=apple-a8','-target '+target)
-s+='''\n# MC Harbor native UI and real input adapter\ntarget_sources(AngelAuraAmethyst PRIVATE HarborEngineAdapter.m HarborArchiveGuard.m HarborAccountTokenStore.m HarborModpackMetadata.m)\ntarget_compile_options(AngelAuraAmethyst PRIVATE "-F${CMAKE_CURRENT_LIST_DIR}/resources/Frameworks")\ntarget_link_libraries(AngelAuraAmethyst PUBLIC "-framework HarborIOSUI" "-framework HarborCore" "-framework Security")\n'''
+s+='''\n# MC Harbor native UI and real input adapter\ntarget_sources(AngelAuraAmethyst PRIVATE HarborEngineAdapter.m HarborArchiveGuard.m HarborAccountTokenStore.m HarborModpackMetadata.m HarborModpackTransaction.m)\ntarget_compile_options(AngelAuraAmethyst PRIVATE "-F${CMAKE_CURRENT_LIST_DIR}/resources/Frameworks")\ntarget_link_libraries(AngelAuraAmethyst PUBLIC "-framework HarborIOSUI" "-framework HarborCore" "-framework Security")\n'''
 cmake.write_text(s)
 make=ENGINE/'Makefile';s=make.read_text().replace('-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0','-DCMAKE_OSX_DEPLOYMENT_TARGET=16.0')
 s=s.replace('-DCMAKE_C_FLAGS="-arch arm64"', '-DCMAKE_C_FLAGS="-arch arm64 -target '+target+'"')
@@ -258,6 +291,7 @@ p['UIDeviceFamily']=[1,2]
 p['NSLocalNetworkUsageDescription']='MC Harbor 使用本地网络发现局域网游戏和连接已授权的 AltServer。'
 p['NSMicrophoneUsageDescription']='仅在你使用支持语音聊天的模组时，MC Harbor 才需要麦克风。'
 p['CFBundleURLTypes']=[{'CFBundleURLName':'net.morben.harbor.ios.launch','CFBundleURLSchemes':['mcharbor','amethyst']}]
+p['UTImportedTypeDeclarations']=[{'UTTypeIdentifier':'net.modrinth.mrpack','UTTypeDescription':'Modrinth Modpack','UTTypeConformsTo':['public.zip-archive'], 'UTTypeTagSpecification':{'public.filename-extension':['mrpack']}}]
 info.write_bytes(plistlib.dumps(p))
 (BUILD/'patch-proof.json').write_text(json.dumps({'upstream':UPSTREAM,'platform':args.platform,'patches':patches,'privateStorage':True,'runtimeLicensesRetained':True},indent=2))
 if args.prepare_only:

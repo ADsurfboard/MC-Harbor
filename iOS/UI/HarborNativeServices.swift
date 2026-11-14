@@ -106,7 +106,10 @@ struct HarborPhoneRoot: View {
                     Section("游戏库") {
                         if let error = library.error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
                         if library.instances.isEmpty && library.error == nil {
-                            Button { page = .init(name: "install") } label: {
+                            Menu {
+                                Button("安装 Minecraft") { page = .init(name: "install") }
+                                Button("从文件导入 Modrinth 整合包") { page = .init(name: "importPack") }
+                            } label: {
                                 Label("安装 Minecraft 或导入整合包", systemImage: "plus.circle.fill")
                                     .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading).contentShape(Rectangle())
                             }.accessibilityIdentifier("library.install.empty")
@@ -126,7 +129,11 @@ struct HarborPhoneRoot: View {
                             .accessibilityLabel("账号与皮肤")
                     }
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Button { page = .init(name: "install") } label: { Image(systemName: "plus").frame(width: 44, height: 44).contentShape(Rectangle()) }
+                        Menu {
+                            Button("安装 Minecraft") { page = .init(name: "install") }
+                            Button("从文件导入 Modrinth 整合包") { page = .init(name: "importPack") }
+                            Button("浏览在线整合包") { page = .init(name: "resources") }
+                        } label: { Image(systemName: "plus").frame(width: 44, height: 44).contentShape(Rectangle()) }
                             .accessibilityLabel("安装或导入")
                     }
                 }.refreshable { library.refresh() }
@@ -135,9 +142,14 @@ struct HarborPhoneRoot: View {
                 List {
                     Section("实例资源") {
                         nativeRow("Modrinth 整合包", symbol: "shippingbox", pageName: "resources")
+                        nativeRow("从文件导入整合包", symbol: "doc.zipper", pageName: "importPack")
                         nativeRow("Fabric 与 Quilt", symbol: "square.stack.3d.down.right", pageName: "fabric")
                         nativeRow("Forge 与 NeoForge", symbol: "square.stack.3d.down.right", pageName: "forge")
                         nativeRow("打开 JAR 安装器", symbol: "square.and.arrow.down", pageName: "import")
+                    }
+                    Section {
+                        Text("本地导入支持 .mrpack，以及包含 modrinth.index.json 的 ZIP。原文件会保留；下载与校验完成后才创建实例。Forge / NeoForge 整合包需要先安装对应的加载器。")
+                            .font(.footnote).foregroundStyle(.secondary)
                     }
                 }.navigationTitle("资源")
             }.tabItem { Label("资源", systemImage: "arrow.down.circle") }

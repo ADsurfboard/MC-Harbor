@@ -5,6 +5,7 @@ FOUNDATION_EXPORT NSDictionary *HBRResolveModpackDependencies(id dependencies, N
 FOUNDATION_EXPORT BOOL HBRValidateModpackName(id name, NSError **error);
 FOUNDATION_EXPORT NSString *HBRUniqueModpackName(NSString *name, NSDictionary *profiles);
 FOUNDATION_EXPORT NSString *HBRNewModpackStorageName(void);
+FOUNDATION_EXPORT BOOL HBRIsModpackStorageName(id name);
 FOUNDATION_EXPORT BOOL HBRValidateModpackRemoteFile(id file, NSError **error);
 FOUNDATION_EXPORT BOOL HBRModpackFileSupportsClient(NSDictionary *file);
 FOUNDATION_EXPORT NSDictionary *HBRParseModpackIndex(id data, NSError **error);

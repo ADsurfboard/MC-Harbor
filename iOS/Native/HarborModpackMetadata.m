@@ -68,12 +68,15 @@ BOOL HBRValidateModpackRemoteFile(id file, NSError **error) {
         HBRInvalid(error, @"整合包文件大小无效。"); return NO;
     }
     NSArray *downloads=[file[@"downloads"] isKindOfClass:NSArray.class] ? file[@"downloads"] : nil;
-    NSString *raw=downloads.count && [downloads[0] isKindOfClass:NSString.class] ? downloads[0] : nil;
-    NSURL *url=raw ? [NSURL URLWithString:raw] : nil;
-    if (!raw.length || raw.length>8192 || [raw rangeOfCharacterFromSet:NSCharacterSet.whitespaceAndNewlineCharacterSet].location!=NSNotFound ||
-        ![url.scheme.lowercaseString isEqual:@"https"] || !url.host.length || url.user.length || url.password.length ||
-        ![@[@"cdn.modrinth.com",@"github.com",@"raw.githubusercontent.com",@"gitlab.com"] containsObject:url.host.lowercaseString]) {
-        HBRInvalid(error, @"整合包下载地址不属于当前支持的 Modrinth HTTPS 域名。"); return NO;
+    if (!downloads.count || downloads.count>8) { HBRInvalid(error,@"整合包下载地址数量无效。");return NO; }
+    for (id raw in downloads) {
+        NSURL *url=[raw isKindOfClass:NSString.class] ? [NSURL URLWithString:raw]:nil;
+        if (![raw isKindOfClass:NSString.class] || ![raw length] || [raw length]>8192 ||
+            [raw rangeOfCharacterFromSet:NSCharacterSet.whitespaceAndNewlineCharacterSet].location!=NSNotFound ||
+            ![url.scheme.lowercaseString isEqual:@"https"] || !url.host.length || url.user || url.password || (url.port && url.port.integerValue!=443) ||
+            ![@[@"cdn.modrinth.com",@"github.com",@"raw.githubusercontent.com",@"gitlab.com"] containsObject:url.host.lowercaseString]) {
+            HBRInvalid(error, @"整合包下载地址不属于当前支持的 Modrinth HTTPS 域名。"); return NO;
+        }
     }
     NSDictionary *hashes=[file[@"hashes"] isKindOfClass:NSDictionary.class] ? file[@"hashes"] : nil;
     NSCharacterSet *notHex=[[NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdefABCDEF"] invertedSet];
@@ -113,6 +116,11 @@ NSString *HBRUniqueModpackName(NSString *name, NSDictionary *profiles) {
 }
 NSString *HBRNewModpackStorageName(void) {
     return [@"pack-" stringByAppendingString:NSUUID.UUID.UUIDString.lowercaseString];
+}
+BOOL HBRIsModpackStorageName(id name) {
+    if (![name isKindOfClass:NSString.class] || [name length]!=41 || ![name hasPrefix:@"pack-"]) return NO;
+    NSUUID *identifier=[[NSUUID alloc] initWithUUIDString:[name substringFromIndex:5]];
+    return identifier && [[@"pack-" stringByAppendingString:identifier.UUIDString.lowercaseString] isEqual:name];
 }
 
 NSDictionary *HBRResolveModpackDependencies(id dependencies, NSString *versionsDirectory, NSError **error) {

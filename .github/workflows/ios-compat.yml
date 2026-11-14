@@ -33,6 +33,8 @@ jobs:
         run: python3 iOS/tools/test-account-tokens.py
       - name: Test modpack metadata and preservation with isolated fixtures
         run: python3 iOS/tools/test-modpack-metadata.py
+      - name: Test asynchronous modpack transactions without player data
+        run: python3 iOS/tools/test-modpack-transaction.py
       - uses: actions/setup-java@v4
         with:
           distribution: zulu

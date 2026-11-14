@@ -15,6 +15,8 @@
 #import "SurfaceViewController.h"
 #import "ios_uikit_bridge.h"
 #import "utils.h"
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
+#import "HarborModpackMetadata.h"
 
 @interface LauncherNavigationController (HarborLaunch)
 - (void)reloadProfileList;
@@ -38,11 +40,12 @@
 - (LauncherNavigationController *)launcherController;
 @end
 
-@interface HarborEnginePage : UIViewController
+@interface HarborEnginePage : UIViewController<UIDocumentPickerDelegate>
 @property(nonatomic,strong) HarborEngineAdapter *adapter;
 @property(nonatomic,copy) NSString *page;
 @property(nonatomic,copy) NSString *profile;
 @property(nonatomic) BOOL performedAction;
+@property(nonatomic,strong) UILabel *importStatus;
 @end
 
 static BOOL lookInvertX = NO, lookInvertY = NO;
@@ -177,6 +180,12 @@ static double lookSensitivity = 1;
         [detail setViewControllers:@[profiles] animated:NO];
     }
     if ([self.page isEqual:@"resources"]) { [profiles actionCreateModpackProfile]; return; }
+    if ([self.page isEqual:@"importPack"]) {
+        UTType *pack=[UTType typeWithIdentifier:@"net.modrinth.mrpack"];
+        UIDocumentPickerViewController *picker=[[UIDocumentPickerViewController alloc] initForOpeningContentTypes:pack ? @[pack,UTTypeZIP]:@[UTTypeZIP] asCopy:NO];
+        picker.delegate=self;picker.allowsMultipleSelection=NO;
+        [self presentViewController:picker animated:YES completion:nil];return;
+    }
     if ([self.page isEqual:@"fabric"]) { [profiles actionCreateFabricProfile]; return; }
     if ([self.page isEqual:@"forge"]) { [profiles actionCreateForgeProfile]; return; }
     if ([self.page isEqual:@"import"]) { [detail enterModInstaller]; return; }
@@ -186,6 +195,54 @@ static double lookSensitivity = 1;
     [self.adapter prepareTouchConfiguration];
     [detail reloadProfileList];
     dispatch_async(dispatch_get_main_queue(), ^{ [detail launchMinecraft:nil]; });
+}
+- (void)documentPickerWasCancelled:(UIDocumentPickerViewController *)controller {
+    UIViewController *host=self;
+    while (host.parentViewController) host=host.parentViewController;
+    [host.presentingViewController dismissViewControllerAnimated:YES completion:nil];
+}
+- (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
+    NSURL *source=urls.firstObject;
+    if (!source || !source.isFileURL) return;
+    NSString *storage=HBRNewModpackStorageName();
+    NSURL *copy=[NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:[storage stringByAppendingString:@".zip"]]];
+    self.modalInPresentation=YES;
+    UILabel *status=[UILabel new];status.numberOfLines=0;status.textAlignment=NSTextAlignmentCenter;
+    status.font=[UIFont preferredFontForTextStyle:UIFontTextStyleBody];status.adjustsFontForContentSizeCategory=YES;
+    status.text=[NSString stringWithFormat:@"正在读取 %@\n原文件将保留，完成后显示逐项导入进度。",source.lastPathComponent];
+    status.backgroundColor=UIColor.secondarySystemBackgroundColor;status.layer.cornerRadius=18;status.clipsToBounds=YES;
+    status.translatesAutoresizingMaskIntoConstraints=NO;[self.view addSubview:status];self.importStatus=status;
+    [NSLayoutConstraint activateConstraints:@[[status.leadingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.leadingAnchor constant:20],
+        [status.trailingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.trailingAnchor constant:-20],
+        [status.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor], [status.heightAnchor constraintGreaterThanOrEqualToConstant:120]]];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY,0),^{
+        BOOL scoped=[source startAccessingSecurityScopedResource];
+        __block NSError *failure=nil;NSError *coordination=nil;
+        NSFileCoordinator *coordinator=[[NSFileCoordinator alloc] initWithFilePresenter:nil];
+        [coordinator coordinateReadingItemAtURL:source options:0 error:&coordination byAccessor:^(NSURL *readable) {
+            NSDictionary *values=[readable resourceValuesForKeys:@[NSURLIsRegularFileKey,NSURLIsSymbolicLinkKey,NSURLFileSizeKey] error:&failure];
+            unsigned long long size=[values[NSURLFileSizeKey] unsignedLongLongValue];
+            if (!failure && (![values[NSURLIsRegularFileKey] boolValue] || [values[NSURLIsSymbolicLinkKey] boolValue] || !size || size>2ULL*1024*1024*1024))
+                failure=[NSError errorWithDomain:@"net.morben.harbor.import" code:3 userInfo:@{NSLocalizedDescriptionKey:@"请选择不超过 2 GB 的 Modrinth 整合包文件。"}];
+            NSDictionary *disk=!failure ? [NSFileManager.defaultManager attributesOfFileSystemForPath:NSTemporaryDirectory() error:&failure]:nil;
+            if (!failure && [disk[NSFileSystemFreeSize] unsignedLongLongValue]<size+64*1024*1024)
+                failure=[NSError errorWithDomain:@"net.morben.harbor.import" code:4 userInfo:@{NSLocalizedDescriptionKey:@"剩余空间不足，原文件没有修改。"}];
+            if (!failure) [NSFileManager.defaultManager copyItemAtURL:readable toURL:copy error:&failure];
+            NSDictionary *copied=!failure ? [NSFileManager.defaultManager attributesOfItemAtPath:copy.path error:&failure]:nil;
+            if (!failure && [copied[NSFileSize] unsignedLongLongValue]!=size)
+                failure=[NSError errorWithDomain:@"net.morben.harbor.import" code:5 userInfo:@{NSLocalizedDescriptionKey:@"文件读取未完成，请重新选择。"}];
+        }];
+        if (scoped) [source stopAccessingSecurityScopedResource];
+        failure=failure ?: coordination;
+        dispatch_async(dispatch_get_main_queue(),^{
+            self.modalInPresentation=NO;[self.importStatus removeFromSuperview];self.importStatus=nil;
+            if (failure || !self.view.window) {
+                [NSFileManager.defaultManager removeItemAtURL:copy error:nil];
+                if (self.view.window) showDialog(@"无法导入整合包",failure.localizedDescription ?: @"导入页面已关闭。");return;
+            }
+            [NSNotificationCenter.defaultCenter postNotificationName:@"HarborInstallLocalModpack" object:nil userInfo:@{@"path":copy.path,@"storage":storage}];
+        });
+    });
 }
 @end
 

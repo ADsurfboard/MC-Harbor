@@ -29,7 +29,8 @@ for family,device_type,runtime in choices:
  if os.environ.get('GITHUB_ACTIONS')=='true':
   run(['xcrun','simctl','shutdown','all'],timeout=120)
   assert not booted_devices(),'CI simulator clones were not released'
- device=subprocess.check_output(['xcrun','simctl','create','Harbor UI '+family+' '+str(uuid.uuid4())[:8],device_type,runtime],text=True,timeout=60).strip()
+ device_name='Harbor UI '+family+' '+str(uuid.uuid4())[:8]
+ device=subprocess.check_output(['xcrun','simctl','create',device_name,device_type,runtime],text=True,timeout=60).strip()
  result=EVIDENCE/('ui-'+family+'.xcresult')
  status={'family':family,'device':device,'runtime':runtime,'resultBundle':str(result),'passed':False,'bootedDevicesBefore':before,'cleanupErrors':[]}
  status['hostMemoryBefore']=subprocess.check_output(['sysctl','vm.swapusage'],text=True,timeout=10).strip()
@@ -47,7 +48,20 @@ for family,device_type,runtime in choices:
   ready=container/'Library/Application Support/NativeUITest/.native-smoke-ready'
   assert not ready.exists(),'A fresh cold-launch marker must not already exist'
   completed=subprocess.run(['xcodebuild','-project','MCHarborIOS.xcodeproj','-scheme','HarborIOSHarness','-destination','platform=iOS Simulator,id='+device,'-parallel-testing-enabled','NO','-maximum-concurrent-test-simulator-destinations','1','-derivedDataPath','DerivedData','-resultBundlePath',str(result),'CODE_SIGNING_ALLOWED=NO','test'],cwd=ROOT,timeout=900)
-  status['rootAppeared']=ready.is_file() and ready.read_text()=='HARBOR_ROOT_READY'
+  # Xcode may reinstall into a new data container or run on its own clone.
+  # Resolve after XCTest, and inspect only this run's uniquely named devices.
+  inventory=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','--json'],timeout=30))
+  candidates=[d for group in inventory['devices'].values() for d in group
+              if d['udid']==device or device_name in d['name']]
+  status['rootAppeared']=False
+  status['rootCandidates']=[{'name':d['name'],'udid':d['udid']} for d in candidates]
+  for candidate in candidates:
+   located=subprocess.run(['xcrun','simctl','get_app_container',candidate['udid'],'net.morben.harbor.ios.qa','data'],capture_output=True,text=True,timeout=30)
+   if located.returncode:continue
+   current=Path(located.stdout.strip())/'Library/Application Support/NativeUITest/.native-smoke-ready'
+   if current.is_file() and current.read_text()=='HARBOR_ROOT_READY':
+    status.update(rootAppeared=True,rootDevice=candidate['udid'],dataContainerChanged=current!=ready)
+    break
   status['passed']=completed.returncode==0 and status['rootAppeared']
   if completed.returncode==0:assert status['rootAppeared'],'Real UI tests did not create the shared-root marker'
  except Exception as error:

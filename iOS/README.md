@@ -19,9 +19,13 @@
 
 根界面使用统一的弹窗状态，避免 iPad 上独立展示入口竞争。资源入口分别连接 Modrinth 整合包、Fabric / Quilt、Forge / NeoForge 与 JAR 文件选择器；先初始化真正的下载控制器及进度监听，再进入相应页面。页面进入、取消和保存属于业务检查范围；这些入口接入不等于所有加载器、网络和整合包安装流程已经验收。
 
-整合包后台校验另有 85 项仅使用临时文件的原生回归，覆盖损坏 / 缺失索引、依赖与名称、中文本地版本名、同名实例保留、HTTPS 域名、哈希格式及客户端 / 服务端声明。新导入使用独立 UUID 目录，不再把项目标题拼进路径；显示名称冲突时保留旧实例并自动编号。索引按 [Modrinth 官方格式](https://support.modrinth.com/en/articles/8802351-modrinth-modpack-format-mrpack) 校验，文件数据使用 SHA-512，旧 Minecraft 元数据保留 SHA-1 兼容；校验分块为 64 KiB，避免整份 JAR 驻留内存。
+整合包后台校验已有 116 项仅使用临时文件的原生回归，覆盖损坏 / 缺失索引、依赖与名称、中文本地版本名、同名实例保留、HTTPS 域名、全部备用地址、哈希格式及客户端 / 服务端声明。新导入使用独立 UUID 目录，不再把项目标题拼进路径；显示名称冲突时保留旧实例并自动编号。索引按 [Modrinth 官方格式](https://support.modrinth.com/en/articles/8802351-modrinth-modpack-format-mrpack) 校验，文件数据使用 SHA-512，旧 Minecraft 元数据保留 SHA-1 兼容；校验分块为 64 KiB，避免整份 JAR 驻留内存。
 
-当前 Forge / NeoForge 整合包要求已安装匹配的游戏及加载器，按实际库坐标匹配原版或自定义中文版本目录；缺失时先报出所需版本，不创建不可启动的实例。自动串联这些加载器的安装、完整导入事务及所有真实网络情形仍需继续接入和验收。独立后台回归不能替代完整整合包下载与 Minecraft 实玩。
+导入事务已有 193 项生产代码检查：最多三个文件同时下载，大小与 SHA-512 校验通过后才应用 overrides、client-overrides，最后原子移动目录并保存实例。断网、内容损坏、取消、重复回调、解压失败、保存失败都不能留下半成品实例或覆盖已有实例。生产 NSURLSession 下载器已实际下载并验证 FerriteCore 6.0.1 的 125,197 字节 Fabric 文件；这不代表已验证国内直连或所有网络环境。可用 `python3 iOS/tools/test-modpack-network.py` 显式重跑在线检查。
+
+“游戏 → ＋”和“资源 → 从文件导入整合包”已连接系统 Files 选择器，支持 `.mrpack` 及含 `modrinth.index.json` 的 ZIP。读取采用安全作用域与文件协调，在独立临时目录中复制，保留所选原件；读取失败有明确提示，导入使用真实引擎的可取消进度。Files 打开 / 取消属于完整 App UI 回归；选择实际整合包、成功导入和启动游戏仍需分别验收，不用后台检查替代。
+
+当前 Forge / NeoForge 整合包要求已安装匹配的游戏及加载器，按实际库坐标匹配原版或自定义中文版本目录；缺失时先报出所需版本。Fabric / Quilt 元数据校验成功后才写入。自动串联 Forge / NeoForge 安装、CurseForge ZIP、备份 / 导出、真实整合包完整安装与 Minecraft 实玩仍待验收。
 
 CI 先将设备 ARM64 交叉构建放在 Intel 执行器，模拟器与界面检查复用一台 ARM 执行器，以减少 GitHub ARM 容量不足造成的排队取消。每个测试的断言仍保留。对应结果以 [最新 iOS Actions](https://github.com/ADsurfboard/MC-Harbor/actions/workflows/ios-compat.yml?query=branch%3Acodex%2Fios-port) 的具体提交为准；旧失败记录不删除。
 

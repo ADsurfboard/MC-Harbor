@@ -48,10 +48,12 @@ int main(void) { @autoreleasepool {
         NSMutableSet *storage = [NSMutableSet set];
         for (NSUInteger i=0; i<20; i++) {
             NSString *name = HBRNewModpackStorageName();
+            CHECK(HBRIsModpackStorageName(name));
             CHECK([name hasPrefix:@"pack-"] && ![name containsString:@"/"] && ![name containsString:@".."]);
             [storage addObject:name];
         }
         CHECK(storage.count == 20);
+        for (id invalid in @[@"pack-../escape",@"pack-invalid",@"pack-00000000-0000-0000-0000-000000000000/../a",@12,NSNull.null]) CHECK(!HBRIsModpackStorageName(invalid));
         NSDictionary *valid=@{@"path":@"mods/example.jar", @"fileSize":@1,
             @"downloads":@[@"https://cdn.modrinth.com/data/example.jar"],
             @"hashes":@{@"sha1":[@"" stringByPaddingToLength:40 withString:@"a" startingAtIndex:0],
@@ -64,9 +66,13 @@ int main(void) { @autoreleasepool {
             CHECK(!HBRValidateModpackRemoteFile(file,nil));
         }
         for (NSString *url in @[@"http://cdn.modrinth.com/a",@"https://localhost/a",@"https://example.com/a",
-                                @"https://user:password@github.com/a",@"https://cdn.modrinth.com/a b"]) {
+                                @"https://user:password@github.com/a",@"https://cdn.modrinth.com/a b",@"https://cdn.modrinth.com:8443/a",@"https://@cdn.modrinth.com/a"]) {
             NSMutableDictionary *file=valid.mutableCopy;file[@"downloads"]=@[url];
             CHECK(!HBRValidateModpackRemoteFile(file,nil));
+        }
+        for (id second in @[@"http://cdn.modrinth.com/a",@"https://localhost/a",@12,NSNull.null]) {
+            NSMutableDictionary *alternate=valid.mutableCopy;alternate[@"downloads"]=@[valid[@"downloads"][0],second];
+            CHECK(!HBRValidateModpackRemoteFile(alternate,nil));
         }
         NSMutableDictionary *file=valid.mutableCopy;file[@"hashes"]=@{};
         CHECK(!HBRValidateModpackRemoteFile(file,nil));

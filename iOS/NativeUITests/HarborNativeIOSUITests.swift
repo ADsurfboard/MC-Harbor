@@ -67,4 +67,27 @@ import CoreGraphics
         cancel.tap()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
     }
+
+    func testLocalModpackImportOpensFilesAndCanCancel() throws {
+        continueAfterFailure = false
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication(bundleIdentifier: "net.morben.harbor.ios")
+        app.launch()
+        let resources = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "资源")).firstMatch
+        XCTAssertTrue(resources.waitForExistence(timeout: 15))
+        resources.tap()
+        let importer = app.buttons["native.page.importPack"]
+        XCTAssertTrue(importer.waitForExistence(timeout: 10))
+        XCTAssertTrue(importer.isHittable)
+        importer.tap()
+        let cancel = app.buttons.matching(NSPredicate(format: "label IN %@", ["Cancel", "取消"])).firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 30))
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "complete-native-modpack-files-picker"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+        cancel.tap()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+        XCTAssertTrue(importer.waitForExistence(timeout: 10))
+    }
 }
