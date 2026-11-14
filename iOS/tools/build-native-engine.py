@@ -65,6 +65,15 @@ replace('Natives/UIKit+hook.m', '''@implementation UITraitCollection(hook)
 }
 
 @end''', '''// Native size classes follow device, orientation and iPad window size.''')
+# The SwiftUI root already provides navigation. Keep the embedded real engine's
+# detail visible in a compact phone rather than losing it behind the old sidebar.
+replace('Natives/LauncherSplitViewController.m',
+        '- (void)splitViewController:(UISplitViewController *)svc willChangeToDisplayMode:',
+        '''- (UISplitViewControllerColumn)splitViewController:(UISplitViewController *)svc topColumnForCollapsingToProposedTopColumn:(UISplitViewControllerColumn)proposedTopColumn {
+    return UISplitViewControllerColumnSecondary;
+}
+
+- (void)splitViewController:(UISplitViewController *)svc willChangeToDisplayMode:''')
 replace('Natives/SurfaceViewController.m','#import "SurfaceViewController.h"','#import "SurfaceViewController.h"\n#import "HarborEngineAdapter.h"')
 replace('Natives/SurfaceViewController.m','[super viewDidAppear:animated];','[super viewDidAppear:animated];\n    HBRInstallGameControls(self);')
 replace('Natives/SurfaceViewController.m','- (void)updateGrabState {','- (void)updateGrabState {\n    HBRUpdateGameGrabState();')

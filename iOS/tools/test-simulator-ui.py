@@ -76,7 +76,10 @@ for family,device_type,runtime in choices:
   (EVIDENCE/('ui-'+family+'.json')).write_text(json.dumps(status,indent=2))
   try:
    output=EVIDENCE/'screenshots'/family;output.mkdir(parents=True,exist_ok=True)
-   if result.exists():run(['xcrun','xcresulttool','export','attachments','--path',str(result),'--output-path',str(output)],timeout=120)
+   if result.exists():
+    summary=subprocess.run(['xcrun','xcresulttool','get','test-results','summary','--path',str(result)],capture_output=True,text=True,timeout=60)
+    (EVIDENCE/('ui-'+family+'-summary.json')).write_text(summary.stdout if summary.returncode==0 else json.dumps({'summaryError':summary.stderr[-4000:]}))
+    run(['xcrun','xcresulttool','export','attachments','--path',str(result),'--output-path',str(output)],timeout=120)
    if not status['passed']:
     with (EVIDENCE/('ui-'+family+'-system.log')).open('w') as log:
      subprocess.run(['xcrun','simctl','spawn',device,'log','show','--last','15m','--style','compact','--predicate','process == "HarborIOSHarness" OR process == "SpringBoard"'],stdout=log,stderr=subprocess.STDOUT,timeout=60)

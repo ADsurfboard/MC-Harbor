@@ -42,7 +42,7 @@ import CryptoKit
     }
 }
 
-struct PhoneInstance: Decodable, Identifiable {
+struct PhoneInstance: Decodable, Identifiable, Equatable {
     let id: String
     let name: String
     let version: String
@@ -86,6 +86,7 @@ struct HarborPhoneRoot: View {
     let services: HarborNativeServices
     @StateObject private var library: PhoneLibrary
     @State private var page: NativePage?
+    @AppStorage(HarborLibraryOptions.coverFlow) private var coverFlow = false
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     init(services: HarborNativeServices) {
@@ -116,12 +117,17 @@ struct HarborPhoneRoot: View {
                                     .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading).contentShape(Rectangle())
                             }.accessibilityIdentifier("library.install.empty")
                         }
-                        ForEach(library.instances) { instance in
+                        if coverFlow && !library.instances.isEmpty {
+                            HarborCoverFlowLibrary(instances: library.instances,
+                                launch: { page = .init(name: "launch", profile: $0.id) },
+                                manage: { page = .init(name: "instance", profile: $0.id) },
+                                controls: { page = .init(name: "touch", profile: $0.id) })
+                        } else { ForEach(library.instances) { instance in
                             HarborInstanceCard(instance: instance, compact: verticalSizeClass == .compact,
                                 launch: { page = .init(name: "launch", profile: instance.id) },
                                 manage: { page = .init(name: "instance", profile: instance.id) },
                                 controls: { page = .init(name: "touch", profile: instance.id) })
-                        }
+                        } }
                     }
                 }
                 .harborPageBackground()
@@ -136,6 +142,7 @@ struct HarborPhoneRoot: View {
                             Button("安装 Minecraft") { page = .init(name: "install") }
                             Button("从文件导入 Modrinth 整合包") { page = .init(name: "importPack") }
                             Button("浏览在线整合包") { page = .init(name: "resources") }
+                            Button(coverFlow ? "使用列表选择实例" : "使用封面流选择实例") { coverFlow.toggle() }
                         } label: { Image(systemName: "plus").frame(width: 44, height: 44).contentShape(Rectangle()) }
                             .accessibilityLabel("安装或导入")
                     }
@@ -172,6 +179,7 @@ struct HarborPhoneRoot: View {
                         HarborGlassPanel { nativeRow("Java、渲染与性能", symbol: "speedometer", pageName: "settings") }
                     }
                     HarborPerformanceSettings()
+                    HarborLibraryPresentationSettings()
                     Section("关于") {
                         LabeledContent("作者", value: "ADsurfboard")
                         NavigationLink { HarborPeopleView() } label: { Label("开发者与贡献名单", systemImage: "person.2").frame(minHeight: 44) }

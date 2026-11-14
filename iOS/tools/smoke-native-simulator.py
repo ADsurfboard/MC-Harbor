@@ -106,6 +106,8 @@ finally:
             report['cleanupErrors'].append('CI profile inspection: ' + type(error).__name__)
     result = OUT / 'native-profile.xcresult'
     if result.is_dir():
+        diagnostic('native-ui-summary.json', ['xcrun', 'xcresulttool', 'get', 'test-results', 'summary',
+                   '--path', str(result)], timeout=60)
         exported = OUT / 'native-ui-attachments'
         diagnostic('attachment-export.log', ['xcrun', 'xcresulttool', 'export', 'attachments',
                    '--path', str(result), '--output-path', str(exported)], timeout=60)

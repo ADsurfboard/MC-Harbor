@@ -138,6 +138,8 @@ struct HarborPerformanceSettings: View {
             Toggle(isOn: $exclusive) {
                 Label("独家优化", systemImage: "bolt.fill")
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture { exclusive.toggle() }
             }.accessibilityIdentifier("settings.performance.exclusive")
             Text(exclusive
                  ? "已保留玻璃外观，关闭启动器内的过渡、玻璃弹性和动态装饰。不会改变游戏的画质、帧率设置或触控响应。"

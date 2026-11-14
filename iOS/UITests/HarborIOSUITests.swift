@@ -3,6 +3,37 @@ import XCTest
 @MainActor final class HarborIOSUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false; XCUIDevice.shared.orientation = .portrait }
     override func tearDownWithError() throws { XCUIDevice.shared.orientation = .portrait }
+    func testCoverFlowSwipesSelectionAndRestoresList() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"; app.launch()
+        let menu = app.buttons["安装或导入"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 15)); menu.tap()
+        if app.buttons["使用列表选择实例"].exists {
+            app.buttons["使用列表选择实例"].tap()
+            menu.tap()
+        }
+        app.buttons["使用封面流选择实例"].tap()
+        let flow = app.collectionViews["library.coverflow"]
+        XCTAssertTrue(flow.waitForExistence(timeout: 10))
+        let previous = app.buttons["上一个实例"], next = app.buttons["下一个实例"]
+        if previous.isEnabled { previous.tap() }
+        XCTAssertEqual(app.staticTexts["library.coverflow.position"].label, "1 / 2")
+        flow.swipeLeft()
+        let predicate = NSPredicate(format: "label == %@", "2 / 2")
+        XCTAssertTrue(app.staticTexts.matching(predicate).firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(previous.isEnabled)
+        capture("coverflow-horizontal-selection")
+        XCUIDevice.shared.orientation = .landscapeLeft
+        if !previous.isHittable { app.swipeUp() }
+        XCTAssertTrue(previous.isHittable)
+        previous.tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label == %@", "1 / 2")).firstMatch.waitForExistence(timeout: 10))
+        XCUIDevice.shared.orientation = .portrait
+        menu.tap(); app.buttons["使用列表选择实例"].tap()
+        XCTAssertTrue(app.buttons["instance.launch.fabric-example"].waitForExistence(timeout: 10))
+        XCTAssertFalse(flow.exists)
+        XCTAssertFalse(next.exists)
+    }
     func testExclusiveOptimizationKeepsGlassAndPersists() throws {
         let app = XCUIApplication()
         app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"
@@ -26,6 +57,11 @@ import XCTest
         if toggle.value as? String == "1" { toggle.tap() }
         XCTAssertEqual(toggle.value as? String, "0")
         capture("glass-full-effects-settings")
+        toggle.tap()
+        XCTAssertEqual(toggle.value as? String, "1")
+        // The label/blank area and the actual switch both remain actionable.
+        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.94, dy: 0.5)).tap()
+        XCTAssertEqual(toggle.value as? String, "0")
         toggle.tap()
         XCTAssertEqual(toggle.value as? String, "1")
         let status = app.staticTexts["settings.performance.material"]

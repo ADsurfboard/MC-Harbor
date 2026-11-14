@@ -22,6 +22,7 @@
 - (void)reloadProfileList;
 - (void)launchMinecraft:(id)sender;
 - (void)enterModInstaller;
+- (void)enterModInstallerWithPath:(NSString *)path hitEnterAfterWindowShown:(BOOL)hitEnter;
 @end
 
 @interface LauncherProfilesViewController (HarborInstall)
@@ -33,6 +34,7 @@
 
 @interface HarborEngineAdapter : NSObject<HarborNativeServices>
 @property(nonatomic,strong) LauncherSplitViewController *legacy;
+@property(nonatomic,strong) LauncherNavigationController *nativeLauncher;
 @property(nonatomic,weak) SurfaceViewController *surface;
 @property(nonatomic,weak) HarborGameTouchOverlay *overlay;
 + (instancetype)shared;
@@ -66,11 +68,19 @@ static double lookSensitivity = 1;
     if (!_legacy) {
         _legacy = [[LauncherSplitViewController alloc] initWithStyle:UISplitViewControllerStyleDoubleColumn];
         [_legacy loadViewIfNeeded];
+        for (UIViewController *controller in _legacy.viewControllers) {
+            if ([controller isKindOfClass:LauncherNavigationController.class]) self.nativeLauncher=(id)controller;
+        }
         _legacy.view.tintColor = [UIColor colorWithRed:0.12 green:0.52 blue:0.36 alpha:1];
     }
     return _legacy;
 }
 - (LauncherNavigationController *)launcherController {
+    [self legacy];
+    if (self.nativeLauncher) {
+        [self.nativeLauncher loadViewIfNeeded];
+        return self.nativeLauncher;
+    }
     // The split view may collapse on iPhone. Do not assume a secondary index.
     NSMutableArray<UIViewController *> *pending = [NSMutableArray arrayWithObject:self.legacy];
     while (pending.count) {
@@ -78,6 +88,7 @@ static double lookSensitivity = 1;
         [pending removeLastObject];
         if ([controller isKindOfClass:LauncherNavigationController.class]) {
             [controller loadViewIfNeeded]; // Register download/progress observers.
+            self.nativeLauncher=(id)controller;
             return (id)controller;
         }
         [pending addObjectsFromArray:controller.childViewControllers];
@@ -188,7 +199,13 @@ static double lookSensitivity = 1;
     }
     if ([self.page isEqual:@"fabric"]) { [profiles actionCreateFabricProfile]; return; }
     if ([self.page isEqual:@"forge"]) { [profiles actionCreateForgeProfile]; return; }
-    if ([self.page isEqual:@"import"]) { [detail enterModInstaller]; return; }
+    if ([self.page isEqual:@"import"]) {
+        UTType *jar=[UTType typeWithFilenameExtension:@"jar"] ?: UTTypeItem;
+        UIDocumentPickerViewController *picker=[[UIDocumentPickerViewController alloc] initForOpeningContentTypes:@[jar] asCopy:YES];
+        picker.delegate=self;picker.allowsMultipleSelection=NO;
+        // Present from the visible SwiftUI bridge, not a collapsed split column.
+        [self presentViewController:picker animated:YES completion:nil];return;
+    }
     if ([self.page isEqual:@"install"]) { [profiles actionEditProfile:@{@"name":@"", @"lastVersionId":@"latest-release"}]; return; }
     if (![self.page isEqual:@"launch"]) return;
     if (self.profile && PLProfiles.current.profiles[self.profile]) [PLProfiles.current setSelectedProfileName:self.profile];
@@ -204,6 +221,10 @@ static double lookSensitivity = 1;
 - (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
     NSURL *source=urls.firstObject;
     if (!source || !source.isFileURL) return;
+    if ([self.page isEqual:@"import"]) {
+        [[self.adapter launcherController] enterModInstallerWithPath:source.path hitEnterAfterWindowShown:NO];
+        return;
+    }
     NSString *storage=HBRNewModpackStorageName();
     NSURL *copy=[NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:[storage stringByAppendingString:@".zip"]]];
     self.modalInPresentation=YES;
