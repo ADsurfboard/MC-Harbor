@@ -11,7 +11,17 @@ do {
     guard let destination=stored.flatMap({FileManager.default.fileExists(atPath:$0.path) ? $0:nil}) ?? NSWorkspace.shared.urlForApplication(withBundleIdentifier:info["HarborBundleID"] as? String ?? "net.morben.shenggan.launcher") else{throw NSError(domain:"MC Harbor",code:1,userInfo:[NSLocalizedDescriptionKey:"找不到 MC Harbor，请安装后重新创建快捷方式。"])}
     let directory=root.appendingPathComponent("shortcut-inbox");try FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true,attributes:[.posixPermissions:0o700]);guard (try directory.resourceValues(forKeys:[.isSymbolicLinkKey])).isSymbolicLink != true else{throw NSError(domain:"MC Harbor",code:1,userInfo:[NSLocalizedDescriptionKey:"快捷方式目录无效。"])}
     let file=directory.appendingPathComponent(UUID().uuidString+".json");try JSONSerialization.data(withJSONObject:["url":value,"created":Date().timeIntervalSince1970]).write(to:file,options:.atomic);try FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:file.path)
+    // LaunchServices may deliver the request but never finish its activation
+    // callback for an already-running App. The inbox consumer removes this
+    // exact private request after receiving it; that is also a valid handoff.
+    // Bound the helper lifetime instead of leaving an invisible process alive.
+    let deadline=Date().addingTimeInterval(60)
+    let handoff=Timer(timeInterval:0.2,repeats:true){timer in
+        if !FileManager.default.fileExists(atPath:file.path){timer.invalidate();app.terminate(nil)}
+        else if Date()>=deadline{timer.invalidate();try? FileManager.default.removeItem(at:file);let alert=NSAlert();alert.messageText="未能完成快捷启动";alert.informativeText="启动器尚未接收请求，请打开 MC Harbor 后重试。";alert.runModal();app.terminate(nil)}
+    }
+    RunLoop.main.add(handoff,forMode:.common)
     let config=NSWorkspace.OpenConfiguration();config.activates=true
-    NSWorkspace.shared.openApplication(at:destination,configuration:config){_,error in DispatchQueue.main.async{if let error{try? FileManager.default.removeItem(at:file);let alert=NSAlert(error:error);alert.runModal()};app.terminate(nil)}}
+    NSWorkspace.shared.openApplication(at:destination,configuration:config){_,error in DispatchQueue.main.async{handoff.invalidate();if let error,FileManager.default.fileExists(atPath:file.path){try? FileManager.default.removeItem(at:file);let alert=NSAlert(error:error);alert.runModal()};app.terminate(nil)}}
     app.run()
 }catch{let alert=NSAlert(error:error);alert.runModal()}
