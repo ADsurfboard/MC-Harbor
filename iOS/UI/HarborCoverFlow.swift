@@ -241,11 +241,11 @@ struct HarborCoverFlowLibrary: View {
                 GeometryReader { geometry in
                     HStack(alignment: .center, spacing: 20) {
                         carousel.frame(width: geometry.size.width * 0.45, height: 190)
-                        controls.frame(maxWidth: .infinity)
+                        selectionControls.frame(maxWidth: .infinity)
                     }.frame(maxWidth: .infinity, maxHeight: .infinity)
                 }.frame(height: 240)
             } else {
-                VStack(spacing: 18) { carousel.frame(height: 268); controls }
+                VStack(spacing: 18) { carousel.frame(height: 268); selectionControls }
             }
         }.padding(.vertical, 10).listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 20, trailing: 0))
             .listRowBackground(Color.clear).listRowSeparator(.hidden)
@@ -253,7 +253,7 @@ struct HarborCoverFlowLibrary: View {
     private var carousel: some View {
         NativeCoverFlow(instances: instances, focused: $focused, spatialEffects: !exclusive && !reduceMotion, requestedDirection: direction)
     }
-    @ViewBuilder private var controls: some View {
+    @ViewBuilder private var selectionControls: some View {
         if !instances.isEmpty {
             VStack(spacing: verticalSizeClass == .compact ? 8 : 18) {
                 let instance = instances[position]

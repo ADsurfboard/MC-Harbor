@@ -376,6 +376,7 @@ p['NSLocalNetworkUsageDescription']='MC Harbor 使用本地网络发现局域网
 p['NSMicrophoneUsageDescription']='仅在你使用支持语音聊天的模组时，MC Harbor 才需要麦克风。'
 p['CFBundleURLTypes']=[{'CFBundleURLName':'net.morben.harbor.ios.launch','CFBundleURLSchemes':['mcharbor','amethyst']}]
 p['UTImportedTypeDeclarations']=[{'UTTypeIdentifier':'net.modrinth.mrpack','UTTypeDescription':'Modrinth Modpack','UTTypeConformsTo':['public.zip-archive'], 'UTTypeTagSpecification':{'public.filename-extension':['mrpack']}}]
+p['UTExportedTypeDeclarations']=[{'UTTypeIdentifier':'net.morben.harbor.folder-mods','UTTypeDescription':'MC Harbor Mod Selection','UTTypeConformsTo':['public.data']}]
 info.write_bytes(plistlib.dumps(p))
 # Keep animation control in our owned copy and out of third-party frameworks.
 # Read the shared default-off preference at every native action boundary.
