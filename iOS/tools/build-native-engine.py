@@ -118,7 +118,7 @@ content=content.replace('[self acquireAccessToken:self.tokenData[@"refreshToken"
 auth.write_text(content);patches.append({'file':'Natives/authenticator/MicrosoftAuthenticator.m','nonDestructiveKeychainUpdates':True})
 
 # Validate complete manifests before any downloaded / extracted payload is written.
-replace('Natives/installer/modpack/ModrinthAPI.m','#import "PLProfiles.h"','#import "PLProfiles.h"\n#import "HarborArchiveGuard.h"\n#import "HarborModpackMetadata.h"\n#import "HarborModpackTransaction.h"')
+replace('Natives/installer/modpack/ModrinthAPI.m','#import "PLProfiles.h"','#import "PLProfiles.h"\n#import "utils.h"\n#import "HarborArchiveGuard.h"\n#import "HarborModpackMetadata.h"\n#import "HarborModpackTransaction.h"')
 # Every import has independent storage, regardless of project-supplied titles.
 replace('Natives/MinecraftResourceDownloadTask.m','#import "MinecraftResourceDownloadTask.h"',
         '#import "MinecraftResourceDownloadTask.h"\n#import "HarborModpackMetadata.h"')
