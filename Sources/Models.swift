@@ -31,7 +31,6 @@ struct NativePreferences: Codable {
     var knownLibraries:[String] = []
     var appearance: HarborAppearance = .ultraClear
     var wallpaper = WallpaperSettings()
-    var fluidBackground = false
     var reduceMotion = false
     var performanceMode = false
     var gameRoot = FileManager.default.fileExists(atPath:"/Applications/.minecraft") ? "/Applications/.minecraft":NativePaths.root.appendingPathComponent("game").path
