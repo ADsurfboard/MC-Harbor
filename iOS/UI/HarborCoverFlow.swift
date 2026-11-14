@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import AudioToolbox
+import HarborCore
 
 enum HarborLibraryOptions {
     static let coverFlow = "harbor.library.coverflow"
@@ -11,50 +12,42 @@ enum HarborLibraryOptions {
 
 /// Native scrolling/layout: no timer, display link, web view or per-frame
 /// SwiftUI state update. Only crossing into another instance publishes state.
-private final class HarborCoverFlowLayout: UICollectionViewFlowLayout {
+private final class HarborCoverFlowLayout: UICollectionViewLayout {
     var spatialEffects = true
-    override init() {
-        super.init()
-        scrollDirection = .horizontal; minimumLineSpacing = 16
+    var geometry: CoverFlowGeometry {
+        .init(width: Double(collectionView?.bounds.width ?? 1),
+              height: Double(collectionView?.bounds.height ?? 1),
+              count: (collectionView?.numberOfItems(inSection: 0) ?? 0) > 1
+                  ? (collectionView?.numberOfItems(inSection: 0) ?? 0) / 3
+                  : (collectionView?.numberOfItems(inSection: 0) ?? 0))
     }
-    required init?(coder: NSCoder) { fatalError("Use init()") }
-    override func prepare() {
-        if let view = collectionView {
-            itemSize = CGSize(width: min(340, max(184, view.bounds.width * 0.70)),
-                              height: max(140, view.bounds.height - 16))
-            let inset = max(0, (view.bounds.width - itemSize.width) / 2)
-            sectionInset = UIEdgeInsets(top: 8, left: inset, bottom: 8, right: inset)
-        }
-        super.prepare()
+    override var collectionViewContentSize: CGSize {
+        CGSize(width: geometry.contentWidth, height: geometry.height)
     }
     override func shouldInvalidateLayout(forBoundsChange newBounds: CGRect) -> Bool { true }
     override func layoutAttributesForElements(in rect: CGRect) -> [UICollectionViewLayoutAttributes]? {
-        guard let collectionView, let original = super.layoutAttributesForElements(in: rect) else { return nil }
-        let center = collectionView.contentOffset.x + collectionView.bounds.width / 2
-        let pitch = itemSize.width + minimumLineSpacing
-        return original.compactMap { value in
-            guard let copy = value.copy() as? UICollectionViewLayoutAttributes else { return nil }
-            let distance = max(-1.5, min(1.5, (copy.center.x - center) / max(1, pitch)))
-            copy.zIndex = 1000 - Int(abs(distance) * 100)
-            if spatialEffects {
-                var transform = CATransform3DIdentity
-                transform.m34 = -1 / 850
-                transform = CATransform3DTranslate(transform, 0, 0, -abs(distance) * 65)
-                transform = CATransform3DRotate(transform, -distance * 0.58, 0, 1, 0)
-                let scale = 1 - min(0.12, abs(distance) * 0.10)
-                copy.transform3D = CATransform3DScale(transform, scale, scale, 1)
-                copy.alpha = 1 - min(0.3, abs(distance) * 0.18)
-            }
-            return copy
-        }
+        guard let view = collectionView, let range = geometry.visible(around: view.contentOffset.x) else { return [] }
+        return range.compactMap { layoutAttributesForItem(at: IndexPath(item: $0, section: 0)) }
+    }
+    override func layoutAttributesForItem(at path: IndexPath) -> UICollectionViewLayoutAttributes? {
+        guard let view = collectionView, path.item < geometry.slots else { return nil }
+        let metrics = geometry
+        let pose = metrics.pose(slot: path.item, offset: Double(view.contentOffset.x), continuous: spatialEffects)
+        let attributes = UICollectionViewLayoutAttributes(forCellWith: path)
+        attributes.size = CGSize(width: metrics.cardWidth, height: metrics.cardHeight)
+        attributes.center = CGPoint(x: pose.centerX, y: pose.centerY)
+        attributes.zIndex = pose.zIndex
+        var transform = CATransform3DIdentity
+        transform.m34 = -1 / 920
+        transform = CATransform3DTranslate(transform, 0, 0, pose.depth)
+        transform = CATransform3DRotate(transform, pose.angle, 0, 1, 0)
+        attributes.transform3D = CATransform3DScale(transform, pose.scale, pose.scale, 1)
+        attributes.alpha = pose.opacity
+        return attributes
     }
     override func targetContentOffset(forProposedContentOffset proposed: CGPoint,
                                       withScrollingVelocity velocity: CGPoint) -> CGPoint {
-        guard let view = collectionView else { return proposed }
-        let pitch = max(1, itemSize.width + minimumLineSpacing)
-        let last = max(0, view.numberOfItems(inSection: 0) - 1)
-        let page = min(CGFloat(last), max(0, (proposed.x / pitch).rounded()))
-        return CGPoint(x: page * pitch, y: proposed.y)
+        CGPoint(x: geometry.offset(geometry.nearest(proposed.x)), y: 0)
     }
 }
 
@@ -87,13 +80,18 @@ private final class HarborCoverFlowLayout: UICollectionViewFlowLayout {
 
 private struct CoverFlowArtwork: View {
     let instance: PhoneInstance
+    @Environment(\.colorScheme) private var scheme
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 10) {
+            Text(instance.loader.uppercased()).font(.system(size: 10, weight: .semibold, design: .rounded))
+                .tracking(1.6).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
             HarborLoaderArtwork(loader: instance.loader)
-                .frame(maxWidth: .infinity, maxHeight: .infinity).padding(24)
-            Text(instance.name).font(.headline).lineLimit(2)
+                .frame(maxWidth: .infinity, maxHeight: .infinity).padding(12)
+            Text(instance.name).font(.subheadline.weight(.medium)).lineLimit(2)
                 .multilineTextAlignment(.center).frame(maxWidth: .infinity)
-        }.padding(18).harborGlass(radius: 28)
+        }.padding(18)
+            .background(LinearGradient(colors: [Color.white.opacity(scheme == .dark ? 0.08 : 0.28), .clear], startPoint: .topLeading, endPoint: .bottomTrailing))
+            .harborGlass(radius: 24)
     }
 }
 
@@ -125,7 +123,7 @@ private struct NativeCoverFlow: UIViewRepresentable {
         let layout = HarborCoverFlowLayout()
         let view = HarborCoverFlowCollection(frame: .zero, collectionViewLayout: layout)
         view.backgroundColor = .clear; view.showsHorizontalScrollIndicator = false
-        view.decelerationRate = .fast; view.alwaysBounceHorizontal = true
+        view.decelerationRate = .fast; view.alwaysBounceHorizontal = instances.count > 1
         view.contentInsetAdjustmentBehavior = .never
         view.dataSource = context.coordinator; view.delegate = context.coordinator
         view.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "cover")
@@ -134,9 +132,7 @@ private struct NativeCoverFlow: UIViewRepresentable {
         view.sizeChanged = { [weak view, weak coordinator] in
             guard let view, let coordinator, !view.isDragging, !coordinator.items.isEmpty else { return }
             let index = coordinator.items.firstIndex { $0.id == coordinator.parent.focused } ?? 0
-            coordinator.suppress = true
-            view.scrollToItem(at: IndexPath(item: index, section: 0), at: .centeredHorizontally, animated: false)
-            coordinator.suppress = false
+            coordinator.center(layout.geometry.middle(index), in: view, animated: false)
         }
         return view
     }
@@ -145,22 +141,18 @@ private struct NativeCoverFlow: UIViewRepresentable {
         coordinator.parent = self
         let changed = coordinator.items != instances
         let layout = view.collectionViewLayout as! HarborCoverFlowLayout
-        if layout.spatialEffects != spatialEffects { layout.spatialEffects = spatialEffects; layout.invalidateLayout() }
+        layout.spatialEffects = spatialEffects; layout.invalidateLayout()
         if changed {
-            coordinator.items = instances
+            coordinator.items = Array(instances.prefix(10_000))
             coordinator.suppress = true; view.reloadData(); view.layoutIfNeeded()
-            let position = instances.firstIndex { $0.id == focused } ?? 0
-            coordinator.current = position
-            if !instances.isEmpty {
-                view.scrollToItem(at: IndexPath(item: position, section: 0), at: .centeredHorizontally, animated: false)
-            }
+            let position = coordinator.items.firstIndex { $0.id == focused } ?? 0
+            coordinator.center(layout.geometry.middle(position), in: view, animated: false)
             coordinator.suppress = false
         } else if !coordinator.dragging, !view.isDecelerating,
-                  let position = instances.firstIndex(where: { $0.id == focused }), position != coordinator.current {
-            coordinator.current = position
+                  let position = coordinator.items.firstIndex(where: { $0.id == focused }), position != coordinator.current {
+            let target = layout.geometry.closestSlot(for: position, around: coordinator.virtualIndex)
             coordinator.feedback.tick()
-            view.scrollToItem(at: IndexPath(item: position, section: 0), at: .centeredHorizontally,
-                              animated: spatialEffects)
+            coordinator.center(target, in: view, animated: spatialEffects)
         }
     }
     static func dismantleUIView(_ view: UICollectionView, coordinator: Coordinator) {
@@ -171,38 +163,62 @@ private struct NativeCoverFlow: UIViewRepresentable {
         var parent: NativeCoverFlow
         var items: [PhoneInstance] = []
         var current = 0
+        var virtualIndex = 0
         var dragging = false
         var suppress = false
         let feedback = HarborCrownFeedback()
         init(_ parent: NativeCoverFlow) { self.parent = parent }
-        func collectionView(_ view: UICollectionView, numberOfItemsInSection section: Int) -> Int { items.count }
-        func collectionView(_ view: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-            let cell = view.dequeueReusableCell(withReuseIdentifier: "cover", for: indexPath)
-            let instance = items[indexPath.item]
-            cell.contentConfiguration = UIHostingConfiguration {
-                CoverFlowArtwork(instance: instance)
-            }.margins(.all, 0)
+        func collectionView(_ view: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+            items.count > 1 ? items.count * 3 : items.count
+        }
+        func collectionView(_ view: UICollectionView, cellForItemAt path: IndexPath) -> UICollectionViewCell {
+            let cell = view.dequeueReusableCell(withReuseIdentifier: "cover", for: path)
+            let index = path.item % items.count
+            let instance = items[index]
+            cell.contentConfiguration = UIHostingConfiguration { CoverFlowArtwork(instance: instance) }.margins(.all, 0)
             cell.backgroundColor = .clear
+            cell.accessibilityIdentifier = "library.cover." + String(path.item)
+            cell.accessibilityLabel = instance.name
             return cell
         }
-        func collectionView(_ view: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-            parent.focused = items[indexPath.item].id
+        func center(_ slot: Int, in view: UICollectionView, animated: Bool) {
+            guard let layout = view.collectionViewLayout as? HarborCoverFlowLayout, !items.isEmpty else { return }
+            virtualIndex = slot; current = layout.geometry.logical(slot)
+            suppress = true
+            view.setContentOffset(CGPoint(x: layout.geometry.offset(slot), y: 0), animated: animated)
+            suppress = false
         }
-        func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
-            dragging = true; feedback.prepare()
+        func collectionView(_ view: UICollectionView, didSelectItemAt path: IndexPath) {
+            guard let layout = view.collectionViewLayout as? HarborCoverFlowLayout else { return }
+            if path.item != virtualIndex { feedback.tick() }
+            center(path.item, in: view, animated: parent.spatialEffects)
+            parent.focused = items[layout.geometry.logical(path.item)].id
         }
+        func scrollViewWillBeginDragging(_ scrollView: UIScrollView) { dragging = true; feedback.prepare() }
         func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
-            if !decelerate { dragging = false }
+            if !decelerate { settle(scrollView) }
         }
-        func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) { dragging = false }
+        func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) { settle(scrollView) }
+        func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) { settle(scrollView) }
+        private func settle(_ scrollView: UIScrollView) {
+            guard let view = scrollView as? UICollectionView,
+                  let layout = view.collectionViewLayout as? HarborCoverFlowLayout, !items.isEmpty else { return }
+            dragging = false
+            let slot = layout.geometry.nearest(view.contentOffset.x)
+            virtualIndex = slot; current = layout.geometry.logical(slot)
+            parent.focused = items[current].id
+            // Rebase an equivalent copy only after motion stops; no visible jump.
+            if items.count > 1 && (slot < items.count || slot >= 2 * items.count) {
+                center(layout.geometry.middle(current), in: view, animated: false)
+            }
+        }
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
             guard !suppress, dragging, let view = scrollView as? UICollectionView,
                   let layout = view.collectionViewLayout as? HarborCoverFlowLayout, !items.isEmpty else { return }
-            let pitch = max(1, layout.itemSize.width + layout.minimumLineSpacing)
-            let index = max(0, min(items.count - 1, Int((view.contentOffset.x / pitch).rounded())))
-            guard index != current else { return }
-            current = index; feedback.tick()
-            parent.focused = items[index].id
+            let slot = layout.geometry.nearest(view.contentOffset.x)
+            guard slot != virtualIndex else { return }
+            virtualIndex = slot; current = layout.geometry.logical(slot); feedback.tick()
+            parent.focused = items[current].id
         }
     }
 }
@@ -241,13 +257,13 @@ struct HarborCoverFlowLibrary: View {
                 let instance = instances[position]
                 HStack {
                     Button { step(-1) } label: { Image(systemName: "chevron.left").frame(width: 44, height: 44) }
-                        .accessibilityLabel("上一个实例").disabled(position == 0)
+                        .accessibilityLabel("上一个实例").disabled(instances.count < 2)
                     Spacer()
                     Text("\(position + 1) / \(instances.count)").font(.subheadline.monospacedDigit())
                         .foregroundStyle(.secondary).accessibilityIdentifier("library.coverflow.position")
                     Spacer()
                     Button { step(1) } label: { Image(systemName: "chevron.right").frame(width: 44, height: 44) }
-                        .accessibilityLabel("下一个实例").disabled(position == instances.count - 1)
+                        .accessibilityLabel("下一个实例").disabled(instances.count < 2)
                 }.buttonStyle(.plain)
                 VStack(spacing: 12) {
                     Text(instance.name).font(verticalSizeClass == .compact ? .headline : .title3.bold()).multilineTextAlignment(.center)
@@ -270,7 +286,7 @@ struct HarborCoverFlowLibrary: View {
         }
     }
     private func step(_ delta: Int) {
-        let next = min(instances.count - 1, max(0, position + delta))
+        let next = (position + delta + instances.count) % instances.count
         guard instances.indices.contains(next) else { return }
         focused = instances[next].id
     }
@@ -289,7 +305,7 @@ struct HarborLibraryPresentationSettings: View {
                 }.pickerStyle(.segmented).accessibilityIdentifier("settings.library.mode")
                 HarborSettingsToggle("切换触觉反馈", isOn: $haptics).frame(minHeight: 44)
                 HarborSettingsToggle("机械切换音效", isOn: $sound).frame(minHeight: 44)
-                Text("封面流可左右滑动并吸附到当前实例。触觉与音效只在切换实例时触发；音效遵循设备静音。独家优化保留滑动操作，关闭额外三维转动。")
+                Text("封面流可左右滑动并吸附到当前实例。触觉与音效只在切换实例时触发；音效遵循设备静音。独家优化保留滑动操作，保留静态空间排布，关闭连续三维形变。")
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }

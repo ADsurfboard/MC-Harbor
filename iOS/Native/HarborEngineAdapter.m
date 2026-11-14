@@ -54,6 +54,7 @@
 
 static BOOL lookInvertX = NO, lookInvertY = NO;
 static double lookSensitivity = 1;
+static __weak UIWindow *harborWindow;
 
 @implementation HarborEngineAdapter
 + (instancetype)shared {
@@ -326,8 +327,23 @@ UIViewController *HBRLauncherController(void) {
     return [HarborEngineAdapter.shared launcherController];
 }
 BOOL HBRCanLaunchGame(void) { return HarborEngineAdapter.shared.modAccessToken == nil; }
+void HBRRegisterLauncherController(UIViewController *controller) {
+    if ([controller isKindOfClass:LauncherNavigationController.class]) HarborEngineAdapter.shared.nativeLauncher=(id)controller;
+}
+UIViewController *HBRVisibleController(Class type) {
+    NSMutableArray *pending=[NSMutableArray array];
+    if (harborWindow.rootViewController) [pending addObject:harborWindow.rootViewController];
+    while (pending.count) {
+        UIViewController *controller=pending.lastObject;[pending removeLastObject];
+        if ([controller isKindOfClass:type] && controller.viewIfLoaded.window) return controller;
+        [pending addObjectsFromArray:controller.childViewControllers];
+        if (controller.presentedViewController) [pending addObject:controller.presentedViewController];
+    }
+    return nil;
+}
 
 void HBRInstallRoot(UIWindow *window) {
+    harborWindow=window;
     window.rootViewController=[HarborRootFactory makeControllerWithServices:HarborEngineAdapter.shared];
 }
 void HBRInstallGameControls(UIViewController *controller) {

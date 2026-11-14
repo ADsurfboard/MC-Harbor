@@ -53,18 +53,26 @@ import XCTest
         let flow = app.collectionViews["library.coverflow"]
         XCTAssertTrue(flow.waitForExistence(timeout: 10))
         let previous = app.buttons["上一个实例"], next = app.buttons["下一个实例"]
-        if previous.isEnabled { previous.tap() }
+        if app.staticTexts["library.coverflow.position"].label != "1 / 2" { previous.tap() }
         XCTAssertEqual(app.staticTexts["library.coverflow.position"].label, "1 / 2")
-        flow.swipeLeft()
+        // Move one physical cover pitch, independent of iPhone/iPad width.
+        // The end hold removes fling ambiguity when a two-instance ring wraps.
+        let centered = try XCTUnwrap(flow.cells.allElementsBoundByIndex.min { abs($0.frame.midX - flow.frame.midX) < abs($1.frame.midX - flow.frame.midX) })
+        let travel = centered.frame.width * 0.56 / flow.frame.width
+        flow.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.5)).press(forDuration: 0.08,
+            thenDragTo: flow.coordinate(withNormalizedOffset: CGVector(dx: 0.65 - travel, dy: 0.5)),
+            withVelocity: .slow, thenHoldForDuration: 0.3)
         let predicate = NSPredicate(format: "label == %@", "2 / 2")
         XCTAssertTrue(app.staticTexts.matching(predicate).firstMatch.waitForExistence(timeout: 10))
         XCTAssertTrue(previous.isEnabled)
+        assertNeighborCovers(flow)
         capture("coverflow-horizontal-selection")
         XCUIDevice.shared.orientation = .landscapeLeft
         capture("coverflow-landscape-before-scroll")
         if !previous.isHittable { app.swipeUp() }
         capture("coverflow-landscape-after-scroll")
         XCTAssertTrue(previous.isHittable)
+        assertNeighborCovers(flow)
         previous.tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label == %@", "1 / 2")).firstMatch.waitForExistence(timeout: 10))
         XCUIDevice.shared.orientation = .portrait
@@ -161,5 +169,11 @@ import XCTest
     }
     private func capture(_ name: String) {
         let attachment = XCTAttachment(screenshot: XCUIApplication().screenshot()); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
+    }
+    private func assertNeighborCovers(_ flow: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
+        let viewport = flow.frame
+        let visible = flow.cells.allElementsBoundByIndex.map(\.frame).filter { $0.intersection(viewport).width >= 12 }
+        XCTAssertTrue(visible.contains { $0.midX < viewport.midX - 30 }, "A real cover must remain visible on the left", file: file, line: line)
+        XCTAssertTrue(visible.contains { $0.midX > viewport.midX + 30 }, "A real cover must remain visible on the right", file: file, line: line)
     }
 }

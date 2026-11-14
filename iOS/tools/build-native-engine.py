@@ -50,6 +50,38 @@ replace('Natives/ios_uikit_bridge.m','#import "SurfaceViewController.h"','#impor
 replace('Natives/LauncherNavigationController.m','#import "LauncherNavigationController.h"','#import "LauncherNavigationController.h"\n#import "HarborEngineAdapter.h"')
 replace('Natives/LauncherNavigationController.m','- (void)launchMinecraft:(UIButton *)sender {',
         '- (void)launchMinecraft:(UIButton *)sender {\n    if (!HBRCanLaunchGame()) { showDialog(@"正在管理模组", @"请等待模组复制或导入结束后再启动游戏。"); return; }')
+replace('Natives/LauncherSplitViewController.m','#import "LauncherSplitViewController.h"',
+        '#import "LauncherSplitViewController.h"\n#import "HarborEngineAdapter.h"')
+replace('Natives/LauncherSplitViewController.m','    detailVc.toolbarHidden = NO;',
+        '    HBRRegisterLauncherController(detailVc);\n    detailVc.toolbarHidden = NO;')
+for native in ['LauncherMenuViewController.m','LauncherPrefContCfgViewController.m','LauncherPrefManageJREViewController.m']:
+    path=ENGINE/'Natives'/native
+    original=path.read_text()
+    old=original
+    original='#import "HarborEngineAdapter.h"\n'+original
+    original=original.replace('((LauncherNavigationController *)self.splitViewController.viewControllers[1])','((LauncherNavigationController *)HBRLauncherController())')
+    original=original.replace('(LauncherNavigationController *)UIApplication.sharedApplication.keyWindow.rootViewController.splitViewController.viewControllers[1]','((LauncherNavigationController *)HBRLauncherController())')
+    original=original.replace('    UISplitViewController *splitVC = (id)currentVC();\n    LauncherNavigationController *nav = (id)splitVC.viewControllers[1];','    LauncherNavigationController *nav = (id)HBRLauncherController();')
+    if native=='LauncherPrefManageJREViewController.m':
+        begin=original.index('+ (LauncherPrefManageJREViewController *)currentInstance {')
+        end=original.index('\n- (void)viewDidLoad',begin)
+        original=original[:begin]+''' + (LauncherPrefManageJREViewController *)currentInstance {
+    return (id)HBRVisibleController(LauncherPrefManageJREViewController.class);
+}
+''' + original[end:]
+        original=original.replace('LauncherNavigationController *nav = (id)self.navigationController;',
+                                  'LauncherNavigationController *nav = (id)HBRLauncherController();')
+    assert original!=old
+    path.write_text(original);patches.append({'file':'Natives/'+native,'compactSafeControllerLookup':True})
+replace('Natives/LauncherNavigationController.m', '''        UIViewController *view = [(UINavigationController *)self.splitViewController.viewControllers[0]
+        viewControllers][0];
+        [view performSelector:@selector(selectAccount:) withObject:sender];''', '''        AccountListViewController *accounts=[AccountListViewController new];
+        UINavigationController *navigation=[[UINavigationController alloc] initWithRootViewController:accounts];
+        __weak UINavigationController *weakNavigation=navigation;
+        accounts.whenItemSelected=^{ [weakNavigation dismissViewControllerAnimated:YES completion:nil]; };
+        [self presentViewController:navigation animated:YES completion:nil];''')
+replace('Natives/LauncherNavigationController.m','#import "HarborEngineAdapter.h"',
+        '#import "HarborEngineAdapter.h"\n#import "AccountListViewController.h"')
 replace('Natives/ios_uikit_bridge.m','void launchInitialViewController(UIWindow *window) {\n    window.rootViewController = [[LauncherSplitViewController alloc] initWithStyle:UISplitViewControllerStyleDoubleColumn];','void launchInitialViewController(UIWindow *window) {\n    HBRInstallRoot(window);')
 replace('Natives/ios_uikit_bridge.m','window.rootViewController = [[LauncherSplitViewController alloc] initWithStyle:UISplitViewControllerStyleDoubleColumn];','HBRInstallRoot(window);',count=2)
 # Harbor uses the actual iPhone/iPad idiom and size classes. Upstream's
@@ -311,6 +343,12 @@ main=main[:start]+'''void init_setupHomeDirectory() {
 }
 ''' + main[end:]
 (ENGINE/'Natives/main.m').write_text(main);patches.append({'file':'Natives/main.m','privatePersistentStorage':True})
+
+# Actual compact phones may contain one collapsed column. Any positional
+# secondary lookup reintroduces the observed NSRangeException.
+for native in (ENGINE/'Natives').rglob('*.m'):
+    assert 'viewControllers[1]' not in native.read_text(), 'Unsafe secondary lookup remains: '+str(native)
+
 
 cmake=ENGINE/'Natives/CMakeLists.txt';s=cmake.read_text()
 target='arm64-apple-ios16.0' + ('-simulator' if args.platform=='simulator' else '')
