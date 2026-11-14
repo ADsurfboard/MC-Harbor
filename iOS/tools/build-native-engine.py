@@ -182,7 +182,7 @@ replace('Natives/LauncherNavigationController.m', '        [self.task downloadMo
         else [self.task downloadModpackFromAPI:notification.object detail:userInfo[@"detail"] atIndex:[userInfo[@"index"] unsignedLongValue]];''')
 # Explicit KVO ownership prevents a finished/cancelled task's queued progress
 # callbacks from completing a later import or observing a released object.
-replace('Natives/LauncherNavigationController.m','@interface LauncherNavigationController ()', '@interface LauncherNavigationController ()\n@property NSProgress *harborObservedProgress;')
+replace('Natives/LauncherNavigationController.m','@property(nonatomic) MinecraftResourceDownloadTask* task;', '@property NSProgress *harborObservedProgress;\n@property(nonatomic) MinecraftResourceDownloadTask* task;')
 replace('Natives/LauncherNavigationController.m', '''            self.progressViewMain.observedProgress = self.task.progress;
             [self.task.progress addObserver:self
                 forKeyPath:@"fractionCompleted"
