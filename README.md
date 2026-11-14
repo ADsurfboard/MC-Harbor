@@ -314,9 +314,9 @@ Intel 版已在 Rosetta 下校验并启动官方陶瓦、退出房间，并验�
 
 Windows 授权开发职责与现有实现贡献分别记录；平台维护分工不改变项目 GPL 许可。
 
-<img src="https://github.com/ADsurfboard.png?size=128" width="64" height="64" alt="ADsurfboard" style="border-radius:50%">
-
 ### 作者与维护负责人 · ADsurfboard
+
+<img src="https://github.com/ADsurfboard.png?size=128" width="64" height="64" alt="ADsurfboard" style="border-radius:50%">
 
 项目发起、产品方向、主要开发与发布维护。Apple Silicon macOS、Intel macOS、iOS / iPadOS 及其他非 Windows 官方版本继续由 ADsurfboard 独立开发与维护。
 

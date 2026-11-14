@@ -205,8 +205,8 @@ para('来源：MCIM / mcimirror.top；B站 / github.com/bilibili/Index-Translate
 finish(13)
 # 14 - Platform responsibilities
 y=page(14,'DEVELOPMENT','清晰分工，持续维护。','Windows 授权开发职责与现有实现贡献分别记录；平台维护分工不改变项目 GPL 许可。')
-README.append('<img src="https://github.com/ADsurfboard.png?size=128" width="64" height="64" alt="ADsurfboard" style="border-radius:50%">')
 y=section('作者与维护负责人 · ADsurfboard','项目发起、产品方向、主要开发与发布维护。Apple Silicon macOS、Intel macOS、iOS / iPadOS 及其他非 Windows 官方版本继续由 ADsurfboard 独立开发与维护。',y)
+README.insert(len(README)-1,'<img src="https://github.com/ADsurfboard.png?size=128" width="64" height="64" alt="ADsurfboard" style="border-radius:50%">')
 for contributor in people:
     if contributor.get('category')=='developer':y=person(contributor,y)
 y=section('开发分支与当前阶段','Windows 移植在同一仓库 windows 分支开展，工作由时咨月. 负责；iOS / iPadOS 在 codex/ios-port 分支独立推进。此版本交付的是两种 macOS 安装包，iOS 工程和原生运行验证仍在继续，不以界面演示或构建成功替代 Minecraft 实玩结论。',y)
