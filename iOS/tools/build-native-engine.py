@@ -49,6 +49,22 @@ for name in ['HarborEngineAdapter.h','HarborEngineAdapter.m','HarborArchiveGuard
 replace('Natives/ios_uikit_bridge.m','#import "SurfaceViewController.h"','#import "SurfaceViewController.h"\n#import "HarborEngineAdapter.h"')
 replace('Natives/ios_uikit_bridge.m','void launchInitialViewController(UIWindow *window) {\n    window.rootViewController = [[LauncherSplitViewController alloc] initWithStyle:UISplitViewControllerStyleDoubleColumn];','void launchInitialViewController(UIWindow *window) {\n    HBRInstallRoot(window);')
 replace('Natives/ios_uikit_bridge.m','window.rootViewController = [[LauncherSplitViewController alloc] initWithStyle:UISplitViewControllerStyleDoubleColumn];','HBRInstallRoot(window);',count=2)
+# Harbor uses the actual iPhone/iPad idiom and size classes. Upstream's
+# cross-platform overrides force every device and orientation to "regular".
+replace('Natives/UIKit+hook.m', '''    UIUserInterfaceIdiom idiom = getPrefBool(@"debug.debug_ipad_ui") ? UIUserInterfaceIdiomPad : UIUserInterfaceIdiomPhone;
+    [UIDevice.currentDevice _setActiveUserInterfaceIdiom:idiom];
+    [UIScreen.mainScreen _setUserInterfaceIdiom:idiom];''', '''    // Preserve the real iPhone/iPad idiom for native SwiftUI and UIKit.''')
+replace('Natives/UIKit+hook.m', '''@implementation UITraitCollection(hook)
+
+- (UIUserInterfaceSizeClass)horizontalSizeClass {
+    return UIUserInterfaceSizeClassRegular;
+}
+
+- (UIUserInterfaceSizeClass)verticalSizeClass {
+    return UIUserInterfaceSizeClassRegular;
+}
+
+@end''', '''// Native size classes follow device, orientation and iPad window size.''')
 replace('Natives/SurfaceViewController.m','#import "SurfaceViewController.h"','#import "SurfaceViewController.h"\n#import "HarborEngineAdapter.h"')
 replace('Natives/SurfaceViewController.m','[super viewDidAppear:animated];','[super viewDidAppear:animated];\n    HBRInstallGameControls(self);')
 replace('Natives/SurfaceViewController.m','- (void)updateGrabState {','- (void)updateGrabState {\n    HBRUpdateGameGrabState();')
@@ -374,6 +390,28 @@ produced=ENGINE/'artifacts/Payload/AngelAuraAmethyst.app';assert produced.is_dir
 destination=IOS/'build'/('MC-Harbor-'+args.platform+'.app')
 if destination.exists():shutil.rmtree(destination)
 shutil.copytree(produced,destination,symlinks=True)
+# The upstream packaging Makefile rewrites every Mach-O SDK to iOS 16. That
+# opts the main executable out of the new system design even though this app
+# was actually compiled using the current SDK. Restore accurate build metadata
+# ONLY for our newly compiled executable/frameworks, not prebuilt JVMs.
+sdk_version = subprocess.check_output(['xcrun','--sdk',sdk,'--show-sdk-version'],text=True).strip()
+assert re.fullmatch(r'\d+\.\d+(?:\.\d+)?',sdk_version), 'Unexpected Apple SDK version'
+assert int(sdk_version.split('.')[0]) >= 26, 'Native Liquid Glass requires the iOS 26+ SDK'
+native_build_metadata = []
+for binary in [destination/'AngelAuraAmethyst',
+               destination/'Frameworks/HarborIOSUI.framework/HarborIOSUI',
+               destination/'Frameworks/HarborCore.framework/HarborCore']:
+    assert binary.is_file(), 'Missing freshly compiled native binary: '+str(binary)
+    run(['xcrun','vtool','-arch','arm64','-set-build-version',
+         '2' if args.platform=='device' else '7','16.0',sdk_version,
+         '-replace','-output',binary,binary])
+    actual = subprocess.check_output(['xcrun','vtool','-show-build',binary],text=True)
+    actual_sdk = re.search(r'^\s*sdk\s+(\S+)',actual,re.M)
+    minimum = re.search(r'^\s*minos\s+(\S+)',actual,re.M)
+    assert actual_sdk and actual_sdk.group(1) == sdk_version, 'Packaged app lost its actual SDK'
+    assert minimum and minimum.group(1) == '16.0', 'Packaged app changed its compatibility floor'
+    native_build_metadata.append({'binary':str(binary.relative_to(destination)),
+                                  'sdk':sdk_version,'minimumOS':minimum.group(1)})
 notices=destination/'Licenses';notices.mkdir(exist_ok=True)
 shutil.copy2(SOURCE/'LICENSE',notices/'Amethyst-GPL.txt');shutil.copy2(REPO/'LICENSE',notices/'MC-Harbor-GPL.txt')
 for binary in macho_files(destination):
@@ -397,5 +435,6 @@ with zipfile.ZipFile(package) as archive:
     assert archive.testzip() is None,'Packaged app failed ZIP integrity verification'
 with package.open('rb') as stream: digest=hashlib.file_digest(stream,'sha256').hexdigest()
 report={'upstream':UPSTREAM,'platform':args.platform,'app':str(destination),'nativeExecutable':(destination/'AngelAuraAmethyst').is_file(),'frameworks':[x.name for x in (destination/'Frameworks').glob('Harbor*.framework')],'javaRuntimes':[x.name for x in (destination/'java_runtimes').iterdir() if x.is_dir()],'package':package.name,'packageBytes':package.stat().st_size,'packageSHA256':digest,'signing':'ad-hoc; device installation requires personal developer signing','minecraftGameplayVerified':False}
+report.update(nativeBuildMetadata=native_build_metadata, nativeLiquidGlassSDK=True)
 (EVIDENCE/('native-build-'+args.platform+'.json')).write_text(json.dumps(report,indent=2))
 print(json.dumps(report),flush=True)
