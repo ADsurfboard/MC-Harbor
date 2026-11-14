@@ -23,6 +23,8 @@ jobs:
           node-version: '24'
       - name: Verify native Intel runner
         run: test "$(uname -m)" = x86_64
+      - name: Test native wallpaper preview lifecycle
+        run: python3 tools/check-wallpaper-preview.py
       - name: Test native window lifecycle
         run: python3 tools/check-window-lifecycle.py
       - name: Obtain pinned Intel runtime
@@ -61,6 +63,7 @@ jobs:
           python3 tools/check-discovery.py
           python3 tools/check-language-pipeline.py
           python3 tools/check-instance-shortcut.py
+          python3 tools/check-wallpaper-library.py
       - name: Test instance deletion and external authentication
         run: |
           python3 tools/check-instance-deletion.py
@@ -70,3 +73,13 @@ jobs:
           mkdir -p evidence
           node social-cloud/test-worker.mjs
           python3 social-server/test_server.py
+      - name: Retain verified native app and regression evidence
+        if: success()
+        run: ditto -c -k --keepParent 'build/MC Harbor.app' build/MC-Harbor-x86_64-verified.zip
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos-x86_64-build-and-evidence
+          path: |
+            build/MC-Harbor-x86_64-verified.zip
+            evidence/*report.json

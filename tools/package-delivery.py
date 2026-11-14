@@ -12,10 +12,10 @@ ROOT = Path(__file__).resolve().parent.parent
 OUTPUT = Path(os.environ.get('HARBOR_DELIVERY_DIR', ROOT / 'outputs')).resolve()
 APP = ROOT / 'build/MC Harbor.app'
 PDF = ROOT / 'MC-Harbor-Introduction.pdf'
-VERSION = '1.6.2'
+VERSION = '1.7.0'
 APP_ZIP = OUTPUT / f'MC-Harbor-{VERSION}-Intel-macOS12.zip'
 SOURCE_ZIP = OUTPUT / f'MC-Harbor-{VERSION}-Intel-source.zip'
-PDF_OUT = OUTPUT / 'MC-Harbor-Intel-Introduction-1.6.2.pdf'
+PDF_OUT = OUTPUT / 'MC-Harbor-Intel-Introduction-1.7.0.pdf'
 SUMS = OUTPUT / f'SHA256SUMS-{VERSION}-intel.txt'
 
 
@@ -63,7 +63,7 @@ with tempfile.TemporaryDirectory(prefix='mcharbor-intel-delivery-') as temporary
     command('/usr/bin/ditto', str(APP), str(stage / APP.name))
     command('/usr/bin/codesign', '--verify', '--deep', '--strict', str(stage / APP.name))
     shutil.copy2(PDF, stage / PDF_OUT.name)
-    (stage / 'README-Install.txt').write_text('''MC Harbor 1.6.2 Intel 兼容版
+    (stage / 'README-Install.txt').write_text('''MC Harbor 1.7.0 Intel 兼容版
 
 适用 Intel 芯片、macOS 12 或以上。此版本尚未在 macOS 12—14 实机完成界面验收。
 先阅读随包 PDF；备份既有游戏和启动器数据后，再将 MC Harbor.app 放入应用程序文件夹。
