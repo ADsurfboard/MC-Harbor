@@ -4,7 +4,7 @@ import XCTest
     override func setUpWithError() throws { continueAfterFailure = false; XCUIDevice.shared.orientation = .portrait }
     override func tearDownWithError() throws { XCUIDevice.shared.orientation = .portrait }
     func testPhoneAndTabletLibraryKeepLaunchButtonsReachable() throws {
-        let app = XCUIApplication(); app.launch()
+        let app = XCUIApplication(); app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"; app.launch()
         let launch = app.buttons["instance.launch.fabric-example"]
         XCTAssertTrue(launch.waitForExistence(timeout: 15)); XCTAssertTrue(launch.isHittable)
         XCTAssertGreaterThanOrEqual(launch.frame.height, 44)
@@ -22,7 +22,7 @@ import XCTest
         XCUIDevice.shared.orientation = .portrait
     }
     func testTouchEditorPersistsSettingsAndAlwaysKeepsPause() throws {
-        let app = XCUIApplication(); app.launch()
+        let app = XCUIApplication(); app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"; app.launch()
         // iPadOS 26 exposes floating tabs as cells instead of a TabBar.
         // Match the visible labelled control without assuming its AX class.
         let settings = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "设置")).firstMatch

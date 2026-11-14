@@ -39,25 +39,17 @@ for family,device_type,runtime in choices:
   run(['xcrun','simctl','bootstatus',device,'-b'],timeout=300)
   phase='install-preflight'
   run(['xcrun','simctl','install',device,str(ROOT/'DerivedData/Build/Products/Debug-iphonesimulator/HarborIOSHarness.app')],timeout=300)
-  phase='launch-preflight'
+  # Let XCTest own cold launch and process lifecycle. A separate simctl launch
+  # can block in fresh iPad SpringBoard snapshot generation before our process
+  # even starts. The same root marker is checked after all real UI assertions.
+  phase='xctest-cold-launch'
   container=Path(subprocess.check_output(['xcrun','simctl','get_app_container',device,'net.morben.harbor.ios.qa','data'],text=True,timeout=30).strip())
   ready=container/'Library/Application Support/NativeUITest/.native-smoke-ready'
-  assert not ready.exists(),'A fresh preflight marker must not already exist'
-  environment=os.environ.copy();environment['SIMCTL_CHILD_HARBOR_SMOKE_TEST']='1'
-  run(['xcrun','simctl','launch',device,'net.morben.harbor.ios.qa'],env=environment,timeout=120)
-  # simctl launch returns a PID before UIKit finishes its first scene. Sending
-  # terminate immediately races SpringBoard's launch assertion on fresh iPads.
-  # Wait for the actual shared root instead of assuming PID means UI readiness.
-  deadline=time.monotonic()+120
-  while time.monotonic()<deadline:
-   if ready.is_file() and ready.read_text()=='HARBOR_ROOT_READY':break
-   time.sleep(0.25)
-  else:raise TimeoutError('UI preflight did not reach the actual SwiftUI root')
-  status['rootAppeared']=True
-  run(['xcrun','simctl','terminate',device,'net.morben.harbor.ios.qa'],timeout=90)
-  status['preflightPassed']=True;phase='xctest'
+  assert not ready.exists(),'A fresh cold-launch marker must not already exist'
   completed=subprocess.run(['xcodebuild','-project','MCHarborIOS.xcodeproj','-scheme','HarborIOSHarness','-destination','platform=iOS Simulator,id='+device,'-parallel-testing-enabled','NO','-maximum-concurrent-test-simulator-destinations','1','-derivedDataPath','DerivedData','-resultBundlePath',str(result),'CODE_SIGNING_ALLOWED=NO','test'],cwd=ROOT,timeout=900)
-  status['passed']=completed.returncode==0
+  status['rootAppeared']=ready.is_file() and ready.read_text()=='HARBOR_ROOT_READY'
+  status['passed']=completed.returncode==0 and status['rootAppeared']
+  if completed.returncode==0:assert status['rootAppeared'],'Real UI tests did not create the shared-root marker'
  except Exception as error:
   status['error']=str(error);raise
  finally:
