@@ -30,7 +30,7 @@ struct HarborFolderContents: View {
                 if folder?.mods.isEmpty == true {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("这个模组夹还是空的").font(.headline)
-                        Text("点右上角“添加”，可选择多个 JAR 文件，或一次收藏一个实例里的全部模组。")
+                        Text("点“添加模组”，可选择多个 JAR 文件，或一次收藏一个实例里的全部模组。")
                             .font(.subheadline).foregroundStyle(.secondary)
                     }.padding(.vertical, 22).listRowBackground(Color.clear)
                 }
@@ -73,18 +73,21 @@ struct HarborFolderContents: View {
             .searchable(text: $query, prompt: "搜索名称、版本或简介")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("完成") { dismiss() }.frame(minHeight: 44) }
-                ToolbarItem(placement: .navigationBarTrailing) {
+            }
+            .safeAreaInset(edge: .top) {
+                HStack(spacing: 14) {
                     Button(selecting ? "取消选择" : "选择") { selecting.toggle(); selected.removeAll() }
-                        .frame(minHeight: 44).disabled(model.busy || folder?.mods.isEmpty != false)
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
+                        .frame(minHeight: 44).harborGlassButton()
+                        .disabled(model.busy || folder?.mods.isEmpty != false)
+                    Spacer(minLength: 8)
                     Menu {
                         Button { showImporter = true } label: { Label("从文件收藏模组", systemImage: "doc.badge.plus") }
                         Button { instanceAction = .collect } label: { Label("收藏实例的全部模组", systemImage: "square.stack.3d.up") }
                         NavigationLink { HarborFolderDisplaySettings() } label: { Label("设置列表信息量", systemImage: "slider.horizontal.3") }
-                    } label: { Image(systemName: "plus").frame(width: 44, height: 44).contentShape(Rectangle()) }
-                        .accessibilityLabel("添加模组").disabled(model.busy)
-                }
+                    } label: {
+                        Label("添加模组", systemImage: "plus").frame(minHeight: 44).contentShape(Rectangle())
+                    }.harborGlassButton(prominent: true).disabled(model.busy)
+                }.padding(.horizontal, 18).padding(.vertical, 8)
             }
             .safeAreaInset(edge: .bottom) {
                 if selecting && !selected.isEmpty {

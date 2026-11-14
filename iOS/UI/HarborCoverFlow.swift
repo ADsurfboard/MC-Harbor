@@ -91,6 +91,7 @@ private struct CoverFlowArtwork: View {
                 .multilineTextAlignment(.center).frame(maxWidth: .infinity)
         }.padding(18)
             .background(LinearGradient(colors: [Color.white.opacity(scheme == .dark ? 0.08 : 0.28), .clear], startPoint: .topLeading, endPoint: .bottomTrailing))
+            .clipShape(RoundedRectangle(cornerRadius: 24))
             .harborGlass(radius: 24)
     }
 }
@@ -177,7 +178,8 @@ private struct NativeCoverFlow: UIViewRepresentable {
             let index = path.item % items.count
             let instance = items[index]
             cell.contentConfiguration = UIHostingConfiguration { CoverFlowArtwork(instance: instance) }.margins(.all, 0)
-            cell.backgroundColor = .clear
+            cell.backgroundColor = .clear; cell.contentView.backgroundColor = .clear
+            cell.backgroundConfiguration = .clear()
             cell.accessibilityIdentifier = "library.cover." + String(path.item)
             cell.accessibilityLabel = instance.name
             return cell

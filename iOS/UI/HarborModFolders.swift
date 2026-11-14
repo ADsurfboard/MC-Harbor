@@ -182,6 +182,7 @@ struct HarborFoldersView: View {
     @ObservedObject var model: HarborFolderLibrary
     @State private var active: ModFolder?
     @State private var editing: ModFolder?
+    @State private var pendingDeletion: ModFolder?
     @State private var newFolder = false
     @State private var query = ""
     var body: some View {
@@ -194,7 +195,7 @@ struct HarborFoldersView: View {
                             Button { active = folder } label: { Label("打开模组夹", systemImage: "folder") }
                             Button { editing = folder } label: { Label("名称与颜色", systemImage: "paintpalette") }
                             Button(role: .destructive) {
-                                model.run("删除模组夹") { try await $0.delete(folder.id); return "已移除模组夹。实例和原始模组未修改。" }
+                                pendingDeletion = folder
                             } label: { Label("删除模组夹", systemImage: "trash") }
                         }
                         .dropDestination(for: HarborModDrag.self) { items, _ in
@@ -214,21 +215,35 @@ struct HarborFoldersView: View {
             }
         }.background { HarborPageBackdrop() }.navigationTitle("模组夹")
         .searchable(text: $query, prompt: "搜索模组夹")
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button { newFolder = true } label: { Image(systemName: "folder.badge.plus").frame(width: 44, height: 44).contentShape(Rectangle()) }
-                    .accessibilityLabel("新建模组夹").accessibilityIdentifier("folder.new")
-            }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                NavigationLink { HarborFolderDisplaySettings() } label: { Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44) }
-                    .accessibilityLabel("模组夹显示设置")
-            }
+        .safeAreaInset(edge: .top) {
+            // Navigation-bar items are visually capped at 36pt on iOS 26.
+            // Keep collection actions in the content safe area with real 44pt targets.
+            HStack(spacing: 14) {
+                Button { newFolder = true } label: {
+                    Label("新建模组夹", systemImage: "folder.badge.plus")
+                        .frame(minHeight: 44).contentShape(Rectangle())
+                }.harborGlassButton(prominent: true)
+                    .accessibilityIdentifier("folder.new")
+                Spacer(minLength: 8)
+                NavigationLink { HarborFolderDisplaySettings() } label: {
+                    Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44).contentShape(Rectangle())
+                }.harborGlassButton().accessibilityLabel("模组夹显示设置")
+            }.padding(.horizontal, 20).padding(.vertical, 8)
         }.task { await model.load() }
         .sheet(isPresented: $newFolder) { HarborFolderEditor(model: model, folder: nil).harborMotionPolicy() }
         .sheet(item: $editing) { HarborFolderEditor(model: model, folder: $0).harborMotionPolicy() }
         .sheet(item: $active) { folder in
             HarborFolderContents(model: model, folderID: folder.id).harborMotionPolicy()
         }
+        .confirmationDialog("删除“\(pendingDeletion?.name ?? "")”？", isPresented: Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } }), titleVisibility: .visible) {
+            if let folder = pendingDeletion {
+                Button("删除模组夹", role: .destructive) {
+                    model.run("删除模组夹") { try await $0.delete(folder.id); return "已移除模组夹。实例和原始模组未修改。" }
+                    pendingDeletion = nil
+                }
+            }
+            Button("取消", role: .cancel) { pendingDeletion = nil }
+        } message: { Text("只删除这个模组夹的名称与收藏列表，不删除实例里的模组，也不影响其他模组夹。") }
         .modifier(HarborFolderStatus(model: model))
     }
 }

@@ -28,6 +28,7 @@ def booted_devices():
 def shutdown_ci_devices():
  run(['xcrun','simctl','shutdown','all'],timeout=120)
  if (Path.home()/'Library/Developer/XCTestDevices').exists():run(['xcrun','simctl','--set','testing','shutdown','all'],timeout=120)
+failures=[]
 for family,device_type,runtime in choices:
  # A fresh owned simulator avoids previous runner state without erasing any
  # user's device. Explicit bootstatus and a cold preflight keep first-boot OS
@@ -70,7 +71,7 @@ for family,device_type,runtime in choices:
   status['passed']=completed.returncode==0 and status['rootAppeared']
   if completed.returncode==0:assert status['rootAppeared'],'Real UI tests did not create the shared-root marker'
  except Exception as error:
-  status['error']=str(error);raise
+  status['error']=str(error)
  finally:
   status.update(phase=phase,elapsedSeconds=round(time.monotonic()-started,2))
   (EVIDENCE/('ui-'+family+'.json')).write_text(json.dumps(status,indent=2))
@@ -99,4 +100,5 @@ for family,device_type,runtime in choices:
     status['hostMemoryAfter']=subprocess.check_output(['sysctl','vm.swapusage'],text=True,timeout=10).strip()
    except Exception as error:status['cleanupErrors'].append('Inventory: '+str(error))
    (EVIDENCE/('ui-'+family+'.json')).write_text(json.dumps(status,indent=2))
- if completed.returncode:raise SystemExit(completed.returncode)
+ if not status['passed']:failures.append(family)
+if failures:raise SystemExit('UI validation failed: '+', '.join(failures))

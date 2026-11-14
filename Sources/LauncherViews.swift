@@ -148,11 +148,9 @@ struct ProjectedGlassPlate:Shape {
 }
 struct NativeBackdrop:View {
     @ObservedObject var model:LauncherModel
-    @Environment(\.scenePhase) private var phase
     var body:some View{ZStack{
         HarborWallpaperView(settings:model.preferences.wallpaper,appearance:model.appearance,pauseWhenInactive:true,animationEnabled:model.preferences.wallpaper.kind == .video && !model.preferences.performanceMode)
         if model.appearance == .theme{model.themeColor.opacity(0.24).allowsHitTesting(false)}
-        if model.preferences.fluidBackground && model.preferences.wallpaper.kind == .harbor{FluidField(dark:model.appearance == .dark,color:model.themeRuntime.effects,active:phase == .active && !model.preferences.reduceMotion && !model.preferences.performanceMode).opacity(0.62)}
     }.ignoresSafeArea()}
 }
 struct FluidField:View {

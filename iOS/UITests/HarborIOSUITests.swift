@@ -24,6 +24,7 @@ import XCTest
         XCTAssertTrue(add.isHittable); XCTAssertGreaterThanOrEqual(add.frame.height, 44)
         capture("folder-empty-foreground-portrait")
         XCUIDevice.shared.orientation = .landscapeLeft
+        waitForLandscape(app)
         XCTAssertTrue(add.waitForExistence(timeout: 5)); XCTAssertTrue(add.isHittable)
         capture("folder-empty-foreground-landscape")
         app.buttons["完成"].tap(); XCUIDevice.shared.orientation = .portrait
@@ -68,6 +69,7 @@ import XCTest
         assertNeighborCovers(flow)
         capture("coverflow-horizontal-selection")
         XCUIDevice.shared.orientation = .landscapeLeft
+        waitForLandscape(app)
         capture("coverflow-landscape-before-scroll")
         if !previous.isHittable { app.swipeUp() }
         capture("coverflow-landscape-after-scroll")
@@ -140,6 +142,7 @@ import XCTest
         XCTAssertTrue(app.staticTexts["触控验证 · Fabric"].exists)
         capture("library-portrait")
         XCUIDevice.shared.orientation = .landscapeLeft
+        waitForLandscape(app)
         XCTAssertTrue(launch.waitForExistence(timeout: 5))
         capture("library-landscape-before-scroll")
         print("HARBOR_LANDSCAPE before app=\(app.frame) button=\(launch.frame)")
@@ -167,8 +170,20 @@ import XCTest
         XCTAssertEqual(app.textFields["touch.layout.name"].value as? String, "Harbor Touch QA")
         capture("touch-editor-restored")
     }
+    private func waitForLandscape(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        // Device orientation requests are asynchronous. Wait for the actual
+        // application viewport before measuring covers or recording evidence.
+        let rotated = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            app.frame.width > app.frame.height
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [rotated], timeout: 15), .completed, file: file, line: line)
+    }
     private func capture(_ name: String) {
-        let attachment = XCTAttachment(screenshot: XCUIApplication().screenshot()); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
+        // App-bounded captures can crop a rotated scene in its old portrait
+        // coordinates. Capture the whole real simulator display instead.
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
+        print("HARBOR_CAPTURE \(name) viewport=\(XCUIApplication().frame) orientation=\(XCUIDevice.shared.orientation.rawValue)")
     }
     private func assertNeighborCovers(_ flow: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
         let viewport = flow.frame

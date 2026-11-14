@@ -106,14 +106,16 @@ struct HarborPhoneRoot: View {
         TabView {
             NavigationStack {
                 List {
-                    Section {
-                        HStack(alignment: .center, spacing: 16) {
-                            HarborBrandArtwork().frame(width: 46, height: 46)
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text("MC Harbor").font(verticalSizeClass == .compact ? .title2.bold() : .largeTitle.bold())
-                                if verticalSizeClass != .compact { Text("Minecraft，随身出发。").font(.subheadline).foregroundStyle(.secondary) }
-                            }
-                        }.padding(.vertical, verticalSizeClass == .compact ? 2 : 18).listRowBackground(Color.clear)
+                    if !coverFlow || verticalSizeClass != .compact {
+                        Section {
+                            HStack(alignment: .center, spacing: coverFlow ? 12 : 16) {
+                                HarborBrandArtwork().frame(width: coverFlow ? 32 : 46, height: coverFlow ? 32 : 46)
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text("MC Harbor").font(coverFlow || verticalSizeClass == .compact ? .title2.bold() : .largeTitle.bold())
+                                    if !coverFlow && verticalSizeClass != .compact { Text("Minecraft，随身出发。").font(.subheadline).foregroundStyle(.secondary) }
+                                }
+                            }.padding(.vertical, coverFlow || verticalSizeClass == .compact ? 2 : 18).listRowBackground(Color.clear)
+                        }
                     }
                     Section("游戏库") {
                         if let error = library.error { Text(error).foregroundStyle(.red).textSelection(.enabled) }

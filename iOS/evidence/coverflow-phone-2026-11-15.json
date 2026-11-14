@@ -1,0 +1,19 @@
+{
+  "source": "a91817995000678897fb43fd409ac5d0ee7b909e",
+  "run": "https://github.com/ADsurfboard/MC-Harbor/actions/runs/43619519859",
+  "device": "iPhone 17 Pro / iOS 26.2 Simulator",
+  "coreTests": 26,
+  "phoneUITests": {
+    "passed": 4,
+    "failed": 1,
+    "failure": "New mod-folder navigation item frame 36pt < required 44pt; content safe-area action bar fix pending rerun"
+  },
+  "coverFlowTest": "passed: physical horizontal drag, both neighboring covers, landscape previous button, restore list",
+  "optimizationTest": "passed: full label hit, retain native glass, persist preferences across relaunch",
+  "screenshotsInspected": [
+    "735025C0-6E9C-4A23-962C-ECF09BDCBD02.png",
+    "81FEC936-9815-40DF-9928-307135997CD1.png"
+  ],
+  "followUp": "Clip rectangular gradient, clear UIKit cell background, compact brand header and await actual landscape viewport before screenshot. These follow-up changes are not covered by the a918 run.",
+  "minecraftGameplayVerified": false
+}
