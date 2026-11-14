@@ -15,9 +15,19 @@ for family in ['iPhone','iPad']:
   found=next((d for d in devices if d['name'].startswith(family)),None)
   if found:choices.append((family,found['deviceTypeIdentifier'],runtime['identifier']));break
 assert len(choices)==2,'Both iPhone and iPad simulator runtimes are required'
+def device_inventory(device_set=None):
+ command=['xcrun','simctl']+(['--set',device_set] if device_set else [])
+ result=subprocess.run(command+['list','devices','--json'],capture_output=True,text=True,timeout=30)
+ # Xcode maintains a separate test-clone device set. On a clean runner it
+ # need not exist yet; other inventory errors remain real failures.
+ if result.returncode and device_set=='testing' and not (Path.home()/'Library/Developer/XCTestDevices').exists():return []
+ result.check_returncode()
+ return [dict(d,deviceSet=device_set) for group in json.loads(result.stdout)['devices'].values() for d in group]
 def booted_devices():
- inventory=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','--json'],timeout=30))
- return [{'name':d['name'],'udid':d['udid']} for group in inventory['devices'].values() for d in group if d['state']=='Booted']
+ return [{'name':d['name'],'udid':d['udid'],'deviceSet':d['deviceSet']} for d in device_inventory()+device_inventory('testing') if d['state']=='Booted']
+def shutdown_ci_devices():
+ run(['xcrun','simctl','shutdown','all'],timeout=120)
+ if (Path.home()/'Library/Developer/XCTestDevices').exists():run(['xcrun','simctl','--set','testing','shutdown','all'],timeout=120)
 for family,device_type,runtime in choices:
  # A fresh owned simulator avoids previous runner state without erasing any
  # user's device. Explicit bootstatus and a cold preflight keep first-boot OS
@@ -27,7 +37,7 @@ for family,device_type,runtime in choices:
  # Local runs continue to own just the UUID created below.
  before=booted_devices()
  if os.environ.get('GITHUB_ACTIONS')=='true':
-  run(['xcrun','simctl','shutdown','all'],timeout=120)
+  shutdown_ci_devices()
   assert not booted_devices(),'CI simulator clones were not released'
  device_name='Harbor UI '+family+' '+str(uuid.uuid4())[:8]
  device=subprocess.check_output(['xcrun','simctl','create',device_name,device_type,runtime],text=True,timeout=60).strip()
@@ -50,17 +60,16 @@ for family,device_type,runtime in choices:
   completed=subprocess.run(['xcodebuild','-project','MCHarborIOS.xcodeproj','-scheme','HarborIOSHarness','-destination','platform=iOS Simulator,id='+device,'-parallel-testing-enabled','NO','-maximum-concurrent-test-simulator-destinations','1','-derivedDataPath','DerivedData','-resultBundlePath',str(result),'CODE_SIGNING_ALLOWED=NO','test'],cwd=ROOT,timeout=900)
   # Xcode may reinstall into a new data container or run on its own clone.
   # Resolve after XCTest, and inspect only this run's uniquely named devices.
-  inventory=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','--json'],timeout=30))
-  candidates=[d for group in inventory['devices'].values() for d in group
-              if d['udid']==device or device_name in d['name']]
+  candidates=[d for d in device_inventory()+device_inventory('testing') if d['udid']==device or device_name in d['name']]
   status['rootAppeared']=False
-  status['rootCandidates']=[{'name':d['name'],'udid':d['udid']} for d in candidates]
+  status['rootCandidates']=[{'name':d['name'],'udid':d['udid'],'deviceSet':d['deviceSet']} for d in candidates]
   for candidate in candidates:
-   located=subprocess.run(['xcrun','simctl','get_app_container',candidate['udid'],'net.morben.harbor.ios.qa','data'],capture_output=True,text=True,timeout=30)
+   command=['xcrun','simctl']+(['--set',candidate['deviceSet']] if candidate['deviceSet'] else [])
+   located=subprocess.run(command+['get_app_container',candidate['udid'],'net.morben.harbor.ios.qa','data'],capture_output=True,text=True,timeout=30)
    if located.returncode:continue
    current=Path(located.stdout.strip())/'Library/Application Support/NativeUITest/.native-smoke-ready'
    if current.is_file() and current.read_text()=='HARBOR_ROOT_READY':
-    status.update(rootAppeared=True,rootDevice=candidate['udid'],dataContainerChanged=current!=ready)
+    status.update(rootAppeared=True,rootDevice=candidate['udid'],rootDeviceSet=candidate['deviceSet'],dataContainerChanged=current!=ready)
     break
   status['passed']=completed.returncode==0 and status['rootAppeared']
   if completed.returncode==0:assert status['rootAppeared'],'Real UI tests did not create the shared-root marker'
@@ -78,7 +87,9 @@ for family,device_type,runtime in choices:
   finally:
    # Only delete this script's UUID. Never shut down a local user's simulators.
    commands=[['xcrun','simctl','shutdown',device],['xcrun','simctl','delete',device]]
-   if os.environ.get('GITHUB_ACTIONS')=='true':commands.insert(0,['xcrun','simctl','shutdown','all'])
+   if os.environ.get('GITHUB_ACTIONS')=='true':
+    commands.insert(0,['xcrun','simctl','shutdown','all'])
+    if (Path.home()/'Library/Developer/XCTestDevices').exists():commands.insert(0,['xcrun','simctl','--set','testing','shutdown','all'])
    for command in commands:
     try:
      cleanup=subprocess.run(command,capture_output=True,text=True,timeout=120)

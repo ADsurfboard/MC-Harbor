@@ -102,6 +102,9 @@ jobs:
         run: |
           xcrun simctl list devices booted --json
           xcrun simctl shutdown all
+          if [ -d "$HOME/Library/Developer/XCTestDevices" ]; then
+            xcrun simctl --set testing shutdown all
+          fi
       - uses: actions/setup-java@v4
         id: native_java
         if: ${{ !cancelled() && steps.ui_build.outcome == 'success' }}
