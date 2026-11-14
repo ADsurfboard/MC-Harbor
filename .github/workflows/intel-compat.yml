@@ -76,10 +76,11 @@ jobs:
       - name: Retain verified native app and regression evidence
         if: success()
         run: ditto -c -k --keepParent 'build/MC Harbor.app' build/MC-Harbor-x86_64-verified.zip
-      - uses: actions/upload-artifact@v4
+      - uses: ./.github/actions/upload-artifact-retry
         if: always()
         with:
           name: macos-x86_64-build-and-evidence
+          compression-level: 0
           path: |
             build/MC-Harbor-x86_64-verified.zip
             evidence/*report.json
