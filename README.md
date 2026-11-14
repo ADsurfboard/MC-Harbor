@@ -1,8 +1,8 @@
 # MC Harbor
 
-1.7.0 · Apple Silicon / Intel 双版本
+1.7.1 · Apple Silicon / Intel 双版本
 
-[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/tag/v1.7.0) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.7.0/MC-Harbor-Introduction-1.7.0.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)
+[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/tag/v1.7.1) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.7.1/MC-Harbor-Introduction-1.7.1.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)
 
 以下正文与随包 PDF 同版。
 
@@ -10,7 +10,7 @@
 保留 HMCL 的游戏能力，采用真实 WinHarbor 原生界面，
 把账号、下载、实例资源与汉化工作集中在一个窗口。
 
-1.7.0 · Apple Silicon / Intel 双版本
+1.7.1 · Apple Silicon / Intel 双版本
 Apple Silicon：macOS 26 起；Intel：macOS 12 起
 
 ## 日常操作，一处完成。
@@ -35,7 +35,7 @@ Apple Silicon：macOS 26 起；Intel：macOS 12 起
 
 ### 外观与声音
 
-主题与反色、图片 / 视频背景、三层叠片和毛玻璃。默认保留动画、四种播报与音效；可选“独家优化”冻结动态并取消过渡。已移除彩虹角。
+主题与反色、图片 / 视频背景、三层叠片和毛玻璃。默认保留动画、四种播报与音效；可选“独家优化”冻结动态并取消过渡。已移除彩虹角及全局流体背景。
 
 ### 存档与前置补全
 
@@ -346,3 +346,5 @@ Windows 移植在同一仓库 windows 分支开展，工作由时咨月. 负责�
 [完整贡献名单](CONTRIBUTORS.md)
 
 如果喜欢，记得 Star 我（
+
+[Plus Version 后续设计规范](docs/PLUS-VERSION.md)（普通版与完整 iOS 正式发布后开发）。

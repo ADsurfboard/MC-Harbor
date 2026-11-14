@@ -10,7 +10,7 @@ enum HarborSettingsIndex {
         .init(title:"主题范围与反色",section:"外观",anchor:"主题范围与反色",keywords:"反色 亮度 饱和度 文字 字体 对比度 按钮 图标 强调文字 辅助文字 背景 边框 染色 自定义"),
         .init(title:"深色、浅色与主题外观",section:"外观",anchor:"外观",keywords:"深色 浅色 通透 模式"),
         .init(title:"毛玻璃与玻璃通透",section:"外观",anchor:"背景",keywords:"磨砂 材质 透明 通透度"),
-        .init(title:"壁纸库与流体背景",section:"外观",anchor:"背景",keywords:"图片 视频 动态 壁纸柔化 窗口透明 后景材质"),
+        .init(title:"壁纸库与背景",section:"外观",anchor:"背景",keywords:"图片 视频 动态 壁纸柔化 窗口透明 后景材质"),
         .init(title:"模组夹信息显示",section:"外观",anchor:"模组夹信息显示",keywords:"图标 名称 加载器 Forge Fabric 模组版本 Minecraft 收藏时间 简介 作者 仅名称"),
         .init(title:"独家优化",section:"外观",anchor:"动态与声音",keywords:"性能 轻量 流畅 卡顿 静态 无动画 关闭动效"),
         .init(title:"减少动态效果",section:"外观",anchor:"动态与声音",keywords:"动画 流畅 性能 动效"),
