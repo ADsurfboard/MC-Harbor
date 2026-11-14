@@ -11,13 +11,13 @@ from reportlab.platypus import Paragraph
 from reportlab.lib.styles import ParagraphStyle
 
 ROOT=Path(__file__).resolve().parent.parent
-OUT=Path(os.environ.get('HARBOR_DOC_OUTPUT',str(ROOT/'outputs/MC-Harbor-Introduction-1.7.0.pdf')));OUT.parent.mkdir(parents=True,exist_ok=True)
+OUT=Path(os.environ.get('HARBOR_DOC_OUTPUT',str(ROOT/'outputs/MC-Harbor-Introduction-1.7.1.pdf')));OUT.parent.mkdir(parents=True,exist_ok=True)
 pdfmetrics.registerFont(TTFont('CJK','/System/Library/Fonts/Supplemental/Arial Unicode.ttf'))
 W,H=595.276,841.89
 INK=HexColor('#10271E');GREEN=HexColor('#29825B');MUTED=HexColor('#5C6E65');PALE=HexColor('#EDF4EE');LINE=HexColor('#D9E5DD')
 DOC=canvas.Canvas(str(OUT),pagesize=(W,H),pageCompression=1)
-DOC.setTitle('MC Harbor | 启动器介绍');DOC.setAuthor('ADsurfboard');DOC.setSubject('1.7.0 双架构版：原生 macOS Minecraft 启动器、功能与汉化')
-README=['# MC Harbor','1.7.0 · Apple Silicon / Intel 双版本','[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/tag/v1.7.0) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.7.0/MC-Harbor-Introduction-1.7.0.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)','以下正文与随包 PDF 同版。']
+DOC.setTitle('MC Harbor | 启动器介绍');DOC.setAuthor('ADsurfboard');DOC.setSubject('1.7.1 双架构版：原生 macOS Minecraft 启动器、功能与汉化')
+README=['# MC Harbor','1.7.1 · Apple Silicon / Intel 双版本','[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/tag/v1.7.1) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.7.1/MC-Harbor-Introduction-1.7.1.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)','以下正文与随包 PDF 同版。']
 STYLE=ParagraphStyle('body',fontName='CJK',fontSize=10.4,leading=17.4,textColor=INK,wordWrap='CJK',spaceAfter=0)
 
 def txt(text,x,y,size=11,color=INK,font='CJK'):
@@ -39,7 +39,7 @@ def page(number,tag,title,description):
     y=para(description,46,H-132,W-92,11,MUTED)
     rule(y-21);return y-52
 def finish(number):
-    rule(52);txt('MC Harbor  ·  1.7.0  ·  2026.11.14',46,33,8,MUTED)
+    rule(52);txt('MC Harbor  ·  1.7.1  ·  2026.11.15',46,33,8,MUTED)
     txt(f'{number:02d} / 14',W-86,33,8,MUTED);DOC.showPage()
 def section(title,text,y):
     README.append('### '+title)
@@ -67,8 +67,8 @@ para('为 macOS 重新设计的 Minecraft 启动器。\n保留 HMCL 的游戏能
 DOC.setStrokeColor(HexColor('#375448'));DOC.line(48,269,W-48,269)
 for x,big,small in [(48,'SwiftUI','原生界面'),(218,'HMCL','稳定内核'),(388,'Frosted','原生磨砂')]:
     txt(big,x,231,17,HexColor('#F4F8F4'));txt(small,x,207,10,HexColor('#A9C7B4'))
-para('1.7.0 · Apple Silicon / Intel 双版本\nApple Silicon：macOS 26 起；Intel：macOS 12 起',48,132,W-96,10,HexColor('#ADC4B5'),17)
-txt('ADsurfboard / Apple Silicon + Intel / 2026.11.14',48,51,9,HexColor('#A9C7B4'));txt('01 / 14',W-91,51,9,HexColor('#A9C7B4'));DOC.showPage()
+para('1.7.1 · Apple Silicon / Intel 双版本\nApple Silicon：macOS 26 起；Intel：macOS 12 起',48,132,W-96,10,HexColor('#ADC4B5'),17)
+txt('ADsurfboard / Apple Silicon + Intel / 2026.11.15',48,51,9,HexColor('#A9C7B4'));txt('01 / 14',W-91,51,9,HexColor('#A9C7B4'));DOC.showPage()
 
 # 02 - Features
 y=page(2,'DAILY USE','日常操作，一处完成。','以实例为中心。默认加载器图标高清重绘，保留实例资源原图标、可视化资源管理与明确的下载目标。')
@@ -79,7 +79,7 @@ y-=147
 card('下载中心','中英文搜索、简介汉化、模组推荐、备注搜索和优化 / PVP 等分区。下载开始有提示；游戏运行时先下载，退出后再安装。',46,y,col,151)
 card('账号与角色','导入原 HMCL 账号；支持 Microsoft、离线及自定义 authlib-injector API 外置登录。真实皮肤头像与 3D 预览。',58+col,y,col,151)
 y-=165
-card('外观与声音','主题与反色、图片 / 视频背景、三层叠片和毛玻璃。默认保留动画、四种播报与音效；可选“独家优化”冻结动态并取消过渡。已移除彩虹角。',46,y,col,151)
+card('外观与声音','主题与反色、图片 / 视频背景、三层叠片和毛玻璃。默认保留动画、四种播报与音效；可选“独家优化”冻结动态并取消过渡。已移除彩虹角及全局流体背景。',46,y,col,151)
 card('存档与前置补全','原生编辑模式、天数、经验和生命等状态。可选前置补全在启动前检测并补齐必需模组；另有存档备份与便携模式。',58+col,y,col,151)
 y-=183
 para('操作细节：实例更多按钮扩大为 38pt 圆形；按钮命中覆盖完整外形与内边距。下载搜索结果按整个圆角矩形选择，空白部分也可点击。',46,y,W-92,10,MUTED)
@@ -215,5 +215,5 @@ source('平台分工与维护范围','https://github.com/ADsurfboard/MC-Harbor/b
 README.append('[iOS / iPadOS 开发分支](https://github.com/ADsurfboard/MC-Harbor/tree/codex/ios-port) · [Windows 开发分支](https://github.com/ADsurfboard/MC-Harbor/tree/windows)')
 finish(14)
 DOC.save()
-README += ['## 构建与许可','构建、开发测试、音效授权与免费服务边界详见 [BUILDING.md](BUILDING.md) 和 [docs/SERVICES.md](docs/SERVICES.md)。本工程为 GPL-3.0-or-later；第三方素材按各自许可分发。','[完整贡献名单](CONTRIBUTORS.md)','如果喜欢，记得 Star 我（']
+README += ['## 构建与许可','构建、开发测试、音效授权与免费服务边界详见 [BUILDING.md](BUILDING.md) 和 [docs/SERVICES.md](docs/SERVICES.md)。本工程为 GPL-3.0-or-later；第三方素材按各自许可分发。','[完整贡献名单](CONTRIBUTORS.md)','[Plus Version 后续设计规范](docs/PLUS-VERSION.md)（普通版与完整 iOS 正式发布后开发）。','如果喜欢，记得 Star 我（']
 (ROOT/'README.md').write_text('\n\n'.join(README)+'\n');print(OUT)
