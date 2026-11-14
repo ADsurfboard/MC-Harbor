@@ -35,6 +35,15 @@ def replace(relative,old,new,count=1):
     p=ENGINE/relative;s=p.read_text();assert s.count(old)==count,(relative,s.count(old),old[:80])
     p.write_text(s.replace(old,new));patches.append({'file':relative,'replacements':count})
 
+# javac resolves dependent sources implicitly. The upstream per-file rules share
+# build/classes, so parallel javac processes can truncate each other's output.
+# Serialize this Java sub-make only; native C/C++ compilation remains bounded
+# and parallel. Keep the empty-class gate and order it after all class writes.
+replace('JavaApp/Makefile', '# Prerequisite variables',
+        '.NOTPARALLEL:\n\n# Prerequisite variables')
+replace('JavaApp/Makefile', 'check_empty_classes:',
+        'check_empty_classes: $(CLASSES)')
+
 for name in ['HarborEngineAdapter.h','HarborEngineAdapter.m','HarborArchiveGuard.h','HarborArchiveGuard.m','HarborAccountTokenStore.h','HarborAccountTokenStore.m','HarborModpackMetadata.h','HarborModpackMetadata.m']:
     shutil.copy2(IOS/'Native'/name,ENGINE/'Natives'/name)
 replace('Natives/ios_uikit_bridge.m','#import "SurfaceViewController.h"','#import "SurfaceViewController.h"\n#import "HarborEngineAdapter.h"')
