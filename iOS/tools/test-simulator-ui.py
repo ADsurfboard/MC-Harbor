@@ -15,13 +15,24 @@ for family in ['iPhone','iPad']:
   found=next((d for d in devices if d['name'].startswith(family)),None)
   if found:choices.append((family,found['deviceTypeIdentifier'],runtime['identifier']));break
 assert len(choices)==2,'Both iPhone and iPad simulator runtimes are required'
+def booted_devices():
+ inventory=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','--json'],timeout=30))
+ return [{'name':d['name'],'udid':d['udid']} for group in inventory['devices'].values() for d in group if d['state']=='Booted']
 for family,device_type,runtime in choices:
  # A fresh owned simulator avoids previous runner state without erasing any
  # user's device. Explicit bootstatus and a cold preflight keep first-boot OS
  # migration outside XCTest's shorter app-launch progress deadline.
+ # XCTest may create its own simulator clone even with one destination. Only
+ # on an ephemeral CI machine may we release all such devices between families.
+ # Local runs continue to own just the UUID created below.
+ before=booted_devices()
+ if os.environ.get('GITHUB_ACTIONS')=='true':
+  run(['xcrun','simctl','shutdown','all'],timeout=120)
+  assert not booted_devices(),'CI simulator clones were not released'
  device=subprocess.check_output(['xcrun','simctl','create','Harbor UI '+family+' '+str(uuid.uuid4())[:8],device_type,runtime],text=True,timeout=60).strip()
  result=EVIDENCE/('ui-'+family+'.xcresult')
- status={'family':family,'device':device,'runtime':runtime,'resultBundle':str(result),'passed':False}
+ status={'family':family,'device':device,'runtime':runtime,'resultBundle':str(result),'passed':False,'bootedDevicesBefore':before,'cleanupErrors':[]}
+ status['hostMemoryBefore']=subprocess.check_output(['sysctl','vm.swapusage'],text=True,timeout=10).strip()
  phase='boot';started=time.monotonic();completed=None
  try:
   run(['xcrun','simctl','boot',device],timeout=60)
@@ -59,7 +70,17 @@ for family,device_type,runtime in choices:
     with (EVIDENCE/('ui-'+family+'-system.log')).open('w') as log:
      subprocess.run(['xcrun','simctl','spawn',device,'log','show','--last','15m','--style','compact','--predicate','process == "HarborIOSHarness" OR process == "SpringBoard"'],stdout=log,stderr=subprocess.STDOUT,timeout=60)
   finally:
-   # Only delete this script's UUID. Never shut down a user's other simulators.
-   subprocess.run(['xcrun','simctl','shutdown',device],capture_output=True,timeout=90)
-   subprocess.run(['xcrun','simctl','delete',device],capture_output=True,timeout=60)
+   # Only delete this script's UUID. Never shut down a local user's simulators.
+   commands=[['xcrun','simctl','shutdown',device],['xcrun','simctl','delete',device]]
+   if os.environ.get('GITHUB_ACTIONS')=='true':commands.insert(0,['xcrun','simctl','shutdown','all'])
+   for command in commands:
+    try:
+     cleanup=subprocess.run(command,capture_output=True,text=True,timeout=120)
+     if cleanup.returncode and command[2]!='shutdown':status['cleanupErrors'].append(' '.join(command)+': '+cleanup.stderr[-1000:])
+    except Exception as error:status['cleanupErrors'].append(str(error))
+   try:
+    status['bootedDevicesAfter']=booted_devices()
+    status['hostMemoryAfter']=subprocess.check_output(['sysctl','vm.swapusage'],text=True,timeout=10).strip()
+   except Exception as error:status['cleanupErrors'].append('Inventory: '+str(error))
+   (EVIDENCE/('ui-'+family+'.json')).write_text(json.dumps(status,indent=2))
  if completed.returncode:raise SystemExit(completed.returncode)
