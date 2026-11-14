@@ -41,4 +41,11 @@ struct HarnessRoot: UIViewControllerRepresentable {
     func sendMouseButton(_ button: Int32, pressed: Bool) {}
     func showGameKeyboard() {}
     func isPointerGrabbed() -> Bool { false }
+    func readModArchive(at url: URL, entry: String?, completion: @escaping (Data?, String?) -> Void) {
+        completion(nil, "隔离界面测试不读取玩家模组归档。")
+    }
+    func beginModAccess(profile: String) throws -> Data {
+        throw NSError(domain: "HarborQAHarness", code: 1, userInfo: [NSLocalizedDescriptionKey: "测试实例不包含游戏文件。"])
+    }
+    func endModAccess(token: String) {}
 }

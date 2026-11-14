@@ -106,6 +106,14 @@ private final class HarborCoverFlowCollection: UICollectionView {
         super.layoutSubviews()
         if changed { sizeChanged?() }
     }
+    override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        if gestureRecognizer === panGestureRecognizer {
+            let velocity = panGestureRecognizer.velocity(in: self)
+            // A vertical swipe belongs to the outer library scroll view.
+            if abs(velocity.y) > abs(velocity.x) { return false }
+        }
+        return super.gestureRecognizerShouldBegin(gestureRecognizer)
+    }
 }
 
 private struct NativeCoverFlow: UIViewRepresentable {
@@ -210,10 +218,26 @@ struct HarborCoverFlowLibrary: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     private var position: Int { instances.firstIndex { $0.id == focused } ?? 0 }
     var body: some View {
-        VStack(spacing: 18) {
-            NativeCoverFlow(instances: instances, focused: $focused, spatialEffects: !exclusive && !reduceMotion)
-                .frame(height: verticalSizeClass == .compact ? 180 : 268)
-            if !instances.isEmpty {
+        Group {
+            if verticalSizeClass == .compact {
+                GeometryReader { geometry in
+                    HStack(alignment: .center, spacing: 20) {
+                        carousel.frame(width: geometry.size.width * 0.45, height: 190)
+                        controls.frame(maxWidth: .infinity)
+                    }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                }.frame(height: 240)
+            } else {
+                VStack(spacing: 18) { carousel.frame(height: 268); controls }
+            }
+        }.padding(.vertical, 10).listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 20, trailing: 0))
+            .listRowBackground(Color.clear).listRowSeparator(.hidden)
+    }
+    private var carousel: some View {
+        NativeCoverFlow(instances: instances, focused: $focused, spatialEffects: !exclusive && !reduceMotion)
+    }
+    @ViewBuilder private var controls: some View {
+        if !instances.isEmpty {
+            VStack(spacing: verticalSizeClass == .compact ? 8 : 18) {
                 let instance = instances[position]
                 HStack {
                     Button { step(-1) } label: { Image(systemName: "chevron.left").frame(width: 44, height: 44) }
@@ -226,7 +250,7 @@ struct HarborCoverFlowLibrary: View {
                         .accessibilityLabel("下一个实例").disabled(position == instances.count - 1)
                 }.buttonStyle(.plain)
                 VStack(spacing: 12) {
-                    Text(instance.name).font(.title3.bold()).multilineTextAlignment(.center)
+                    Text(instance.name).font(verticalSizeClass == .compact ? .headline : .title3.bold()).multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("library.coverflow.name")
                     Text(instance.version + " · " + instance.loader).font(.subheadline).foregroundStyle(.secondary)
                     HStack(spacing: 14) {
@@ -243,8 +267,7 @@ struct HarborCoverFlowLibrary: View {
                     }
                 }.padding(.horizontal, 16)
             }
-        }.padding(.vertical, 10).listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 14, trailing: 0))
-            .listRowBackground(Color.clear).listRowSeparator(.hidden)
+        }
     }
     private func step(_ delta: Int) {
         let next = min(instances.count - 1, max(0, position + delta))
@@ -264,8 +287,8 @@ struct HarborLibraryPresentationSettings: View {
                     Text("列表").tag(false)
                     Text("封面流").tag(true)
                 }.pickerStyle(.segmented).accessibilityIdentifier("settings.library.mode")
-                Toggle("切换触觉反馈", isOn: $haptics).frame(minHeight: 44)
-                Toggle("机械切换音效", isOn: $sound).frame(minHeight: 44)
+                HarborSettingsToggle("切换触觉反馈", isOn: $haptics).frame(minHeight: 44)
+                HarborSettingsToggle("机械切换音效", isOn: $sound).frame(minHeight: 44)
                 Text("封面流可左右滑动并吸附到当前实例。触觉与音效只在切换实例时触发；音效遵循设备静音。独家优化保留滑动操作，关闭额外三维转动。")
                     .font(.footnote).foregroundStyle(.secondary)
             }

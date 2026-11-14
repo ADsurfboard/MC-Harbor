@@ -157,3 +157,17 @@ struct HarborPerformanceSettings: View {
         } header: { Text("外观与性能") }
     }
 }
+
+/// Keep the platform switch, while also making its full label/blank area an
+/// explicit target. Native switch gestures are left to the platform control.
+struct HarborSettingsToggle: View {
+    let title: String
+    @Binding var value: Bool
+    init(_ title: String, isOn value: Binding<Bool>) { self.title = title; _value = value }
+    var body: some View {
+        Toggle(isOn: $value) {
+            Text(title).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle()).onTapGesture { value.toggle() }
+        }.frame(minHeight: 44)
+    }
+}

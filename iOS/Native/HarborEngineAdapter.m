@@ -17,6 +17,7 @@
 #import "utils.h"
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #import "HarborModpackMetadata.h"
+#import "HarborModArchive.h"
 
 @interface LauncherNavigationController (HarborLaunch)
 - (void)reloadProfileList;
@@ -37,6 +38,7 @@
 @property(nonatomic,strong) LauncherNavigationController *nativeLauncher;
 @property(nonatomic,weak) SurfaceViewController *surface;
 @property(nonatomic,weak) HarborGameTouchOverlay *overlay;
+@property(nonatomic,copy) NSString *modAccessToken;
 + (instancetype)shared;
 - (void)prepareTouchConfiguration;
 - (LauncherNavigationController *)launcherController;
@@ -64,6 +66,59 @@ static double lookSensitivity = 1;
     return [NSURL fileURLWithPath:home ? @(home) : NSHomeDirectory() isDirectory:YES];
 }
 - (NSString *)runtimeDescription { return @"iOS 原生 Java / 图形运行层 · Amethyst 开源内核"; }
+- (void)readModArchiveAtURL:(NSURL *)url entry:(NSString *)entry completion:(void (^)(NSData *,NSString *))completion {
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY,0), ^{
+        @autoreleasepool {
+            NSError *error=nil;NSData *data=HBRReadModArchive(url,entry,&error);
+            dispatch_async(dispatch_get_main_queue(), ^{ completion(data,error.localizedDescription); });
+        }
+    });
+}
+- (NSData *)beginModAccessForProfile:(NSString *)profile error:(NSError **)error {
+    NSString *failure=nil;
+    if (self.modAccessToken || (self.surface && self.surface.view.window) || UIApplication.sharedApplication.idleTimerDisabled)
+        failure=@"请先停止游戏、等待下载完成，再操作实例中的模组文件。";
+    NSDictionary *record=PLProfiles.current.profiles[profile];
+    if (![record isKindOfClass:NSDictionary.class]) failure=@"实例已不存在，请返回游戏库刷新。";
+    NSString *base=getPrefObject(@"general.game_directory");
+    NSString *relative=[record[@"gameDir"] isKindOfClass:NSString.class] && [record[@"gameDir"] length] ? record[@"gameDir"]:@".";
+    if (![base isKindOfClass:NSString.class] || !base.length || base.isAbsolutePath || base.pathComponents.count!=1 ||
+        [base isEqual:@".."] || [base containsString:@"\\"] || [base containsString:@":"] || relative.isAbsolutePath ||
+        [relative containsString:@"\\"] || [relative containsString:@":"] || [relative.pathComponents containsObject:@".."])
+        failure=@"实例模组目录不在允许的存储范围内。";
+    if (failure) {
+        if (error) *error=[NSError errorWithDomain:@"net.morben.harbor.modaccess" code:1 userInfo:@{NSLocalizedDescriptionKey:failure}];
+        return nil;
+    }
+    NSString *home=self.harborHomeURL.path.stringByResolvingSymlinksInPath;
+    NSString *root=[[home stringByAppendingPathComponent:@"instances"] stringByAppendingPathComponent:base ?: @""];
+    NSString *directory=[[[root stringByAppendingPathComponent:relative] stringByAppendingPathComponent:@"mods"] stringByStandardizingPath];
+    if (![directory hasPrefix:[root stringByAppendingString:@"/"]] || ![directory isEqual:directory.stringByResolvingSymlinksInPath])
+        failure=@"实例模组目录包含越界路径或符号链接。";
+    NSMutableArray *files=[NSMutableArray array];
+    if (!failure && [NSFileManager.defaultManager fileExistsAtPath:directory]) {
+        NSArray *names=[NSFileManager.defaultManager contentsOfDirectoryAtPath:directory error:error];
+        if (!names) return nil;
+        if (names.count>10000) failure=@"实例文件过多，请先在文件管理器中整理。";
+        for (NSString *name in names) if ([name.pathExtension.lowercaseString isEqual:@"jar"]) {
+            NSString *path=[directory stringByAppendingPathComponent:name];
+            NSDictionary *attributes=[NSFileManager.defaultManager attributesOfItemAtPath:path error:error];
+            if (!attributes) return nil;
+            if (![attributes[NSFileType] isEqual:NSFileTypeRegular]) { failure=@"实例模组中包含链接或非普通文件，已停止操作。"; break; }
+            [files addObject:path];
+        }
+        if (files.count>4000) failure=@"一次最多管理 4000 个模组。";
+    }
+    if (failure) {
+        if (error) *error=[NSError errorWithDomain:@"net.morben.harbor.modaccess" code:1 userInfo:@{NSLocalizedDescriptionKey:failure}];
+        return nil;
+    }
+    NSString *token=NSUUID.UUID.UUIDString;
+    NSData *data=[NSJSONSerialization dataWithJSONObject:@{@"token":token,@"directory":directory,@"files":files} options:0 error:error];
+    if (data) self.modAccessToken=token;
+    return data;
+}
+- (void)endModAccessWithToken:(NSString *)token { if ([self.modAccessToken isEqual:token]) self.modAccessToken=nil; }
 - (LauncherSplitViewController *)legacy {
     if (!_legacy) {
         _legacy = [[LauncherSplitViewController alloc] initWithStyle:UISplitViewControllerStyleDoubleColumn];
@@ -270,6 +325,7 @@ static double lookSensitivity = 1;
 UIViewController *HBRLauncherController(void) {
     return [HarborEngineAdapter.shared launcherController];
 }
+BOOL HBRCanLaunchGame(void) { return HarborEngineAdapter.shared.modAccessToken == nil; }
 
 void HBRInstallRoot(UIWindow *window) {
     window.rootViewController=[HarborRootFactory makeControllerWithServices:HarborEngineAdapter.shared];

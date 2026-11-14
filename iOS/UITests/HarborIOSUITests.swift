@@ -3,9 +3,46 @@ import XCTest
 @MainActor final class HarborIOSUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false; XCUIDevice.shared.orientation = .portrait }
     override func tearDownWithError() throws { XCUIDevice.shared.orientation = .portrait }
+    func testModFolderForegroundEmptyStateAndPersistence() throws {
+        let app = XCUIApplication(); app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"; app.launch()
+        func openFolders() {
+            let tab = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "模组夹")).firstMatch
+            XCTAssertTrue(tab.waitForExistence(timeout: 15)); tab.tap()
+        }
+        openFolders()
+        let create = app.buttons["folder.new"]
+        XCTAssertTrue(create.waitForExistence(timeout: 15)); XCTAssertGreaterThanOrEqual(create.frame.height, 44); create.tap()
+        let title = "Harbor QA " + String(UUID().uuidString.prefix(6))
+        let name = app.textFields["folder.editor.name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 10)); name.tap(); name.typeText(title)
+        XCTAssertEqual(name.value as? String, title)
+        app.buttons["folder.editor.save"].tap()
+        let folder = app.buttons["folder.open." + title]
+        XCTAssertTrue(folder.waitForExistence(timeout: 15)); folder.tap()
+        XCTAssertTrue(app.staticTexts["这个模组夹还是空的"].waitForExistence(timeout: 10))
+        let add = app.buttons["添加模组"]
+        XCTAssertTrue(add.isHittable); XCTAssertGreaterThanOrEqual(add.frame.height, 44)
+        capture("folder-empty-foreground-portrait")
+        XCUIDevice.shared.orientation = .landscapeLeft
+        XCTAssertTrue(add.waitForExistence(timeout: 5)); XCTAssertTrue(add.isHittable)
+        capture("folder-empty-foreground-landscape")
+        app.buttons["完成"].tap(); XCUIDevice.shared.orientation = .portrait
+        app.terminate(); app.launch(); openFolders()
+        XCTAssertTrue(folder.waitForExistence(timeout: 15))
+        capture("folder-persisted-library")
+    }
     func testCoverFlowSwipesSelectionAndRestoresList() throws {
         let app = XCUIApplication()
         app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"; app.launch()
+        defer {
+            // Keep unrelated UI tests independent even when an assertion fails.
+            XCUIDevice.shared.orientation = .portrait
+            if app.buttons["安装或导入"].isHittable {
+                app.buttons["安装或导入"].tap()
+                if app.buttons["使用列表选择实例"].exists { app.buttons["使用列表选择实例"].tap() }
+                else { app.tap() }
+            }
+        }
         let menu = app.buttons["安装或导入"]
         XCTAssertTrue(menu.waitForExistence(timeout: 15)); menu.tap()
         if app.buttons["使用列表选择实例"].exists {
@@ -24,7 +61,9 @@ import XCTest
         XCTAssertTrue(previous.isEnabled)
         capture("coverflow-horizontal-selection")
         XCUIDevice.shared.orientation = .landscapeLeft
+        capture("coverflow-landscape-before-scroll")
         if !previous.isHittable { app.swipeUp() }
+        capture("coverflow-landscape-after-scroll")
         XCTAssertTrue(previous.isHittable)
         previous.tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label == %@", "1 / 2")).firstMatch.waitForExistence(timeout: 10))

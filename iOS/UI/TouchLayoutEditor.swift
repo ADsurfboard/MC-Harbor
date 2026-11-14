@@ -27,17 +27,17 @@ struct TouchLayoutEditor: View {
                     slider("死区", value: $layout.settings.joystickDeadZone, range: 0.04...0.5)
                     slider("横向位置", value: $layout.settings.joystickCenter.x, range: 0...1)
                     slider("纵向位置", value: $layout.settings.joystickCenter.y, range: 0...1)
-                    Toggle("浮动摇杆", isOn: $layout.settings.floatingJoystick)
-                    Toggle("推到底自动疾跑", isOn: $layout.settings.autoSprint)
+                    HarborSettingsToggle("浮动摇杆", isOn: $layout.settings.floatingJoystick)
+                    HarborSettingsToggle("推到底自动疾跑", isOn: $layout.settings.autoSprint)
                 }
                 Section("视角与反馈") {
                     slider("视角灵敏度", value: $layout.settings.cameraSensitivity, range: 0.1...4)
-                    Toggle("反转横向视角", isOn: $layout.settings.invertCameraX)
-                    Toggle("反转纵向视角", isOn: $layout.settings.invertCameraY)
-                    Toggle("陀螺仪辅助", isOn: $layout.settings.gyroEnabled)
+                    HarborSettingsToggle("反转横向视角", isOn: $layout.settings.invertCameraX)
+                    HarborSettingsToggle("反转纵向视角", isOn: $layout.settings.invertCameraY)
+                    HarborSettingsToggle("陀螺仪辅助", isOn: $layout.settings.gyroEnabled)
                     if layout.settings.gyroEnabled { slider("陀螺仪灵敏度", value: $layout.settings.gyroSensitivity, range: 0.05...3) }
-                    Toggle("触觉反馈", isOn: $layout.settings.haptics)
-                    Toggle("快捷栏触控", isOn: $layout.settings.hotbarVisible)
+                    HarborSettingsToggle("触觉反馈", isOn: $layout.settings.haptics)
+                    HarborSettingsToggle("快捷栏触控", isOn: $layout.settings.hotbarVisible)
                 }
                 Section("按键") {
                     ForEach(layout.buttons) { button in
@@ -66,9 +66,9 @@ struct TouchLayoutEditor: View {
                             Text("空格").tag(Optional(32)); Text("Tab").tag(Optional(258)); Text("Shift").tag(Optional(340))
                             Text("Ctrl").tag(Optional(341)); Text("Alt").tag(Optional(342))
                         }.disabled(layout.buttons[index].action == .pause)
-                        Toggle("显示按键", isOn: $layout.buttons[index].visible)
+                        HarborSettingsToggle("显示按键", isOn: $layout.buttons[index].visible)
                             .disabled(layout.buttons[index].action == .pause)
-                        Toggle("点按切换保持状态", isOn: $layout.buttons[index].toggle).disabled(layout.buttons[index].action == .pause)
+                        HarborSettingsToggle("点按切换保持状态", isOn: $layout.buttons[index].toggle).disabled(layout.buttons[index].action == .pause)
                         slider("按键大小", value: $layout.buttons[index].diameter, range: 44...160, unit: "pt")
                         slider("按键不透明度", value: $layout.buttons[index].opacity, range: 0.1...1)
                         slider("横向位置", value: $layout.buttons[index].center.x, range: 0...1)

@@ -13,6 +13,12 @@ import CryptoKit
     func sendMouseButton(_ button: Int32, pressed: Bool)
     func showGameKeyboard()
     func isPointerGrabbed() -> Bool
+    @objc(readModArchiveAtURL:entry:completion:)
+    func readModArchive(at url: URL, entry: String?, completion: @escaping (Data?, String?) -> Void)
+    @objc(beginModAccessForProfile:error:)
+    func beginModAccess(profile: String) throws -> Data
+    @objc(endModAccessWithToken:)
+    func endModAccess(token: String)
 }
 
 @MainActor @objc(HarborRootFactory) public final class HarborRootFactory: NSObject {
@@ -85,6 +91,8 @@ struct NativePresentationContent: View {
 struct HarborPhoneRoot: View {
     let services: HarborNativeServices
     @StateObject private var library: PhoneLibrary
+    @StateObject private var folders: HarborFolderLibrary
+    @State private var settingsQuery = ""
     @State private var page: NativePage?
     @AppStorage(HarborLibraryOptions.coverFlow) private var coverFlow = false
     @Environment(\.scenePhase) private var scenePhase
@@ -92,6 +100,7 @@ struct HarborPhoneRoot: View {
     init(services: HarborNativeServices) {
         self.services = services
         _library = StateObject(wrappedValue: PhoneLibrary(services))
+        _folders = StateObject(wrappedValue: HarborFolderLibrary(services: services))
     }
     var body: some View {
         TabView {
@@ -165,8 +174,11 @@ struct HarborPhoneRoot: View {
                     }
                 }.harborPageBackground().navigationTitle("资源")
             }.tabItem { Label("资源", systemImage: "arrow.down.circle") }
+            NavigationStack { HarborFoldersView(model: folders) }
+                .tabItem { Label("模组夹", systemImage: "folder") }
             NavigationStack {
                 List {
+                  if matchesSettings("触控 摇杆 手柄 键鼠 控制 布局") {
                     Section("游戏控制") {
                       HarborGlassPanel {
                         Button { page = .init(name: "touch") } label: {
@@ -175,11 +187,26 @@ struct HarborPhoneRoot: View {
                         nativeRow("手柄、键鼠与原生控制设置", symbol: "gamecontroller", pageName: "controls")
                       }
                     }
+                  }
+                  if matchesSettings("Java 渲染 性能 内存 JVM 运行") {
                     Section("运行") {
                         HarborGlassPanel { nativeRow("Java、渲染与性能", symbol: "speedometer", pageName: "settings") }
                     }
+                  }
+                  if matchesSettings("外观 性能 动画 独家优化 Liquid Glass 玻璃") {
                     HarborPerformanceSettings()
+                  }
+                  if matchesSettings("游戏库 实例 封面流 Cover Flow 列表 音效 触感 振动") {
                     HarborLibraryPresentationSettings()
+                  }
+                  if matchesSettings("模组夹 图标 名称 加载器 版本 简介 收藏 信息 显示") {
+                    Section("模组夹") {
+                        NavigationLink { HarborFolderDisplaySettings() } label: {
+                            Label("模组夹内的信息显示", systemImage: "folder").frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                        }
+                    }
+                  }
+                  if matchesSettings("关于 作者 贡献 GitHub issues 开发者 ADsurfboard") {
                     Section("关于") {
                         LabeledContent("作者", value: "ADsurfboard")
                         NavigationLink { HarborPeopleView() } label: { Label("开发者与贡献名单", systemImage: "person.2").frame(minHeight: 44) }
@@ -187,7 +214,9 @@ struct HarborPhoneRoot: View {
                         Link("GitHub 项目", destination: URL(string: "https://github.com/ADsurfboard/MC-Harbor")!)
                         Link("提交问题或建议", destination: URL(string: "https://github.com/ADsurfboard/MC-Harbor/issues")!)
                     }
+                  }
                 }.harborPageBackground().navigationTitle("设置")
+                    .searchable(text: $settingsQuery, prompt: "搜索设置、功能或关键词")
             }.tabItem { Label("设置", systemImage: "slider.horizontal.3") }
         }
         .tint(Color(red: 0.12, green: 0.52, blue: 0.36))
@@ -202,6 +231,9 @@ struct HarborPhoneRoot: View {
                     to: services.harborHomeURL.appendingPathComponent(".native-smoke-ready"), options: .atomic)
             }
         }
+    }
+    private func matchesSettings(_ keywords: String) -> Bool {
+        settingsQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || keywords.localizedCaseInsensitiveContains(settingsQuery.trimmingCharacters(in: .whitespacesAndNewlines))
     }
     private func nativeRow(_ title: String, symbol: String, pageName: String) -> some View {
         Button { page = .init(name: pageName) } label: {
