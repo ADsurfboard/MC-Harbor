@@ -18,6 +18,12 @@ struct HarnessRoot: UIViewControllerRepresentable {
 @MainActor final class HarnessServices: NSObject, HarborNativeServices {
     let harborHomeURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("NativeUITest")
     let runtimeDescription = "隔离界面测试环境，不包含游戏 JVM，不使用玩家账号或存档。"
+    override init() {
+        super.init()
+        // The shared production root can publish its ready marker only inside
+        // this disposable UI host's own Application Support directory.
+        try? FileManager.default.createDirectory(at: harborHomeURL, withIntermediateDirectories: true)
+    }
     func instanceListJSON() -> Data {
         Data("""
         [{"id":"fabric-example","name":"触控验证 · Fabric","version":"1.20.1","loader":"Fabric"},

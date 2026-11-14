@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Run the native app UI on disposable iPhone and iPad simulators."""
-import subprocess,json,uuid,time
+import subprocess,json,uuid,time,os
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]; EVIDENCE=ROOT/'evidence'; EVIDENCE.mkdir(exist_ok=True)
 def run(args,**kwargs): return subprocess.run(args,check=True,**kwargs)
@@ -29,8 +29,21 @@ for family,device_type,runtime in choices:
   phase='install-preflight'
   run(['xcrun','simctl','install',device,str(ROOT/'DerivedData/Build/Products/Debug-iphonesimulator/HarborIOSHarness.app')],timeout=300)
   phase='launch-preflight'
-  run(['xcrun','simctl','launch',device,'net.morben.harbor.ios.qa'],timeout=120)
-  run(['xcrun','simctl','terminate',device,'net.morben.harbor.ios.qa'],timeout=30)
+  container=Path(subprocess.check_output(['xcrun','simctl','get_app_container',device,'net.morben.harbor.ios.qa','data'],text=True,timeout=30).strip())
+  ready=container/'Library/Application Support/NativeUITest/.native-smoke-ready'
+  assert not ready.exists(),'A fresh preflight marker must not already exist'
+  environment=os.environ.copy();environment['SIMCTL_CHILD_HARBOR_SMOKE_TEST']='1'
+  run(['xcrun','simctl','launch',device,'net.morben.harbor.ios.qa'],env=environment,timeout=120)
+  # simctl launch returns a PID before UIKit finishes its first scene. Sending
+  # terminate immediately races SpringBoard's launch assertion on fresh iPads.
+  # Wait for the actual shared root instead of assuming PID means UI readiness.
+  deadline=time.monotonic()+120
+  while time.monotonic()<deadline:
+   if ready.is_file() and ready.read_text()=='HARBOR_ROOT_READY':break
+   time.sleep(0.25)
+  else:raise TimeoutError('UI preflight did not reach the actual SwiftUI root')
+  status['rootAppeared']=True
+  run(['xcrun','simctl','terminate',device,'net.morben.harbor.ios.qa'],timeout=90)
   status['preflightPassed']=True;phase='xctest'
   completed=subprocess.run(['xcodebuild','-project','MCHarborIOS.xcodeproj','-scheme','HarborIOSHarness','-destination','platform=iOS Simulator,id='+device,'-parallel-testing-enabled','NO','-maximum-concurrent-test-simulator-destinations','1','-derivedDataPath','DerivedData','-resultBundlePath',str(result),'CODE_SIGNING_ALLOWED=NO','test'],cwd=ROOT,timeout=900)
   status['passed']=completed.returncode==0
