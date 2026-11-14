@@ -103,9 +103,17 @@ struct HarborPageBackdrop: View {
     }
 }
 
-struct HarborGlassRowBackground: View {
+/// Glass belongs to the group, not to every touching List row. This avoids
+/// overlapping system shadows and keeps a real 14pt gap between hit regions.
+struct HarborGlassPanel<Content: View>: View {
+    private let content: Content
+    init(@ViewBuilder content: () -> Content) { self.content = content() }
     var body: some View {
-        Color.clear.harborGlass(radius: 20).accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: 14) { content }
+            .padding(18).frame(maxWidth: .infinity, alignment: .leading)
+            .harborGlass(radius: 26)
+            .listRowBackground(Color.clear).listRowSeparator(.hidden)
+            .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 10, trailing: 0))
     }
 }
 
@@ -126,6 +134,7 @@ struct HarborPerformanceSettings: View {
     @AppStorage(HarborAppearance.exclusiveOptimizationKey) private var exclusive = false
     var body: some View {
         Section {
+          HarborGlassPanel {
             Toggle(isOn: $exclusive) {
                 Label("独家优化", systemImage: "bolt.fill")
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -142,7 +151,7 @@ struct HarborPerformanceSettings: View {
                 Text("此系统使用兼容的磨砂玻璃材质。")
                     .font(.footnote).foregroundStyle(.secondary)
             }
+          }
         } header: { Text("外观与性能") }
-            .listRowBackground(HarborGlassRowBackground())
     }
 }

@@ -144,12 +144,14 @@ struct HarborPhoneRoot: View {
             NavigationStack {
                 List {
                     Section("实例资源") {
+                      HarborGlassPanel {
                         nativeRow("Modrinth 整合包", symbol: "shippingbox", pageName: "resources")
                         nativeRow("从文件导入整合包", symbol: "doc.zipper", pageName: "importPack")
                         nativeRow("Fabric 与 Quilt", symbol: "square.stack.3d.down.right", pageName: "fabric")
                         nativeRow("Forge 与 NeoForge", symbol: "square.stack.3d.down.right", pageName: "forge")
                         nativeRow("打开 JAR 安装器", symbol: "square.and.arrow.down", pageName: "import")
-                    }.listRowBackground(HarborGlassRowBackground())
+                      }
+                    }
                     Section {
                         Text("本地导入支持 .mrpack，以及包含 modrinth.index.json 的 ZIP。原文件会保留；下载与校验完成后才创建实例。Forge / NeoForge 整合包需要先安装对应的加载器。")
                             .font(.footnote).foregroundStyle(.secondary)
@@ -159,13 +161,16 @@ struct HarborPhoneRoot: View {
             NavigationStack {
                 List {
                     Section("游戏控制") {
+                      HarborGlassPanel {
                         Button { page = .init(name: "touch") } label: {
                             Label("触控与摇杆", systemImage: "hand.draw").frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
-                        }.accessibilityIdentifier("settings.touch")
+                        }.buttonStyle(.plain).accessibilityIdentifier("settings.touch")
                         nativeRow("手柄、键鼠与原生控制设置", symbol: "gamecontroller", pageName: "controls")
-                    }.listRowBackground(HarborGlassRowBackground())
-                    Section("运行") { nativeRow("Java、渲染与性能", symbol: "speedometer", pageName: "settings") }
-                        .listRowBackground(HarborGlassRowBackground())
+                      }
+                    }
+                    Section("运行") {
+                        HarborGlassPanel { nativeRow("Java、渲染与性能", symbol: "speedometer", pageName: "settings") }
+                    }
                     HarborPerformanceSettings()
                     Section("关于") {
                         LabeledContent("作者", value: "ADsurfboard")
@@ -192,7 +197,8 @@ struct HarborPhoneRoot: View {
     }
     private func nativeRow(_ title: String, symbol: String, pageName: String) -> some View {
         Button { page = .init(name: pageName) } label: {
-            Label(title, systemImage: symbol).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
-        }.accessibilityIdentifier("native.page." + pageName)
+            Label(title, systemImage: symbol).frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                .padding(.vertical, 4).contentShape(Rectangle())
+        }.buttonStyle(.plain).accessibilityIdentifier("native.page." + pageName)
     }
 }
