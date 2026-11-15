@@ -22,6 +22,7 @@ enum HarborWelcomeVoice: String, CaseIterable, Identifiable {
     static let voiceKey = "harbor.ios.welcome.voice"
     static let volumeKey = "harbor.ios.welcome.volume"
     @Published var error: String?
+    @Published private(set) var resourcesReady = false
     private var player: AVAudioPlayer?
     private var welcomed = false
     private var observation: AnyCancellable?
@@ -37,10 +38,18 @@ enum HarborWelcomeVoice: String, CaseIterable, Identifiable {
               UserDefaults.standard.object(forKey: Self.enabledKey) as? Bool ?? true else { return }
         play()
     }
+    private func asset(_ voice: HarborWelcomeVoice) -> URL? {
+        let bundle = Bundle(for: HarborRootFactory.self)
+        return bundle.url(forResource: voice.rawValue, withExtension: "mp3") ?? bundle.url(forResource: voice.rawValue, withExtension: "mp3", subdirectory: "Voice")
+    }
+    func validateResources() {
+        resourcesReady = HarborWelcomeVoice.allCases.allSatisfy { asset($0) != nil }
+        if !resourcesReady { error = "欢迎音频不完整，请重新安装完整应用包。" }
+    }
     func play() {
         stop(); error = nil
         let voice = HarborWelcomeVoice(rawValue: UserDefaults.standard.string(forKey: Self.voiceKey) ?? "") ?? .female1
-        guard let file = Bundle(for: HarborRootFactory.self).url(forResource: voice.rawValue, withExtension: "mp3") else { error = "未找到欢迎音频，请重新安装完整应用包。"; return }
+        guard let file = asset(voice) else { error = "未找到欢迎音频，请重新安装完整应用包。"; return }
         do {
             let session = AVAudioSession.sharedInstance()
             // Ambient respects the silent switch and mixes with other apps.
@@ -87,10 +96,12 @@ struct HarborWelcomeAudioSettings: View {
                 VStack(alignment: .leading, spacing: 10) { Text("音量"); Slider(value: $volume, in: 0...1).accessibilityLabel("欢迎音量") }
                 Button { audio.play() } label: { Text("试听所选音频").frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle()) }
                 Button { audio.stop() } label: { Text("停止试听").frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle()) }
+                if audio.resourcesReady { Text("四份原始 MP3 已就绪").font(.footnote).foregroundStyle(.secondary).accessibilityIdentifier("welcome.resources.ready") }
                 if let error = audio.error { Text(error).font(.footnote).foregroundStyle(.red) }
             } footer: { Text("使用已有四份 MP3 原始素材，不以系统合成语音代替。遵循静音开关，切后台即停止；与其他应用音频混合。") }
         }.harborPageBackground().navigationTitle("欢迎音频").navigationBarTitleDisplayMode(.inline)
             .onChange(of: enabled) { if !$0 { audio.stop() } }
+            .onAppear { audio.validateResources() }
             .onDisappear { audio.stop() }
     }
 }

@@ -80,9 +80,9 @@ static __weak UIWindow *harborWindow;
 }
 - (NSData *)beginResourceAccessForProfile:(NSString *)profile kind:(NSString *)kind error:(NSError **)error {
     NSString *failure=nil;
-    if (![@[@"mods",@"resourcepacks",@"shaderpacks"] containsObject:kind]) failure=@"不支持此实例资源目录。";
+    if (![@[@"mods",@"resourcepacks",@"shaderpacks",@"saves"] containsObject:kind]) failure=@"不支持此实例资源目录。";
     if (self.modAccessToken || (self.surface && self.surface.view.window) || UIApplication.sharedApplication.idleTimerDisabled)
-        failure=@"请先停止游戏、等待下载完成，再操作实例中的模组文件。";
+        failure=@"请先停止游戏，并等待正在进行的实例资源操作完成。";
     NSDictionary *record=PLProfiles.current.profiles[profile];
     if (![record isKindOfClass:NSDictionary.class]) failure=@"实例已不存在，请返回游戏库刷新。";
     NSString *base=getPrefObject(@"general.game_directory");

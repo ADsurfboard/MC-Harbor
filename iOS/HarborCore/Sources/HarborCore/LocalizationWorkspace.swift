@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 public struct LocalizationSource: Codable, Sendable, Identifiable {
     public let id: String
@@ -164,22 +165,31 @@ public enum LocalizationZIP {
         catch { try? FileManager.default.removeItem(at: output); throw error }
         var completed = false
         defer { try? file.close(); if !completed { try? FileManager.default.removeItem(at: output) } }
+        var expectedHash = SHA256()
+        func write(_ data: Data) throws { try file.write(contentsOf: data); expectedHash.update(data: data) }
         var directory = Data(), offset: UInt32 = 0
         for entry in entries.sorted(by: { $0.path < $1.path }) {
             try Task.checkCancellation()
             let name = Data(entry.path.utf8), size = UInt32(entry.data.count), crc = crc32(entry.data)
             var header = Data(); header.u32(0x04034b50); header.u16(20); header.u16(0x800); header.u16(0)
             header.u16(0); header.u16(0x21); header.u32(crc); header.u32(size); header.u32(size); header.u16(UInt16(name.count)); header.u16(0); header.append(name)
-            try file.write(contentsOf: header); try file.write(contentsOf: entry.data)
+            try write(header); try write(entry.data)
             directory.u32(0x02014b50); directory.u16(20); directory.u16(20); directory.u16(0x800); directory.u16(0)
             directory.u16(0); directory.u16(0x21); directory.u32(crc); directory.u32(size); directory.u32(size); directory.u16(UInt16(name.count)); directory.u16(0)
             directory.u16(0); directory.u16(0); directory.u16(0); directory.u32(0); directory.u32(offset); directory.append(name)
             offset += UInt32(header.count) + size
         }
-        try file.write(contentsOf: directory)
+        try write(directory)
         var end = Data(); end.u32(0x06054b50); end.u16(0); end.u16(0); end.u16(UInt16(entries.count)); end.u16(UInt16(entries.count))
         end.u32(UInt32(directory.count)); end.u32(offset); end.u16(0)
-        try file.write(contentsOf: end); try file.synchronize(); completed = true
+        try write(end); try file.synchronize()
+        let readback = try FileHandle(forReadingFrom: output); defer { try? readback.close() }
+        var actualHash = SHA256()
+        while let chunk = try readback.read(upToCount: 65536), !chunk.isEmpty {
+            try Task.checkCancellation(); actualHash.update(data: chunk)
+        }
+        guard actualHash.finalize() == expectedHash.finalize() else { throw ResourceError.invalid("ZIP 写入后校验失败，已移除本次无效输出。") }
+        completed = true
     }
     private static let table: [UInt32] = (0..<256).map { value in
         var x = UInt32(value)

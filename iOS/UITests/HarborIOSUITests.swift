@@ -3,6 +3,36 @@ import XCTest
 @MainActor final class HarborIOSUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false; XCUIDevice.shared.orientation = .portrait }
     override func tearDownWithError() throws { XCUIDevice.shared.orientation = .portrait }
+    func testWorldEditorSavesRealNBTAndRestoresAfterRelaunch() throws {
+        let app = XCUIApplication(); app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"; app.launchEnvironment["HARBOR_WORLD_FIXTURE"] = "1"; app.launch()
+        func openWorld() {
+            openSettingsEntry("settings.worlds", app: app)
+            let instance = app.buttons["worlds.instance.fabric-example"]
+            XCTAssertTrue(instance.waitForExistence(timeout: 10)); instance.tap()
+            let world = app.buttons["worlds.folder.World QA"]
+            XCTAssertTrue(world.waitForExistence(timeout: 10)); world.tap()
+            XCTAssertTrue(app.textFields["worlds.field.name"].waitForExistence(timeout: 10))
+        }
+        openWorld()
+        let name = app.textFields["worlds.field.name"], title = "Saved QA " + String(UUID().uuidString.prefix(6))
+        name.tap(); name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: (name.value as? String ?? "").count)); name.typeText(title)
+        waitForValue(title, in: name)
+        let health = app.textFields["worlds.field.health"]
+        for _ in 0..<7 { if health.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(health.isHittable); health.tap()
+        health.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: (health.value as? String ?? "").count)); health.typeText("7.5")
+        waitForValue("7.5", in: health)
+        let save = app.buttons["worlds.save"]
+        XCTAssertTrue(save.isHittable); XCTAssertGreaterThanOrEqual(save.frame.height, 44); save.tap()
+        let backup = app.buttons["分享本次原始元数据备份"]
+        for _ in 0..<5 { if backup.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(backup.waitForExistence(timeout: 10)); capture("world-editor-backed-up-save")
+        app.terminate(); app.launch(); openWorld()
+        XCTAssertEqual(app.textFields["worlds.field.name"].value as? String, title)
+        let restoredHealth = app.textFields["worlds.field.health"]
+        for _ in 0..<7 { if restoredHealth.isHittable { break }; app.swipeUp() }
+        XCTAssertEqual(restoredHealth.value as? String, "7.5"); capture("world-editor-relaunch-persisted")
+    }
     func testWallpaperLibraryUsesPreviewAndPersistsSelection() throws {
         let app = XCUIApplication(); app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"; app.launchEnvironment["HARBOR_WALLPAPER_FIXTURE"] = "1"; app.launch()
         func openLibrary() {
@@ -27,6 +57,7 @@ import XCTest
     func testWelcomeAudioListsFourOriginalVoicesAndPersistsChoice() throws {
         let app = XCUIApplication(); app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"; app.launch()
         openSettingsEntry("settings.welcome", app: app)
+        XCTAssertTrue(app.staticTexts["welcome.resources.ready"].waitForExistence(timeout: 10))
         let picker = app.buttons["welcome.voice"]
         XCTAssertTrue(picker.waitForExistence(timeout: 10)); picker.tap()
         for title in ["女声 1 · Clara", "女声 2 · Clara", "男声 1 · Adam", "男声 2 · Morgan"] { XCTAssertTrue(app.buttons[title].waitForExistence(timeout: 5)) }

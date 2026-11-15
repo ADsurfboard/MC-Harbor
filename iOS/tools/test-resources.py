@@ -9,13 +9,13 @@ import argparse, re, subprocess, tempfile
 
 root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
-parser.add_argument('--suite', choices=['resources', 'social', 'history', 'localization', 'wallpapers', 'media'], default='resources')
+parser.add_argument('--suite', choices=['resources', 'social', 'history', 'localization', 'wallpapers', 'media', 'nbt', 'worlds'], default='resources')
 parser.add_argument('--arch', choices=['host', 'x86_64'], default='host')
 args = parser.parse_args()
-test_class = {'resources': 'ResourceTests', 'social': 'SocialTests', 'history': 'SocialPlayHistoryTests', 'localization': 'LocalizationTests', 'wallpapers': 'WallpaperTests', 'media': 'WallpaperMediaTests'}[args.suite]
+test_class = {'resources': 'ResourceTests', 'social': 'SocialTests', 'history': 'SocialPlayHistoryTests', 'localization': 'LocalizationTests', 'wallpapers': 'WallpaperTests', 'media': 'WallpaperMediaTests', 'nbt': 'WorldNBTTests', 'worlds': 'WorldEditorTests'}[args.suite]
 tests = (root / ('HarborCore/Tests/HarborCoreTests/' + test_class + '.swift')).read_text()
 names = re.findall(r'    func (test\w+)\(\)([^\{]+)\{', tests)
-assert len(names) >= {'resources': 12, 'social': 8, 'history': 6, 'localization': 11, 'wallpapers': 5, 'media': 4}[args.suite]
+assert len(names) >= {'resources': 12, 'social': 8, 'history': 6, 'localization': 11, 'wallpapers': 5, 'media': 4, 'nbt': 6, 'worlds': 6}[args.suite]
 tests = tests.replace('import XCTest', 'import Foundation').replace('@testable import HarborCore', '')
 shim = r'''
 @MainActor class XCTestCase {}
@@ -53,6 +53,8 @@ with tempfile.TemporaryDirectory(prefix='harbor-resource-checks-') as temporary:
     if args.suite == 'wallpapers': production.append(root / 'HarborCore/Sources/HarborCore/WallpaperLibrary.swift')
     if args.suite == 'media':
         production += [root / 'HarborCore/Sources/HarborCore/WallpaperLibrary.swift', root / 'HarborCore/Sources/HarborCore/WallpaperMedia.swift']
+    if args.suite == 'nbt': production.append(root / 'HarborCore/Sources/HarborCore/WorldNBT.swift')
+    if args.suite == 'worlds': production += sorted((root / 'HarborCore/Sources/HarborCore').glob('World*.swift')) + sorted((root / 'HarborCore/Sources/HarborCore').glob('Localization*.swift'))
     if args.suite in ['social', 'history']: production.append(root / 'HarborCore/Sources/HarborCore/SocialClient.swift')
     if args.suite == 'history': production.append(root / 'HarborCore/Sources/HarborCore/SocialPlayHistory.swift')
     architecture = ['-target', 'x86_64-apple-macos13.0'] if args.arch == 'x86_64' else []

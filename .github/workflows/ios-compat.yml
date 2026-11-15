@@ -69,6 +69,8 @@ jobs:
         run: python3 iOS/tools/test-localization-zip.py
       - name: Decode the four bundled welcome MP3s without playback
         run: python3 iOS/tools/test-welcome-audio.py
+      - name: Verify world edits against Java and HMCL NBT with independent backups
+        run: python3 iOS/tools/test-world-nbt-interop.py
       - uses: actions/setup-java@v4
         with:
           distribution: zulu

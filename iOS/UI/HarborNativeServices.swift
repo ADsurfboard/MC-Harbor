@@ -245,6 +245,13 @@ struct HarborPhoneRoot: View {
                         }.accessibilityIdentifier("settings.localization")
                     }
                   }
+                  if matchesSettings("存档 编辑 世界 游戏模式 天数 时间 经验 生命 血量 饱食度 饱和度 备份 NBT") {
+                    Section("存档") {
+                        NavigationLink { HarborWorldsHome(services: services, instances: library.instances) } label: {
+                            Label("编辑存档与玩家数据", systemImage: "square.and.pencil").frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                        }.accessibilityIdentifier("settings.worlds")
+                    }
+                  }
                   if matchesSettings("关于 作者 贡献 GitHub issues 开发者 ADsurfboard") {
                     Section("关于") {
                         LabeledContent("作者", value: "ADsurfboard")

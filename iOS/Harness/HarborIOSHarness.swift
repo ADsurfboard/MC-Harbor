@@ -39,6 +39,7 @@ struct HarnessRoot: UIViewControllerRepresentable {
         // The shared production root can publish its ready marker only inside
         // this disposable UI host's own Application Support directory.
         try? FileManager.default.createDirectory(at: harborHomeURL, withIntermediateDirectories: true)
+        if ProcessInfo.processInfo.environment["HARBOR_WORLD_FIXTURE"] == "1" { try? WorldFixture.prepare(home: harborHomeURL) }
         if ProcessInfo.processInfo.environment["HARBOR_LOCALIZATION_FIXTURE"] == "1" {
             // Only this disposable UI host has fixtures. No environment flag
             // enables synthetic resources inside the complete native app.
@@ -98,6 +99,10 @@ struct HarnessRoot: UIViewControllerRepresentable {
     }
     func endModAccess(token: String) { if token == fixtureAccess { fixtureAccess = nil } }
     func beginResourceAccess(profile: String, kind: String) throws -> Data {
+        if ProcessInfo.processInfo.environment["HARBOR_WORLD_FIXTURE"] == "1", profile == "fabric-example", kind == "saves", fixtureAccess == nil {
+            let token = UUID().uuidString; fixtureAccess = token
+            return try JSONSerialization.data(withJSONObject: ["token": token, "directory": harborHomeURL.appendingPathComponent("world-fixture/saves").path, "files": [] as [String]])
+        }
         throw NSError(domain: "HarborQAHarness", code: 1, userInfo: [NSLocalizedDescriptionKey: "测试实例不包含游戏文件。"])
     }
 }
