@@ -21,6 +21,18 @@ import Foundation
     let tasks=LocalizationProject(name:"Tasks",sources:[.init(name:"FTB",installPath:"config/ftbquests/quests",kind:"ftbquests",documents:[quest])])
     let result=try LocalizationApply.apply(tasks,instance:instance,backupHome:output)
     try FileManager.default.copyItem(at:result.backup!,to:output.appendingPathComponent("backup.zip"))
+    let locale=instance.appendingPathComponent("config/ftbquests/quests/lang")
+    try FileManager.default.createDirectory(at:locale,withIntermediateDirectories:true)
+    try Data("{title:'Welcome' next:'Next %s'}".utf8).write(to:locale.appendingPathComponent("en_us.snbt"))
+    let chinese=Data("{title:'原译文' extra:'保留'}".utf8);try chinese.write(to:locale.appendingPathComponent("zh_cn.snbt"))
+    var localized=LocalizationProject(name:"Native FTB",sources:try LocalizationScanner.loose(instance:instance).sources.filter{$0.kind == "ftbquests"})
+    for s in localized.sources.indices { for d in localized.sources[s].documents.indices where localized.sources[s].documents[d].kind == .ftbLocale {
+      for r in localized.sources[s].documents[d].rows.indices where localized.sources[s].documents[d].rows[r].key == "/next" {localized.sources[s].documents[d].rows[r].translation="下一步 %s"}
+    }}
+    let merged=try LocalizationApply.apply(localized,instance:instance,backupHome:output)
+    try FileManager.default.copyItem(at:merged.backup!,to:output.appendingPathComponent("locale-backup.zip"))
+    let document=try LocalizationDocument.read(Data(contentsOf:locale.appendingPathComponent("zh_cn.snbt")),path:"lang/zh_cn.snbt",kind:.ftbLocale)
+    guard document.rows.first(where:{$0.key == "/extra"})?.source == "保留",document.rows.first(where:{$0.key == "/next"})?.source == "下一步 %s" else{throw ResourceError.invalid("native Chinese FTB merge failed")}
   }
 }
 '''
@@ -45,3 +57,7 @@ with tempfile.TemporaryDirectory(prefix='harbor-localization-zip-') as temporary
                 assert archive.read('config/ftbquests/quests/start.snbt') == b"{id:'ABC' title:'Start' rewards:[{xp:25}]}"
                 assert json.loads(archive.read('MC-Harbor-backup.json'))['createdFiles']==[]
     print('PASS: independent ZIP/CRC/UTF-8 reader validates translated pack, AI source pack and pre-application original backup.')
+    with zipfile.ZipFile(home/'locale-backup.zip') as archive:
+        assert archive.testzip() is None
+        assert archive.read('config/ftbquests/quests/lang/zh_cn.snbt') == "{title:'原译文' extra:'保留'}".encode()
+    print('PASS: existing Chinese FTB merge and byte-identical pre-merge ZIP backup verified.')

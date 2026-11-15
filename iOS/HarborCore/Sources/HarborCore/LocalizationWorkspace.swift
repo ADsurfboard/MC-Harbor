@@ -111,9 +111,10 @@ public enum LocalizationPack {
                     }
                     language[target] = values
                 } else if !sourceOnly {
-                    let rendered = try doc.rendered()
+                    var rendered = try doc.rendered()
                     if rendered != doc.original {
                         let path = doc.kind == .ftbLocale ? Self.chinesePath(doc.path) : doc.path
+                        if doc.kind == .ftbLocale, let existing = source.originalFiles[path] { rendered = try doc.mergingLocale(into: existing) }
                         let prefix = source.installPath.isEmpty ? "" : source.installPath + "/"
                         entries.append(.init(path: "overrides/" + prefix + path, data: rendered))
                     }

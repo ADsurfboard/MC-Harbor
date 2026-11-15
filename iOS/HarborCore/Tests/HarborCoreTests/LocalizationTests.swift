@@ -171,9 +171,53 @@ import XCTest
         try english.write(to: folder.appendingPathComponent("en_us.snbt")); try chinese.write(to: folder.appendingPathComponent("zh_cn.snbt"))
         var doc = try LocalizationDocument.read(english, path: "lang/en_us.snbt", kind: .ftbLocale); doc.rows[0].translation = "欢迎"
         let source = LocalizationSource(name: "FTB", installPath: "config/ftbquests/quests", kind: "ftbquests", documents: [doc])
-        XCTAssertThrowsError(try LocalizationApply.apply(.init(name: "Pack", sources: [source]), instance: home.appendingPathComponent("instance"), backupHome: home))
-        XCTAssertEqual(try Data(contentsOf: folder.appendingPathComponent("zh_cn.snbt")), chinese)
+        let applied = try LocalizationApply.apply(.init(name: "Pack", sources: [source]), instance: home.appendingPathComponent("instance"), backupHome: home)
+        XCTAssertEqual(applied.files, 1); XCTAssertTrue(applied.backup != nil)
+        let merged = try LocalizationDocument.read(Data(contentsOf: folder.appendingPathComponent("zh_cn.snbt")), path: "lang/zh_cn.snbt", kind: .ftbLocale)
+        XCTAssertEqual(merged.rows.first(where: { $0.key == "/key" })?.source, "欢迎")
+        XCTAssertEqual(merged.rows.first(where: { $0.key == "/extra" })?.source, "保留")
         let unsafe = LocalizationSource(name: "Bad", installPath: "../outside", kind: "ftbquests", documents: [doc])
         XCTAssertThrowsError(try LocalizationApply.apply(.init(name: "Pack", sources: [unsafe]), instance: home.appendingPathComponent("instance"), backupHome: home))
+    }
+    func testFTBMergeKeepsCommentsNestedValuesAndListIndexes() throws {
+        var doc = try LocalizationDocument.read(Data(#"{first:'First' nested:{one:'One' two:'Two'} lines:['A','B','C'] untouched:'English'}"#.utf8), path: "lang/en_us.snbt", kind: .ftbLocale)
+        for index in doc.rows.indices where doc.rows[index].key != "/untouched" { doc.rows[index].translation = "译文 " + doc.rows[index].source }
+        let originals = ["{first:'原译文' // keep , comment\n nested:{one:'旧值', extra:'保留',} lines:['原行'] untouched:'自定义'}",
+                         #"{first:'原译文', nested:{one:'旧值'} lines:['原行',] untouched:'自定义',}"#,
+                         "{}"]
+        for original in originals {
+            let bytes = try doc.mergingLocale(into: Data(original.utf8))
+            let merged = try LocalizationDocument.read(bytes, path: "lang/zh_cn.snbt", kind: .ftbLocale)
+            let values = Dictionary(uniqueKeysWithValues: merged.rows.map { ($0.key, $0.source) })
+            XCTAssertEqual(values["/first"], "译文 First"); XCTAssertEqual(values["/nested/two"], "译文 Two")
+            XCTAssertEqual(values["/lines/2"], "译文 C")
+            if original != "{}" { XCTAssertEqual(values["/untouched"], "自定义") }
+            if original.contains("// keep") { XCTAssertTrue(String(decoding: bytes, as: UTF8.self).contains("// keep , comment")); XCTAssertEqual(values["/nested/extra"], "保留") }
+        }
+        XCTAssertThrowsError(try doc.mergingLocale(into: Data("{nested:'different shape'}".utf8)))
+    }
+    func testFTBScannerPrefillsChineseAndPrioritizesEnglishUS() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: home) }
+        let folder = home.appendingPathComponent("config/ftbquests/quests/lang")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        for (name, text) in [("en_us", "{title:'Welcome' next:'Next %s'}"), ("en_gb", "{title:'Welcome UK'}"), ("zh_cn", "{title:'欢迎' extra:'保留'}")] { try Data(text.utf8).write(to: folder.appendingPathComponent(name + ".snbt")) }
+        let scan = try LocalizationScanner.loose(instance: home)
+        let docs = scan.sources.flatMap(\.documents)
+        XCTAssertEqual(docs.count, 1); XCTAssertEqual(docs[0].path, "lang/en_us.snbt")
+        XCTAssertEqual(docs[0].rows.first(where: { $0.key == "/title" })?.translation, "欢迎")
+        XCTAssertEqual(docs[0].rows.first(where: { $0.key == "/next" })?.translation, "")
+        var project = LocalizationProject(name: "FTB", sources: scan.sources)
+        let index = try XCTUnwrap(project.sources[0].documents[0].rows.firstIndex(where: { $0.key == "/next" }))
+        project.sources[0].documents[0].rows[index].translation = "下一步 %s"
+        let exported = try LocalizationPack.entries(project, sourceOnly: false)
+        let override = try XCTUnwrap(exported.first(where: { $0.path.hasSuffix("/lang/zh_cn.snbt") }))
+        let output = try LocalizationDocument.read(override.data, path: "lang/zh_cn.snbt", kind: .ftbLocale)
+        XCTAssertEqual(output.rows.first(where: { $0.key == "/extra" })?.source, "保留")
+        XCTAssertEqual(output.rows.first(where: { $0.key == "/next" })?.source, "下一步 %s")
+        let changed = Data("{title:'另一程序的新译文' extra:'保留'}".utf8)
+        try changed.write(to: folder.appendingPathComponent("zh_cn.snbt"))
+        XCTAssertThrowsError(try LocalizationApply.apply(project, instance: home, backupHome: home))
+        XCTAssertEqual(try Data(contentsOf: folder.appendingPathComponent("zh_cn.snbt")), changed)
     }
 }

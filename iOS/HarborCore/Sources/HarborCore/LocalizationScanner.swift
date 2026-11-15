@@ -53,7 +53,7 @@ public enum LocalizationScanner {
             let keys: [URLResourceKey] = [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey]
             var walkError: Error?
             guard let enumerator = fm.enumerator(at: base, includingPropertiesForKeys: keys, options: [], errorHandler: { _, error in walkError = error; return false }) else { throw ResourceError.invalid("无法读取语言目录：" + relative) }
-            var docs: [LocalizationDocument] = [], languages: [String: Data] = [:]
+            var docs: [LocalizationDocument] = [], languages: [String: Data] = [:], existingLocales: [String: Data] = [:]
             while let enumerated = enumerator.nextObject() as? URL {
                 // Foundation enumerators can report /private/var while their
                 // input URL is standardized as /var on current Apple OSes.
@@ -83,12 +83,35 @@ public enum LocalizationScanner {
                 guard bytes <= 24 * 1024 * 1024 else { throw ResourceError.invalid("实例文本超过 24 MB，请分批处理。") }
                 if kind == "languages" { languages[path] = data }
                 else {
-                    do { let doc = try LocalizationDocument.read(data, path: path, kind: fileKind); if !doc.rows.isEmpty { docs.append(doc) } }
+                    do {
+                        var doc = try LocalizationDocument.read(data, path: path, kind: fileKind)
+                        if fileKind == .ftbLocale {
+                            let chinese = path.replacingOccurrences(of: #"(?i)(^|/)en_(?:us|gb)(?=/|\.)"#, with: "$1zh_cn", options: .regularExpression)
+                            let file = base.appendingPathComponent(chinese)
+                            if fm.fileExists(atPath: file.path) {
+                                try safe(file)
+                                let info = try file.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+                                guard info.isRegularFile == true, (info.fileSize ?? Int.max) <= 4 * 1024 * 1024 else { throw ResourceError.invalid("已有中文任务语言文件不是普通文件或超过 4 MB。") }
+                                let original = try Data(contentsOf: file); bytes += original.count
+                                guard bytes <= 24 * 1024 * 1024 else { throw ResourceError.invalid("实例文本超过 24 MB，请分批处理。") }
+                                let locale = try LocalizationDocument.read(original, path: chinese, kind: .ftbLocale)
+                                existingLocales[chinese] = original
+                                let values = Dictionary(locale.rows.map { ($0.key, $0.source) }, uniquingKeysWith: { first, _ in first })
+                                for index in doc.rows.indices {
+                                    if let value = values[doc.rows[index].key], LocalizationPlaceholders.compatible(doc.rows[index].source, value) { doc.rows[index].translation = value }
+                                }
+                            }
+                        }
+                        if !doc.rows.isEmpty { docs.append(doc) }
+                    }
                     catch { result.warnings.append(relative + "/" + path + "：" + error.localizedDescription) }
                 }
             }
             if let walkError { throw walkError }
-            let source = kind == "languages" ? try archive(entries: languages, name: relative, installPath: relative, kind: kind) : .init(name: relative, installPath: relative, kind: kind, documents: docs)
+            let paths = Set(docs.map { $0.path.lowercased() })
+            docs.removeAll { $0.kind == .ftbLocale && $0.path.lowercased().contains("en_gb") && paths.contains($0.path.lowercased().replacingOccurrences(of: "en_gb", with: "en_us")) }
+            var source = kind == "languages" ? try archive(entries: languages, name: relative, installPath: relative, kind: kind) : .init(name: relative, installPath: relative, kind: kind, documents: docs)
+            if kind == "ftbquests" { source.originalFiles = existingLocales }
             if !source.documents.isEmpty || !source.originalFiles.isEmpty { result.sources.append(source) }
         }
         // KubeJS language assets are real resource-pack assets; arbitrary JS

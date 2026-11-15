@@ -26,17 +26,18 @@ public enum LocalizationApply {
         }
         for source in project.sources where source.selected && source.kind != "mods" && source.kind != "resourcepacks" && source.kind != "languages" {
             for doc in source.documents where doc.kind != .languageJSON && doc.kind != .languageLegacy {
-                let rendered = try doc.rendered()
+                var rendered = try doc.rendered()
                 guard rendered != doc.original else { continue }
                 let sourceRelative = source.installPath + "/" + doc.path
                 let relative = doc.kind == .ftbLocale ? sourceRelative.replacingOccurrences(of: #"(?i)(^|/)en_(?:us|gb)(?=/|\.)"#, with: "$1zh_cn", options: .regularExpression) : sourceRelative
                 let originalURL = try safe(sourceRelative), target = try safe(relative)
                 guard let original = try read(originalURL), LocalizationDocument.digest(original) == doc.revision else { throw ResourceError.invalid("任务 / 数据包原文已变化，请重新读取后应用：" + sourceRelative) }
                 let before = try read(target)
-                // Existing native locale files need a structural merge. Until
-                // that merge is available, preserve them instead of replacing
-                // custom Chinese entries with an English-derived document.
-                guard doc.kind != .ftbLocale || before == nil else { throw ResourceError.invalid("已存在中文任务语言文件，为保护自定义内容，请先导出并手动合并：" + relative) }
+                if doc.kind == .ftbLocale, let scanned = source.originalFiles[doc.path.replacingOccurrences(of: #"(?i)(^|/)en_(?:us|gb)(?=/|\.)"#, with: "$1zh_cn", options: .regularExpression)], scanned != before {
+                    throw ResourceError.invalid("已有中文任务文件在读取后发生变化，请重新读取再合并：" + relative)
+                }
+                if doc.kind == .ftbLocale, let before { rendered = try doc.mergingLocale(into: before) }
+                guard rendered != before else { continue }
                 guard targets.insert(relative.precomposedStringWithCanonicalMapping.lowercased()).inserted else { throw ResourceError.invalid("所选任务译文目标重复。") }
                 total += rendered.count + (before?.count ?? 0)
                 guard total <= 48 * 1024 * 1024 else { throw ResourceError.invalid("任务应用文本超过 48 MB，请分批选择。") }

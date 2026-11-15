@@ -120,6 +120,62 @@ public struct LocalizationDocument: Codable, Sendable, Identifiable {
             throw ResourceError.invalid("语言 / 任务路径无效。")
         }
     }
+
+    /// Merge translated paths into a native FTB locale without discarding
+    /// custom Chinese-only entries, comments, unrelated numbers or list tails.
+    public func mergingLocale(into originalLocale: Data) throws -> Data {
+        guard kind == .ftbLocale else { throw ResourceError.invalid("只有原生任务语言文件支持结构合并。") }
+        _ = try Self.read(originalLocale, path: path, kind: .ftbLocale)
+        let incoming = try rendered(), from = try LocalizationSyntax.parse(incoming), to = try LocalizationSyntax.parse(originalLocale)
+        guard from.fields != nil, to.fields != nil else { throw ResourceError.invalid("任务语言文件根节点必须是键值表，原件未修改。") }
+        let translated = Set(rows.filter { !$0.translation.isEmpty }.map(\.key))
+        var edits: [(Range<Int>, Data)] = []
+        func affected(_ pointer: String) -> Bool { translated.contains(pointer) || translated.contains { $0.hasPrefix(pointer + "/") } }
+        func quote(_ value: String) throws -> Data { try JSONSerialization.data(withJSONObject: [value], options: [.withoutEscapingSlashes]).dropFirst().dropLast() }
+        func append(_ fragments: [Data], to node: LocalizationSyntax, last: Int?) throws {
+            guard !fragments.isEmpty else { return }
+            var text = Data()
+            if let last, try !LocalizationSyntax.hasTrailingSeparator(originalLocale, start: last, end: node.end - 1) {
+                if last == node.end - 1 { text.append(44) } else { edits.append((last..<last, Data([44]))) }
+            }
+            text.append(10)
+            for index in fragments.indices { if index > 0 { text.append(contentsOf: [44, 10]) }; text.append(fragments[index]) }
+            text.append(10); edits.append(((node.end - 1)..<(node.end - 1), text))
+        }
+        func merge(_ source: LocalizationSyntax, _ target: LocalizationSyntax, pointer: String) throws {
+            guard affected(pointer) else { return }
+            if let fields = source.fields, let existing = target.fields {
+                let byKey = Dictionary(uniqueKeysWithValues: existing)
+                var additions: [Data] = []
+                for (key, node) in fields {
+                    let child = pointer + "/" + key.replacingOccurrences(of: "~", with: "~0").replacingOccurrences(of: "/", with: "~1")
+                    guard affected(child) else { continue }
+                    if let current = byKey[key] { try merge(node, current, pointer: child) }
+                    else { additions.append(try quote(key) + Data(": ".utf8) + incoming[node.start..<node.end]) }
+                }
+                try append(additions, to: target, last: existing.last?.1.end)
+            } else if let values = source.list, let existing = target.list {
+                var additions: [Data] = []
+                for index in values.indices {
+                    let child = pointer + "/\(index)"
+                    if index < existing.count { try merge(values[index], existing[index], pointer: child) }
+                    else {
+                        // Preserve list indexes: a later translated entry also
+                        // requires the preceding missing original entries.
+                        if values.indices.contains(where: { $0 >= index && affected(pointer + "/\($0)") }) { additions.append(Data(incoming[values[index].start..<values[index].end])) }
+                    }
+                }
+                try append(additions, to: target, last: existing.last?.end)
+            } else if source.string != nil, target.string != nil, translated.contains(pointer) {
+                edits.append((target.start..<target.end, Data(incoming[source.start..<source.end])))
+            } else { throw ResourceError.invalid("中文任务条目结构与原文不一致，未覆盖自定义内容：" + pointer) }
+        }
+        try merge(from, to, pointer: "")
+        var output = originalLocale
+        for (range, bytes) in edits.sorted(by: { $0.0.lowerBound > $1.0.lowerBound }) { output.replaceSubrange(range, with: bytes) }
+        _ = try Self.read(output, path: path, kind: .ftbLocale)
+        return output
+    }
 }
 
 public enum LocalizationPlaceholders {
@@ -157,6 +213,24 @@ private struct LocalizationSyntax {
     static func parse(_ data: Data) throws -> Self {
         var parser = Parser(bytes: Array(data)); let result = try parser.value(depth: 0)
         try parser.skip(); guard parser.position == parser.bytes.count else { throw parser.failure() }; return result
+    }
+    static func hasTrailingSeparator(_ data: Data, start: Int, end: Int) throws -> Bool {
+        var parser = Parser(bytes: Array(data[start..<end]))
+        // skip() also consumes commas; preserve whether there was one outside
+        // a comment by using the same bounded lexical rules in this short tail.
+        while parser.position < parser.bytes.count {
+            let byte = parser.bytes[parser.position]
+            if byte == 44 { return true }
+            if [9, 10, 13, 32].contains(byte) { parser.position += 1 }
+            else if byte == 35 || parser.starts([47, 47]) {
+                while parser.position < parser.bytes.count && parser.bytes[parser.position] != 10 { parser.position += 1 }
+            } else if parser.starts([47, 42]) {
+                parser.position += 2
+                while parser.position < parser.bytes.count && !parser.starts([42, 47]) { parser.position += 1 }
+                guard parser.position < parser.bytes.count else { throw parser.failure() }; parser.position += 2
+            } else { throw parser.failure() }
+        }
+        return false
     }
     private struct Parser {
         let bytes: [UInt8]
