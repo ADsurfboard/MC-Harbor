@@ -226,6 +226,9 @@ struct HarborPhoneRoot: View {
                         NavigationLink { HarborResourceSettings() } label: {
                             Label("资源与翻译", systemImage: "character.bubble").frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
                         }.accessibilityIdentifier("settings.resources")
+                        NavigationLink { HarborLocalizationHome(services: services, instances: library.instances) } label: {
+                            Label("实例资源一键汉化", systemImage: "character.book.closed").frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                        }.accessibilityIdentifier("settings.localization")
                     }
                   }
                   if matchesSettings("关于 作者 贡献 GitHub issues 开发者 ADsurfboard") {

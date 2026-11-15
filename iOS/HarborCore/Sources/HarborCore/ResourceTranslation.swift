@@ -52,10 +52,10 @@ public actor ResourceTextService {
     private var cache: [String: String] = [:]
     private var order: [String] = []
     public init(transport: @escaping ResourceTransport = ResourceNetwork.fetch) { self.transport = transport }
-    public func translate(_ text: String, toChinese: Bool = true, provider: ResourceTranslationProvider, aliKey: String? = nil) async throws -> String {
+    public func translate(_ text: String, toChinese: Bool = true, provider: ResourceTranslationProvider, aliKey: String? = nil, forceTranslation: Bool = false) async throws -> String {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, text.utf8.count <= 8_000 else { throw ResourceError.invalid("翻译文本为空或过长。") }
-        if toChinese && ResourceNames.containsChinese(text) { return text }
+        if toChinese && !forceTranslation && ResourceNames.containsChinese(text) { return text }
         let key = provider.rawValue + "/" + String(toChinese) + "/" + text
         if let value = cache[key] { return value }
         // At most three translation requests, even if many rows enter the

@@ -7,7 +7,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: ios-port-${{ github.ref }}
+  group: ios-port-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   device-and-core:
@@ -47,6 +47,11 @@ jobs:
               text=path.read_text(errors='replace')
               if 'HarborCorePackageTests' in text:shutil.copy2(path,destination/path.name)
           PY
+      - name: Verify optimized resource installation on Intel
+        working-directory: iOS/HarborCore
+        run: |
+          set -o pipefail
+          swift test --configuration release --jobs 3 --filter ResourceTests 2>&1 | tee ../evidence/core-release-resources.log
       - name: Test production account-token storage without real Keychain access
         run: python3 iOS/tools/test-account-tokens.py
       - name: Test opt-in native motion policy without persistent preference changes
@@ -59,6 +64,8 @@ jobs:
         run: python3 iOS/tools/test-mod-folders.py
       - name: Test production friend client with isolated identities and redirect protection
         run: python3 iOS/tools/test-social-client.py
+      - name: Verify exported localization ZIPs with an independent decoder
+        run: python3 iOS/tools/test-localization-zip.py
       - uses: actions/setup-java@v4
         with:
           distribution: zulu

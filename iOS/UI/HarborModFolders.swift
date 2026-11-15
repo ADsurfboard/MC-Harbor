@@ -262,7 +262,7 @@ private struct HarborFolderEditor: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("名称") { TextField("例如：常用优化", text: $name).accessibilityIdentifier("folder.editor.name") }
+                Section("名称") { TextField("例如：常用优化", text: $name).textInputAutocapitalization(.never).autocorrectionDisabled().accessibilityIdentifier("folder.editor.name") }
                 Section("轻染色 · 保留半透明材质") {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 52))]) {
                         ForEach(colors, id: \.self) { value in

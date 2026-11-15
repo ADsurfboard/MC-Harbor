@@ -142,6 +142,24 @@ private actor ResourceProbe {
         do { _ = try await task.value; XCTFail("cancel accepted") } catch { }
         XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
     }
+    func testEarlyRejectionsDoNotInvokeTransferOrLeaveStages() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).resolvingSymlinksInPath()
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let installer = ResourceInstaller(home: root), probe = ResourceProbe()
+        let destination = root.appendingPathComponent("instance/mods")
+        for _ in 0..<8 {
+            do { _ = try await installer.install([], kind: .mod, destination: destination, route: .domesticFirst); XCTFail("empty plan accepted") } catch { }
+            do { _ = try await installer.install([file("../bad.jar")], kind: .mod, destination: destination, route: .domesticFirst); XCTFail("unsafe name accepted") } catch { }
+            do {
+                _ = try await installer.install([file()], kind: .mod, destination: root.appendingPathComponent("outside"), route: .domesticFirst, download: { url, _, _ in await probe.record(URLRequest(url: url)) })
+                XCTFail("wrong directory accepted")
+            } catch { }
+        }
+        let requests = await probe.requestList(); XCTAssertTrue(requests.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("harbor-resource-downloads").path))
+    }
     func testChineseNamesAndCompleteTranslationOnly() throws {
         XCTAssertEqual(ResourceNames.english("机械动力"), "Create"); XCTAssertEqual(ResourceNames.chinese("Sodium"), "钠")
         let valid = try bytes(["choices": [["finish_reason": "stop", "message": ["content": "优化游戏内存占用"]]]])

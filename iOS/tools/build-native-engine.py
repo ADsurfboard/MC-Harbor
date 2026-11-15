@@ -412,10 +412,10 @@ if args.prepare_only:
 
 run(['xcodegen','generate'],cwd=IOS)
 derived=IOS/'build'/('ui-'+args.platform)
-run(['xcodebuild','-project','MCHarborIOS.xcodeproj','-scheme','HarborIOSUI','-sdk',sdk,'-destination','generic/platform='+('iOS' if args.platform=='device' else 'iOS Simulator'),'-derivedDataPath',derived,'ARCHS=arm64','ONLY_ACTIVE_ARCH=NO','CODE_SIGNING_ALLOWED=NO','build'],cwd=IOS)
+run(['xcodebuild','-project','MCHarborIOS.xcodeproj','-scheme','HarborIOSUI','-configuration','Release','-sdk',sdk,'-destination','generic/platform='+('iOS' if args.platform=='device' else 'iOS Simulator'),'-derivedDataPath',derived,'ARCHS=arm64','ONLY_ACTIVE_ARCH=NO','CODE_SIGNING_ALLOWED=NO','build'],cwd=IOS)
 frameworks=ENGINE/'Natives/resources/Frameworks'
 for name in ['HarborCore','HarborIOSUI']:
-    product=derived/'Build/Products'/('Debug-iphoneos' if args.platform=='device' else 'Debug-iphonesimulator')/(name+'.framework')
+    product=derived/'Build/Products'/('Release-iphoneos' if args.platform=='device' else 'Release-iphonesimulator')/(name+'.framework')
     assert product.is_dir(),product
     shutil.copytree(product,frameworks/product.name,symlinks=True,dirs_exist_ok=True)
 # The pinned upstream carries iOS-arm64 graphics binaries. Its own simulator

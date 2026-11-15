@@ -101,7 +101,7 @@ public actor ResourceInstaller {
         guard url.isFileURL, url.path.hasPrefix(home.path + "/"), url.path == url.resolvingSymlinksInPath().path else { throw ResourceError.invalid("资源目标不在实例存储范围内，或包含符号链接。") }
     }
     public func install(_ files: [ResourceFile], kind: ResourceKind, destination: URL, route: ResourceRoute,
-                        download: @escaping ResourceDownload = ResourceFiles.download,
+                        download: ResourceDownload? = nil,
                         progress: @escaping @Sendable (Int, Int, String) async -> Void = { _, _, _ in }) async throws -> Int {
         guard !busy else { throw ResourceError.invalid("已有资源正在安装。") }
         guard !files.isEmpty, files.count <= 40, destination.lastPathComponent == kind.directory else { throw ResourceError.invalid("下载计划或目标目录无效。") }
@@ -110,6 +110,13 @@ public actor ResourceInstaller {
         for file in files {
             try ResourceFileValidation.validate(file, kind: kind)
             guard names.insert(file.name.precomposedStringWithCanonicalMapping.lowercased()).inserted else { throw ResourceError.invalid("下载计划包含同名文件。") }
+        }
+        // Do not synthesize an escaping async function-reference thunk at the
+        // call site. The Swift 6.3 x86_64 XCTest abort was localized to an early
+        // rejection with that default argument. Resolve it after preflight;
+        // injected downloaders still exercise the identical transaction.
+        let transfer: ResourceDownload = download ?? { url, target, size in
+            try await ResourceFiles.download(url, to: target, size: size)
         }
         busy = true; defer { busy = false }
         let fm = FileManager.default
@@ -130,7 +137,7 @@ public actor ResourceInstaller {
             var failure: Error?
             for file in files.prefix(3) {
                 let target = stage.appendingPathComponent(file.name)
-                group.addTask { await Self.fetch(file, target: target, route: route, download: download) }
+                group.addTask { await Self.fetch(file, target: target, route: route, download: transfer) }
                 next += 1
             }
             while let result = await group.next() {
@@ -142,7 +149,7 @@ public actor ResourceInstaller {
                         if next < files.count {
                             let file = files[next], target = stage.appendingPathComponent(files[next].name)
                             next += 1
-                            group.addTask { await Self.fetch(file, target: target, route: route, download: download) }
+                            group.addTask { await Self.fetch(file, target: target, route: route, download: transfer) }
                         }
                     }
                 case .failure(let error):

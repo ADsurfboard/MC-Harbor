@@ -17,6 +17,7 @@ struct HarnessRoot: UIViewControllerRepresentable {
 }
 
 @MainActor final class HarnessServices: NSObject, HarborNativeServices, HarborSocialTransportProvider {
+    private var fixtureAccess: String?
     var socialCredential: String? { ProcessInfo.processInfo.environment["HARBOR_FRIENDS_FIXTURE"] == "1" ? String(repeating: "a", count: 96) : nil }
     var socialTransport: ResourceTransport? {
         guard socialCredential != nil else { return nil }
@@ -38,6 +39,19 @@ struct HarnessRoot: UIViewControllerRepresentable {
         // The shared production root can publish its ready marker only inside
         // this disposable UI host's own Application Support directory.
         try? FileManager.default.createDirectory(at: harborHomeURL, withIntermediateDirectories: true)
+        if ProcessInfo.processInfo.environment["HARBOR_LOCALIZATION_FIXTURE"] == "1" {
+            // Only this disposable UI host has fixtures. No environment flag
+            // enables synthetic resources inside the complete native app.
+            let root = harborHomeURL.appendingPathComponent("localization-fixture")
+            let files = ["kubejs/assets/harborqa/lang/en_us.json": #"{"item.harborqa.tool":"Fixture tool %s"}"#,
+                         "config/ftbquests/quests/start.snbt": "{id:'QA0001' title:'Fixture quest' rewards:[{xp:25}]}" ]
+            for (path, text) in files {
+                let file = root.appendingPathComponent(path)
+                try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try? Data(text.utf8).write(to: file, options: .atomic)
+            }
+            try? FileManager.default.createDirectory(at: root.appendingPathComponent("mods"), withIntermediateDirectories: true)
+        }
     }
     func instanceListJSON() -> Data {
         Data("""
@@ -60,9 +74,13 @@ struct HarnessRoot: UIViewControllerRepresentable {
         completion(nil, "隔离界面测试不读取玩家模组归档。")
     }
     func beginModAccess(profile: String) throws -> Data {
+        if ProcessInfo.processInfo.environment["HARBOR_LOCALIZATION_FIXTURE"] == "1", profile == "fabric-example", fixtureAccess == nil {
+            let token = UUID().uuidString; fixtureAccess = token
+            return try JSONSerialization.data(withJSONObject: ["token": token, "directory": harborHomeURL.appendingPathComponent("localization-fixture/mods").path, "files": [] as [String]])
+        }
         throw NSError(domain: "HarborQAHarness", code: 1, userInfo: [NSLocalizedDescriptionKey: "测试实例不包含游戏文件。"])
     }
-    func endModAccess(token: String) {}
+    func endModAccess(token: String) { if token == fixtureAccess { fixtureAccess = nil } }
     func beginResourceAccess(profile: String, kind: String) throws -> Data {
         throw NSError(domain: "HarborQAHarness", code: 1, userInfo: [NSLocalizedDescriptionKey: "测试实例不包含游戏文件。"])
     }

@@ -3,6 +3,36 @@ import XCTest
 @MainActor final class HarborIOSUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false; XCUIDevice.shared.orientation = .portrait }
     override func tearDownWithError() throws { XCUIDevice.shared.orientation = .portrait }
+    func testLocalizationReadsRealLooseFixturesAndPersistsManualDraft() throws {
+        let app = XCUIApplication(); app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"; app.launchEnvironment["HARBOR_LOCALIZATION_FIXTURE"] = "1"; app.launch()
+        func openWorkspace() {
+            let settings = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "设置")).firstMatch
+            XCTAssertTrue(settings.waitForExistence(timeout: 15)); settings.tap()
+            let entry = app.buttons["settings.localization"]
+            for _ in 0..<7 { if entry.isHittable { break }; app.swipeUp() }
+            XCTAssertTrue(entry.waitForExistence(timeout: 10)); XCTAssertTrue(entry.isHittable); entry.tap()
+            let instance = app.buttons["localization.instance.fabric-example"]
+            XCTAssertTrue(instance.waitForExistence(timeout: 10)); instance.tap()
+        }
+        openWorkspace()
+        let scan = app.buttons["localization.scan"]
+        XCTAssertTrue(scan.waitForExistence(timeout: 10)); XCTAssertGreaterThanOrEqual(scan.frame.height, 44); scan.tap()
+        let original = app.staticTexts["Fixture tool %s"]
+        for _ in 0..<5 { if original.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(original.waitForExistence(timeout: 15)); original.tap()
+        let editor = app.textViews["中文译文"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 10)); editor.tap(); editor.typeText("Localized tool %s")
+        waitForValue("Localized tool %s", in: editor)
+        let save = app.buttons["保存译文"]
+        for _ in 0..<4 { if save.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(save.isHittable); save.tap(); XCTAssertTrue(app.staticTexts["译文已保存。"].waitForExistence(timeout: 10))
+        capture("localization-manual-draft")
+        app.terminate(); app.launch(); openWorkspace()
+        let restored = app.staticTexts["Localized tool %s"]
+        for _ in 0..<5 { if restored.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(restored.waitForExistence(timeout: 10)); XCTAssertTrue(restored.isHittable)
+        capture("localization-draft-restored")
+    }
     func testManyFriendsRemainSeparatedAndNotesPersist() throws {
         let app = XCUIApplication(); app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"; app.launchEnvironment["HARBOR_FRIENDS_FIXTURE"] = "1"; app.launch()
         func openFriends() {
@@ -66,6 +96,7 @@ import XCTest
         let title = "Harbor QA " + String(UUID().uuidString.prefix(6))
         let name = app.textFields["folder.editor.name"]
         XCTAssertTrue(name.waitForExistence(timeout: 10)); name.tap(); name.typeText(title)
+        waitForValue(title, in: name)
         XCTAssertEqual(name.value as? String, title)
         app.buttons["folder.editor.save"].tap()
         let folder = app.buttons["folder.open." + title]
@@ -216,10 +247,17 @@ import XCTest
         let name = app.textFields["touch.layout.name"]; XCTAssertTrue(name.exists); name.tap()
         if let old = name.value as? String { name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: old.count)) }
         name.typeText("Harbor Touch QA")
+        waitForValue("Harbor Touch QA", in: name)
         app.buttons["touch.save"].tap()
         XCTAssertTrue(touch.waitForExistence(timeout: 5)); touch.tap()
         XCTAssertEqual(app.textFields["touch.layout.name"].value as? String, "Harbor Touch QA")
         capture("touch-editor-restored")
+    }
+    private func waitForValue(_ expected: String, in element: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
+        // Keep the exact-value assertion. Wait only for UIKit/SwiftUI to
+        // publish the already-entered keys; never retype or accept truncation.
+        let committed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", expected), object: element)
+        XCTAssertEqual(XCTWaiter.wait(for: [committed], timeout: 5), .completed, file: file, line: line)
     }
     private func waitForLandscape(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         // Device orientation requests are asynchronous. Wait for the actual

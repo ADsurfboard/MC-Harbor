@@ -36,6 +36,9 @@ struct HarborResourcesView: View {
                 if let instance {
                     Text("\(instance.name) · \(instance.gameVersion ?? instance.version) · \(instance.loader)")
                         .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                    NavigationLink { HarborLocalizationView(services: model.services, instance: instance) } label: {
+                        Label("实例资源汉化", systemImage: "character.book.closed").frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    }.accessibilityIdentifier("resources.localization")
                 }
                 if model.kind == .mod, let instance, !["fabric", "forge", "quilt", "neoforge"].contains(instance.loader.lowercased()) {
                     Text("此实例为原版。可以浏览模组；安装前请先为实例安装对应的模组加载器。")
