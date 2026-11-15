@@ -3,6 +3,64 @@ import CoreGraphics
 
 /// Targets the installed full JVM/graphics App, never the fixture harness.
 @MainActor final class HarborNativeIOSUITests: XCTestCase {
+    func testNativeWorldEditorSavesRealMetadataAndBackup() throws {
+        continueAfterFailure = false; XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication(bundleIdentifier: "net.morben.harbor.ios")
+        app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"; app.launch()
+        let settings = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "设置")).firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: 15)); settings.tap()
+        let entry = app.buttons["settings.worlds"]
+        for _ in 0..<10 { if entry.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(entry.isHittable); entry.tap()
+        let instance = app.buttons["worlds.instance.(Default)"]
+        XCTAssertTrue(instance.waitForExistence(timeout: 10)); instance.tap()
+        let world = app.buttons["worlds.folder.Harbor Data QA"]
+        XCTAssertTrue(world.waitForExistence(timeout: 10)); world.tap()
+        let name = app.textFields["worlds.field.name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 10)); replace(name, with: "Native world edited")
+        let health = app.textFields["worlds.field.health"]
+        for _ in 0..<7 { if health.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(health.isHittable); replace(health, with: "7.5")
+        let save = app.buttons["worlds.save"]
+        XCTAssertTrue(save.isHittable); XCTAssertGreaterThanOrEqual(save.frame.height, 44); save.tap()
+        let backup = app.buttons["分享本次原始元数据备份"]
+        for _ in 0..<6 { if backup.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(backup.waitForExistence(timeout: 10))
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "complete-native-world-backed-up-save"; shot.lifetime = .keepAlways; add(shot)
+    }
+    func testNativeCompressedDatapackReadsEditsAndAppliesWithBackup() throws {
+        continueAfterFailure = false; XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication(bundleIdentifier: "net.morben.harbor.ios")
+        app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"; app.launch()
+        let settings = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "设置")).firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: 15)); settings.tap()
+        let entry = app.buttons["settings.localization"]
+        for _ in 0..<9 { if entry.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(entry.isHittable); entry.tap()
+        let instance = app.buttons["localization.instance.(Default)"]
+        XCTAssertTrue(instance.waitForExistence(timeout: 10)); instance.tap()
+        let scan = app.buttons["localization.scan"]
+        XCTAssertTrue(scan.waitForExistence(timeout: 10)); scan.tap()
+        let original = app.staticTexts["Native ZIP QA title"]
+        XCTAssertTrue(original.waitForExistence(timeout: 20))
+        for _ in 0..<6 { if original.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(original.isHittable); original.tap()
+        let editor = app.textViews["中文译文"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 10)); editor.tap(); editor.typeText("Localized native ZIP QA")
+        let save = app.buttons["保存译文"]
+        for _ in 0..<4 { if save.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(save.isHittable); save.tap()
+        XCTAssertTrue(app.staticTexts["译文已保存。"].waitForExistence(timeout: 10))
+        app.navigationBars["对照编辑"].buttons.firstMatch.tap()
+        let menu = app.buttons["汉化操作"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 10)); menu.tap()
+        app.buttons["备份并应用任务 / 数据包译文"].tap()
+        let confirm = app.buttons["备份并应用"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 10)); confirm.tap()
+        let complete = app.staticTexts["已应用 1 个任务 / 数据包文本；原文件备份已保留。"]
+        XCTAssertTrue(complete.waitForExistence(timeout: 20))
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "complete-native-compressed-datapack-applied"; shot.lifetime = .keepAlways; add(shot)
+    }
     func testExclusiveOptimizationPersistsInCompleteNativeApp() throws {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = .portrait

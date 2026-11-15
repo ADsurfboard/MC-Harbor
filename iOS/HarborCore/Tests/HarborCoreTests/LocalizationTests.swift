@@ -220,4 +220,31 @@ import XCTest
         XCTAssertThrowsError(try LocalizationApply.apply(project, instance: home, backupHome: home))
         XCTAssertEqual(try Data(contentsOf: folder.appendingPathComponent("zh_cn.snbt")), changed)
     }
+    func testZIPDatapackKeepsBinaryEntriesAndRejectsStaleArchive() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).resolvingSymlinksInPath()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let folder = home.appendingPathComponent("saves/World/datapacks")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let path = "saves/World/datapacks/quest.zip", file = home.appendingPathComponent(path)
+        let binary = Data([0, 255, 128, 17, 31, 99, 0])
+        let files: [String: Data] = ["pack.mcmeta": Data(#"{"pack":{"pack_format":15,"description":"Adventure"}}"#.utf8),
+                                    "data/qa/advancements/start.json": Data(#"{"display":{"title":{"text":"Find stone"}},"criteria":{"id":{"trigger":"minecraft:impossible"}}}"#.utf8),
+                                    "data/qa/structure/untouched.nbt": binary]
+        try LocalizationZIP.write(files.map { .init(path: $0.key, data: $0.value) }, to: file)
+        let original = try Data(contentsOf: file), revision = try LocalizationDatapackZIP.revision(file)
+        var source = try LocalizationDatapackZIP.scan(entries: files, name: "quest.zip", installPath: path, revision: revision)
+        for d in source.documents.indices { for r in source.documents[d].rows.indices { source.documents[d].rows[r].translation = "译文 " + source.documents[d].rows[r].source } }
+        XCTAssertEqual(try LocalizationScanner.loose(instance: home).datapackArchives, [path])
+        let project = LocalizationProject(name: "ZIP", sources: [source])
+        let pack = try LocalizationPack.entries(project, sourceOnly: false)
+        XCTAssertTrue(pack.contains { $0.path == "overrides/" + path })
+        let result = try LocalizationApply.apply(project, instance: home, backupHome: home)
+        XCTAssertEqual(result.files, 1); XCTAssertTrue(result.backup != nil)
+        let applied = try Data(contentsOf: file)
+        XCTAssertFalse(applied == original); XCTAssertTrue(applied.range(of: binary) != nil)
+        XCTAssertThrowsError(try LocalizationApply.apply(project, instance: home, backupHome: home))
+        XCTAssertEqual(try Data(contentsOf: file), applied)
+        XCTAssertThrowsError(try LocalizationDatapackZIP.scan(entries: ["../escape": binary], name: "unsafe", installPath: path, revision: revision))
+        XCTAssertThrowsError(try LocalizationDatapackZIP.scan(entries: ["PACK.mcmeta": Data(), "pack.mcmeta": Data()], name: "duplicate", installPath: path, revision: revision))
+    }
 }

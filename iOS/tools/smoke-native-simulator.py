@@ -4,7 +4,7 @@
 No JVM/gameplay claim is made. Neither shared UI-test devices nor real accounts
 are modified. Cleanup diagnostics must never mask the original failure.
 """
-import json, os, plistlib, re, shutil, subprocess, time, uuid
+import json, os, plistlib, re, shutil, subprocess, time, uuid, zipfile, runpy
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -79,10 +79,41 @@ try:
     assert (home / 'accounts').is_dir(), 'Account storage was not initialized'
     assert not (data / 'Documents/accounts').exists(), 'Accounts must not be Files-shared'
     report.update(rootAppeared=True, privateStorage=True, pid=pid)
+    # Real input files in this freshly-created simulator's private container.
+    # No runtime test flag switches archive reading or localization behavior.
+    datapack = home / 'instances/default/saves/Harbor Data QA/datapacks/qa.zip'
+    datapack.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(datapack, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr('pack.mcmeta', json.dumps({'pack': {'pack_format': 15, 'description': 'QA datapack'}}))
+        archive.writestr('data/qa/advancements/start.json', json.dumps({'display': {'title': {'text': 'Native ZIP QA title'}}, 'criteria': {'id': {'trigger': 'minecraft:impossible'}}}))
+        archive.writestr('data/qa/structure/untouched.nbt', bytes([0, 255, 128, 17, 31, 99, 0]))
+    original_datapack = datapack.read_bytes()
+    world_fixture = runpy.run_path(str(ROOT / 'tools/native-world-fixture.py'))
+    world_file = datapack.parent.parent / 'level.dat'
+    original_world = world_fixture['create'](); world_file.write_bytes(original_world)
     run(['xcodebuild', '-project', str(ROOT / 'MCHarborIOS.xcodeproj'), '-scheme', 'HarborNativeRuntimeTests',
          '-destination', 'platform=iOS Simulator,id=' + udid, '-parallel-testing-enabled', 'NO',
          '-maximum-concurrent-test-simulator-destinations', '1', '-derivedDataPath', str(ROOT / 'DerivedData'),
-         '-resultBundlePath', str(OUT / 'native-profile.xcresult'), 'CODE_SIGNING_ALLOWED=NO', 'test'], timeout=360)
+         '-resultBundlePath', str(OUT / 'native-profile.xcresult'), 'CODE_SIGNING_ALLOWED=NO', 'test'], timeout=900)
+    with zipfile.ZipFile(datapack) as archive:
+        assert archive.testzip() is None
+        translated = json.loads(archive.read('data/qa/advancements/start.json'))
+        assert translated == {'display': {'title': {'text': 'Localized native ZIP QA'}}, 'criteria': {'id': {'trigger': 'minecraft:impossible'}}}
+        assert archive.read('data/qa/structure/untouched.nbt') == bytes([0, 255, 128, 17, 31, 99, 0])
+    backups = list((home / 'harbor-localization-backups').glob('*.zip'))
+    assert backups, 'Native ZIP datapack application did not create a backup'
+    with zipfile.ZipFile(backups[-1]) as archive:
+        assert archive.read('saves/Harbor Data QA/datapacks/qa.zip') == original_datapack
+    report['realCompressedDatapackTranslationAndBackup'] = True
+    edited_world = world_fixture['inspect_fixture'](world_file.read_bytes())
+    assert edited_world['LevelName'] == 'Native world edited'
+    assert edited_world['Player']['Health'] == 7.5
+    assert edited_world['mod_blob'] == world_fixture['OPAQUE']
+    backups = list((home / 'harbor-world-backups').glob('*.zip'))
+    assert backups, 'Native world editor did not create an original backup'
+    with zipfile.ZipFile(backups[-1]) as archive:
+        assert archive.read('level.dat') == original_world
+    report['realWorldEditingAndBackup'] = True
     report.update(passed=True, realProfileCancelSaveAndRelaunch=True)
 except Exception as error:
     report['error'] = str(error)

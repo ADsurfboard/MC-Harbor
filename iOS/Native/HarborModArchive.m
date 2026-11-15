@@ -22,6 +22,8 @@ static NSData *HBRModEntry(UZKArchive *archive, UZKFileInfo *entry, NSUInteger l
 }
 NSData *HBRReadModArchive(NSURL *url, NSString *entry, NSError **error) {
     BOOL languages=[entry isEqual:@"@harbor-language-files"];
+    BOOL datapack=[entry isEqual:@"@harbor-datapack-files"];
+    BOOL collection=languages || datapack;
     if (!url.isFileURL) return HBRModFailure(error,@"请选择本地 JAR 文件。");
     if (entry && (entry.length>512 || entry.isAbsolutePath || [entry containsString:@"\\"] || [entry containsString:@":"] ||
                   [entry.pathComponents containsObject:@".."] || [entry.pathComponents containsObject:@"."]))
@@ -31,40 +33,40 @@ NSData *HBRReadModArchive(NSURL *url, NSString *entry, NSError **error) {
     [[[NSFileCoordinator alloc] initWithFilePresenter:nil] coordinateReadingItemAtURL:url options:NSFileCoordinatorReadingWithoutChanges error:&coordination byAccessor:^(NSURL *readable) {
         NSDictionary *attributes=[readable resourceValuesForKeys:@[NSURLIsRegularFileKey,NSURLIsSymbolicLinkKey,NSURLFileSizeKey] error:&failure];
         if (!attributes || ![attributes[NSURLIsRegularFileKey] boolValue] || [attributes[NSURLIsSymbolicLinkKey] boolValue] ||
-            [attributes[NSURLFileSizeKey] unsignedLongLongValue]>1000000000ULL) {
-            HBRModFailure(&failure,@"请选择小于 1 GB 的普通 JAR 模组文件。"); return;
+            [attributes[NSURLFileSizeKey] unsignedLongLongValue]>(datapack ? 32ULL*1024*1024:1000000000ULL)) {
+            HBRModFailure(&failure,datapack ? @"请选择不超过 32 MB 的普通 ZIP 数据包文件。":@"请选择小于 1 GB 的普通 JAR / ZIP 文件。"); return;
         }
         UZKArchive *archive=[[UZKArchive alloc] initWithPath:readable.path error:&failure];
         NSArray<UZKFileInfo *> *files=[archive listFileInfo:&failure];
         if (!files || files.count>100000) { if (!failure) HBRModFailure(&failure,@"模组归档文件数量过多。"); return; }
         NSMutableArray *languageNames=[NSMutableArray array];
         NSMutableDictionary<NSString *,UZKFileInfo *> *languageFiles=[NSMutableDictionary dictionary];
-        if (languages) {
+        if (collection) {
             NSRegularExpression *pattern=[NSRegularExpression regularExpressionWithPattern:@"^assets/[a-z0-9_.-]+/lang/[a-z]{2,3}_[a-z0-9]{2,6}\\.(json|lang)$" options:NSRegularExpressionCaseInsensitive error:&failure];
             NSMutableSet *seen=[NSMutableSet set]; unsigned long long expanded=0;
-            for (UZKFileInfo *file in files) if ([pattern numberOfMatchesInString:file.filename options:0 range:NSMakeRange(0,file.filename.length)]) {
+            for (UZKFileInfo *file in files) if (datapack ? !file.isDirectory:[pattern numberOfMatchesInString:file.filename options:0 range:NSMakeRange(0,file.filename.length)]>0) {
                 NSString *key=file.filename.precomposedStringWithCanonicalMapping.lowercaseString;
-                if ([seen containsObject:key] || languageNames.count>=2048 || file.uncompressedSize>4*1024*1024 || expanded+file.uncompressedSize>24*1024*1024) {
-                    HBRModFailure(&failure,@"语言文件重复、数量过多或文本总量超过 24 MB，请分批处理。");return;
+                if ([seen containsObject:key] || languageNames.count>=2048 || file.uncompressedSize>(datapack ? 24ULL:4ULL)*1024*1024 || expanded+file.uncompressedSize>24*1024*1024) {
+                    HBRModFailure(&failure,@"归档文件重复、数量过多或展开总量超过 24 MB，请分批处理。");return;
                 }
                 [seen addObject:key];[languageNames addObject:file.filename];languageFiles[file.filename]=file;expanded+=file.uncompressedSize;
             }
         }
-        NSArray *names=languages ? languageNames:(entry ? @[entry] : @[@"fabric.mod.json",@"quilt.mod.json",@"META-INF/neoforge.mods.toml",@"META-INF/mods.toml",@"mcmod.info",@"META-INF/MANIFEST.MF"]);
+        NSArray *names=collection ? languageNames:(entry ? @[entry] : @[@"fabric.mod.json",@"quilt.mod.json",@"META-INF/neoforge.mods.toml",@"META-INF/mods.toml",@"mcmod.info",@"META-INF/MANIFEST.MF"]);
         NSMutableDictionary *entries=[NSMutableDictionary dictionary];
         for (NSString *name in names) {
-            UZKFileInfo *found=languages ? languageFiles[name]:nil;
-            if (!languages) for (UZKFileInfo *file in files) if ([file.filename isEqual:name]) {
+            UZKFileInfo *found=collection ? languageFiles[name]:nil;
+            if (!collection) for (UZKFileInfo *file in files) if ([file.filename isEqual:name]) {
                 if (found) { HBRModFailure(&failure,@"模组包含重复的资料条目。"); return; }
                 found=file;
             }
             if (!found) continue;
-            NSData *bytes=HBRModEntry(archive,found,languages ? 4*1024*1024:(entry ? 512*1024:1024*1024),&failure);
+            NSData *bytes=HBRModEntry(archive,found,collection ? (datapack ? 24:4)*1024*1024:(entry ? 512*1024:1024*1024),&failure);
             if (!bytes) return;
-            if (entry && !languages) { result=bytes; return; }
+            if (entry && !collection) { result=bytes; return; }
             entries[name]=[bytes base64EncodedStringWithOptions:0];
         }
-        if (!entry || languages) result=[NSJSONSerialization dataWithJSONObject:entries options:0 error:&failure];
+        if (!entry || collection) result=[NSJSONSerialization dataWithJSONObject:entries options:0 error:&failure];
         else HBRModFailure(&failure,@"模组未包含声明的图标。");
     }];
     if (scoped) [url stopAccessingSecurityScopedResource];

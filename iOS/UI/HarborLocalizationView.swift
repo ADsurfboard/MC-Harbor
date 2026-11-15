@@ -128,7 +128,7 @@ struct HarborLocalizationView: View {
             .confirmationDialog("备份并应用所选任务 / 数据包译文？", isPresented: $confirmApply, titleVisibility: .visible) {
                 Button("备份并应用") { model.apply() }
                 Button("取消", role: .cancel) {}
-            } message: { Text("先核对原文版本并保存 ZIP 备份，再写入已有译文。游戏运行时禁止应用；已有自定义中文任务语言文件会保留并提示手动合并。") }
+            } message: { Text("先核对原文版本并保存 ZIP 备份，再写入已有译文。游戏运行时禁止应用；已有中文任务文件按结构合并，ZIP 数据包保留未修改文件的原始内容。") }
     }
     private var resourceSelection: some View {
         NavigationStack {

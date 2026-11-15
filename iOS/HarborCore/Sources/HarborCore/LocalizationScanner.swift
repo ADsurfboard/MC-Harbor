@@ -3,6 +3,7 @@ import Foundation
 public struct LocalizationScanResult: Sendable {
     public var sources: [LocalizationSource] = []
     public var warnings: [String] = []
+    public var datapackArchives: [String] = []
     public init() {}
 }
 
@@ -137,7 +138,7 @@ public enum LocalizationScanner {
                 let properties = try url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
                 if properties.isSymbolicLink == true { result.warnings.append(url.lastPathComponent + "：符号链接已跳过"); continue }
                 if properties.isDirectory == true { try collect(relative + "/" + url.lastPathComponent, kind: "datapacks") }
-                else if url.pathExtension.lowercased() == "zip" { result.warnings.append(relative + "/" + url.lastPathComponent + "：ZIP 数据包尚需解包到同目录后扫描；原件未改动") }
+                else if url.pathExtension.lowercased() == "zip" { result.datapackArchives.append(relative + "/" + url.lastPathComponent) }
             }
         }
         try packs("datapacks")

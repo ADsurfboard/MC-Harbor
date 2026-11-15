@@ -8,6 +8,7 @@ public struct LocalizationSource: Codable, Sendable, Identifiable {
     public let kind: String
     public var documents: [LocalizationDocument]
     public var originalFiles: [String: Data] = [:]
+    public var archiveRevision: String?
     public var selected: Bool = true
     public init(name: String, installPath: String, kind: String, documents: [LocalizationDocument]) {
         let sourceID = LocalizationDocument.digest(Data((kind + "/" + installPath).utf8))
@@ -96,6 +97,12 @@ public enum LocalizationPack {
         var language: [String: [String: String]] = [:]
         var textIndex: [[String: String]] = []
         for source in project.sources where source.selected {
+            if source.kind == "datapack-zip", !sourceOnly {
+                if source.documents.contains(where: { $0.rows.contains(where: { !$0.translation.isEmpty }) }) {
+                    entries.append(.init(path: "overrides/" + source.installPath, data: try LocalizationDatapackZIP.rendered(source)))
+                }
+                continue
+            }
             for doc in source.documents {
                 let parts = doc.path.split(separator: "/").map(String.init)
                 if (doc.kind == .languageJSON || doc.kind == .languageLegacy), parts.count == 4, parts[0] == "assets", parts[2] == "lang" {
@@ -156,7 +163,7 @@ public enum LocalizationZIP {
         for entry in entries {
             try LocalizationDocument.validatePath(entry.path)
             guard entry.path.utf8.count <= 65_535, names.insert(entry.path.precomposedStringWithCanonicalMapping.lowercased()).inserted,
-                  entry.data.count <= 24 * 1024 * 1024, total <= 96 * 1024 * 1024 - entry.data.count else { throw ResourceError.invalid("导出路径重复或文本超过安全上限。") }
+                  entry.data.count <= 32 * 1024 * 1024, total <= 96 * 1024 * 1024 - entry.data.count else { throw ResourceError.invalid("导出路径重复或内容超过安全上限。") }
             total += entry.data.count
         }
         guard output.path == output.resolvingSymlinksInPath().path else { throw ResourceError.invalid("导出目标不能包含符号链接。") }

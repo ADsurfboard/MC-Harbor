@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Independent Python ZIP decoder verifies actual Swift pack/backup output."""
 from pathlib import Path
-import subprocess, tempfile, zipfile, json
+import subprocess, tempfile, zipfile, json, base64
 root = Path(__file__).resolve().parents[1]
 producer = r'''
 import Foundation
@@ -33,11 +33,29 @@ import Foundation
     try FileManager.default.copyItem(at:merged.backup!,to:output.appendingPathComponent("locale-backup.zip"))
     let document=try LocalizationDocument.read(Data(contentsOf:locale.appendingPathComponent("zh_cn.snbt")),path:"lang/zh_cn.snbt",kind:.ftbLocale)
     guard document.rows.first(where:{$0.key == "/extra"})?.source == "保留",document.rows.first(where:{$0.key == "/next"})?.source == "下一步 %s" else{throw ResourceError.invalid("native Chinese FTB merge failed")}
+    let zipPath="saves/World/datapacks/input.zip",zip=instance.appendingPathComponent(zipPath)
+    try FileManager.default.createDirectory(at:zip.deletingLastPathComponent(),withIntermediateDirectories:true)
+    try FileManager.default.copyItem(at:output.appendingPathComponent("datapack-input.zip"),to:zip)
+    let encoded=try JSONDecoder().decode([String:String].self,from:Data(contentsOf:output.appendingPathComponent("datapack-entries.json")))
+    let entries=try encoded.mapValues { value in guard let data=Data(base64Encoded:value) else{throw ResourceError.invalid("fixture decode failed")};return data }
+    var zipSource=try LocalizationDatapackZIP.scan(entries:entries,name:"ZIP fixture",installPath:zipPath,revision:LocalizationDatapackZIP.revision(zip))
+    for d in zipSource.documents.indices {for r in zipSource.documents[d].rows.indices{zipSource.documents[d].rows[r].translation="译文 "+zipSource.documents[d].rows[r].source}}
+    let zipProject=LocalizationProject(name:"ZIP fixture",sources:[zipSource])
+    try LocalizationZIP.write(LocalizationPack.entries(zipProject,sourceOnly:false),to:output.appendingPathComponent("datapack-outer-pack.zip"))
+    let applied=try LocalizationApply.apply(zipProject,instance:instance,backupHome:output)
+    try FileManager.default.copyItem(at:zip,to:output.appendingPathComponent("datapack-output.zip"))
+    try FileManager.default.copyItem(at:applied.backup!,to:output.appendingPathComponent("datapack-backup.zip"))
   }
 }
 '''
 with tempfile.TemporaryDirectory(prefix='harbor-localization-zip-') as temporary:
     home = Path(temporary); source = home/'Producer.swift'; source.write_text(producer); binary = home/'produce'
+    entries={'pack.mcmeta':json.dumps({'pack':{'pack_format':15,'description':'Adventure'}}).encode(),
+             'data/qa/advancements/start.json':json.dumps({'display':{'title':{'text':'Find stone'}},'criteria':{'id':{'trigger':'minecraft:impossible'}}}).encode(),
+             'data/qa/structure/原始.nbt':bytes([0,255,128,17,31,99,0])}
+    with zipfile.ZipFile(home/'datapack-input.zip','w',compression=zipfile.ZIP_DEFLATED) as archive:
+        for name,data in entries.items(): archive.writestr(name,data)
+    (home/'datapack-entries.json').write_text(json.dumps({name:base64.b64encode(data).decode() for name,data in entries.items()}))
     production = sorted((root/'HarborCore/Sources/HarborCore').glob('Resource*.swift')) + sorted((root/'HarborCore/Sources/HarborCore').glob('Localization*.swift'))
     subprocess.run(['xcrun','swiftc','-swift-version','6','-parse-as-library',*map(str,production),str(source),'-o',str(binary)],check=True)
     subprocess.run([str(binary),str(home)],check=True,timeout=45)
@@ -61,3 +79,13 @@ with tempfile.TemporaryDirectory(prefix='harbor-localization-zip-') as temporary
         assert archive.testzip() is None
         assert archive.read('config/ftbquests/quests/lang/zh_cn.snbt') == "{title:'原译文' extra:'保留'}".encode()
     print('PASS: existing Chinese FTB merge and byte-identical pre-merge ZIP backup verified.')
+    with zipfile.ZipFile(home/'datapack-output.zip') as archive:
+        assert archive.testzip() is None and set(archive.namelist())==set(entries)
+        assert archive.read('data/qa/structure/原始.nbt') == entries['data/qa/structure/原始.nbt']
+        assert json.loads(archive.read('data/qa/advancements/start.json'))=={'display':{'title':{'text':'译文 Find stone'}},'criteria':{'id':{'trigger':'minecraft:impossible'}}}
+    with zipfile.ZipFile(home/'datapack-backup.zip') as archive:
+        assert archive.read('saves/World/datapacks/input.zip') == (home/'datapack-input.zip').read_bytes()
+    with zipfile.ZipFile(home/'datapack-outer-pack.zip') as archive:
+        assert archive.testzip() is None
+        assert archive.read('overrides/saves/World/datapacks/input.zip') == (home/'datapack-output.zip').read_bytes()
+    print('PASS: compressed ZIP datapack translation/application/export, unknown binary preservation and byte-identical original ZIP backup verified by independent decoder.')

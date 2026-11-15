@@ -35,23 +35,27 @@ private func localizationBackground<T: Sendable>(_ work: @escaping @Sendable () 
             catch { self.error = error.localizedDescription }
         }
     }
-    private func archive(_ file: URL) async throws -> [String: Data] {
+    private func archive(_ file: URL, datapack: Bool = false) async throws -> [String: Data] {
         try Task.checkCancellation()
         let bytes: Data = try await withCheckedThrowingContinuation { continuation in
-            services.readModArchive(at: file, entry: "@harbor-language-files") { data, message in
+            services.readModArchive(at: file, entry: datapack ? "@harbor-datapack-files" : "@harbor-language-files") { data, message in
                 if let data { continuation.resume(returning: data) }
                 else { continuation.resume(throwing: ResourceError.invalid(message ?? "语言归档读取失败。")) }
             }
         }
         try Task.checkCancellation()
         guard bytes.count <= 36 * 1024 * 1024 else { throw ResourceError.invalid("语言归档响应过大。") }
-        let encoded = try JSONDecoder().decode([String: String].self, from: bytes)
-        var result: [String: Data] = [:]
-        for (path, base64) in encoded {
-            guard let data = Data(base64Encoded: base64) else { throw ResourceError.invalid("语言归档未完整读取。") }
-            result[path] = data
+        return try await localizationBackground {
+            let encoded = try JSONDecoder().decode([String: String].self, from: bytes)
+            var result: [String: Data] = [:], total = 0
+            guard encoded.count <= 2048 else { throw ResourceError.invalid("归档条目过多。") }
+            for (path, base64) in encoded {
+                try Task.checkCancellation(); try LocalizationDocument.validatePath(path)
+                guard let data = Data(base64Encoded: base64), total <= 24 * 1024 * 1024 - data.count else { throw ResourceError.invalid("归档未完整读取或超过 24 MB。") }
+                result[path] = data; total += data.count
+            }
+            return result
         }
-        return result
     }
     func scan() {
         run {
@@ -68,14 +72,23 @@ private func localizationBackground<T: Sendable>(_ work: @escaping @Sendable () 
                 guard files.count <= 2048 else { throw ResourceError.invalid("资源包数量过多，请分批处理。") }
                 for file in files where file.pathExtension.lowercased() == "zip" { archives.append((file, "resourcepacks/" + file.lastPathComponent, "resourcepacks")) }
             }
+            for path in result.datapackArchives { archives.append((root.appendingPathComponent(path), path, "datapack-zip")) }
             var total = result.sources.reduce(0) { $0 + max($1.originalFiles.values.reduce(0) { $0 + $1.count }, $1.documents.reduce(0) { $0 + $1.original.count }) }
             for (index, item) in archives.enumerated() {
                 try Task.checkCancellation(); self.status = "读取语言 \(index + 1)/\(archives.count) · " + item.0.lastPathComponent
                 do {
-                    let entries = try await self.archive(item.0)
-                    let source = try await localizationBackground { try LocalizationScanner.archive(entries: entries, name: item.0.lastPathComponent, installPath: item.1, kind: item.2) }
-                    total += source.originalFiles.values.reduce(0) { $0 + $1.count }
-                    guard total <= 24 * 1024 * 1024 else { throw ResourceError.invalid("实例语言超过 24 MB，请拆分资源后扫描。") }
+                    let zipped = item.2 == "datapack-zip"
+                    let revision = zipped ? try await localizationBackground { try LocalizationDatapackZIP.revision(item.0) } : nil
+                    let entries = try await self.archive(item.0, datapack: zipped)
+                    let source = try await localizationBackground {
+                        if let revision {
+                            guard try LocalizationDatapackZIP.revision(item.0) == revision else { throw ResourceError.invalid("读取时 ZIP 数据包发生变化，请重试。") }
+                            return try LocalizationDatapackZIP.scan(entries: entries, name: item.0.lastPathComponent, installPath: item.1, revision: revision)
+                        }
+                        return try LocalizationScanner.archive(entries: entries, name: item.0.lastPathComponent, installPath: item.1, kind: item.2)
+                    }
+                    let size = source.originalFiles.values.reduce(0) { $0 + $1.count }
+                    guard total <= 24 * 1024 * 1024 - size else { throw ResourceError.invalid("实例语言和数据包超过 24 MB，请拆分资源后扫描。") }; total += size
                     if !source.documents.isEmpty || !source.originalFiles.isEmpty { result.sources.append(source) }
                 } catch is CancellationError { throw CancellationError() }
                 catch { result.warnings.append(item.0.lastPathComponent + "：" + error.localizedDescription) }
