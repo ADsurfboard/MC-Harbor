@@ -201,5 +201,11 @@ import XCTest
         XCTAssertGreaterThanOrEqual(right.intersection(viewport).width, 24, file: file, line: line)
         XCTAssertGreaterThan(left.midX, viewport.minX, file: file, line: line)
         XCTAssertLessThan(right.midX, viewport.maxX, file: file, line: line)
+        if viewport.width >= 1200 {
+            XCTAssertEqual(visible.filter { $0.midX < center.midX - 30 }.count, 3,
+                           "Wide iPad needs the complete left fan", file: file, line: line)
+            XCTAssertEqual(visible.filter { $0.midX > center.midX + 30 }.count, 3,
+                           "Two-instance looping must also fill the right fan", file: file, line: line)
+        }
     }
 }

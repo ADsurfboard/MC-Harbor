@@ -14,12 +14,11 @@ enum HarborLibraryOptions {
 /// SwiftUI state update. Only crossing into another instance publishes state.
 private final class HarborCoverFlowLayout: UICollectionViewLayout {
     var spatialEffects = true
+    var instanceCount = 0
     var geometry: CoverFlowGeometry {
         .init(width: Double(collectionView?.bounds.width ?? 1),
               height: Double(collectionView?.bounds.height ?? 1),
-              count: (collectionView?.numberOfItems(inSection: 0) ?? 0) > 1
-                  ? (collectionView?.numberOfItems(inSection: 0) ?? 0) / 3
-                  : (collectionView?.numberOfItems(inSection: 0) ?? 0))
+              count: instanceCount)
     }
     override var collectionViewContentSize: CGSize {
         CGSize(width: geometry.contentWidth, height: geometry.height)
@@ -81,15 +80,17 @@ private final class HarborCoverFlowLayout: UICollectionViewLayout {
 private struct CoverFlowArtwork: View {
     let instance: PhoneInstance
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    private var compact: Bool { verticalSizeClass == .compact }
     var body: some View {
-        VStack(spacing: 10) {
-            Text(instance.loader.uppercased()).font(.system(size: 10, weight: .semibold, design: .rounded))
+        VStack(spacing: compact ? 6 : 10) {
+            Text(instance.loader.uppercased()).font(.system(size: compact ? 9 : 10, weight: .semibold, design: .rounded))
                 .tracking(1.6).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
             HarborLoaderArtwork(loader: instance.loader)
-                .frame(maxWidth: .infinity, maxHeight: .infinity).padding(12)
-            Text(instance.name).font(.subheadline.weight(.medium)).lineLimit(2)
+                .frame(maxWidth: .infinity, maxHeight: .infinity).padding(compact ? 2 : 12)
+            Text(instance.name).font(compact ? .caption.weight(.medium) : .subheadline.weight(.medium)).lineLimit(compact ? 1 : 2)
                 .multilineTextAlignment(.center).frame(maxWidth: .infinity)
-        }.padding(18)
+        }.padding(compact ? 12 : 18)
             .background(LinearGradient(colors: [Color.white.opacity(scheme == .dark ? 0.08 : 0.28), .clear], startPoint: .topLeading, endPoint: .bottomTrailing))
             .clipShape(RoundedRectangle(cornerRadius: 24))
             .harborGlass(radius: 24)
@@ -146,6 +147,7 @@ private struct NativeCoverFlow: UIViewRepresentable {
         layout.spatialEffects = spatialEffects; layout.invalidateLayout()
         if changed {
             coordinator.items = Array(instances.prefix(10_000))
+            layout.instanceCount = coordinator.items.count
             coordinator.suppress = true; view.reloadData(); view.layoutIfNeeded()
             let position = coordinator.items.firstIndex { $0.id == focused } ?? 0
             coordinator.center(layout.geometry.middle(position), in: view, animated: false)
@@ -171,7 +173,7 @@ private struct NativeCoverFlow: UIViewRepresentable {
         let feedback = HarborCrownFeedback()
         init(_ parent: NativeCoverFlow) { self.parent = parent }
         func collectionView(_ view: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-            items.count > 1 ? items.count * 3 : items.count
+            (view.collectionViewLayout as? HarborCoverFlowLayout)?.geometry.slots ?? 0
         }
         func collectionView(_ view: UICollectionView, cellForItemAt path: IndexPath) -> UICollectionViewCell {
             let cell = view.dequeueReusableCell(withReuseIdentifier: "cover", for: path)
@@ -211,7 +213,8 @@ private struct NativeCoverFlow: UIViewRepresentable {
             virtualIndex = slot; current = layout.geometry.logical(slot)
             parent.focused = items[current].id
             // Rebase an equivalent copy only after motion stops; no visible jump.
-            if items.count > 1 && (slot < items.count || slot >= 2 * items.count) {
+            let first = layout.geometry.middle(0)
+            if items.count > 1 && (slot < first || slot >= first + items.count) {
                 center(layout.geometry.middle(current), in: view, animated: false)
             }
         }

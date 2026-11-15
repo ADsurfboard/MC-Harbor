@@ -69,15 +69,30 @@ final class CoverFlowGeometryTests: XCTestCase {
     }
     func testCopiesWrapWithoutAddingLogicalInstances() {
         let layout = CoverFlowGeometry(width: 390, height: 268, count: 2)
-        XCTAssertEqual(layout.slots, 6)
+        XCTAssertEqual(layout.slots, 10)
         XCTAssertEqual(layout.logical(layout.middle(0) - 1), 1)
         XCTAssertEqual(layout.logical(layout.middle(1) + 1), 0)
-        XCTAssertEqual(layout.closestSlot(for: 0, around: 3), 2)
-        XCTAssertEqual(layout.closestSlot(for: 0, around: 3, direction: 1), 4)
-        XCTAssertEqual(layout.closestSlot(for: 0, around: 3, direction: -1), 2)
+        XCTAssertEqual(layout.closestSlot(for: 0, around: layout.middle(1)), 4)
+        XCTAssertEqual(layout.closestSlot(for: 0, around: layout.middle(1), direction: 1), 6)
+        XCTAssertEqual(layout.closestSlot(for: 0, around: layout.middle(1), direction: -1), 4)
         XCTAssertEqual(layout.nearest(-100), 0)
-        XCTAssertEqual(layout.nearest(100_000), 5)
+        XCTAssertEqual(layout.nearest(100_000), 9)
         XCTAssertNil(CoverFlowGeometry(width: 390, height: 268, count: 0).visible(around: 0))
         XCTAssertEqual(CoverFlowGeometry(width: 390, height: 268, count: 1).slots, 1)
+    }
+    func testEveryLogicalPositionHasThreeSymmetricNeighbors() throws {
+        for count in 2...8 {
+            let layout = CoverFlowGeometry(width: 1376, height: 268, count: count)
+            for logical in 0..<count {
+                let selected = layout.middle(logical)
+                let range = try XCTUnwrap(layout.visible(around: layout.offset(selected)))
+                XCTAssertEqual(range.lowerBound, selected - 3)
+                XCTAssertEqual(range.upperBound, selected + 3)
+                for step in 1...3 {
+                    XCTAssertEqual(layout.logical(selected + step), (logical + step) % count)
+                    XCTAssertEqual(layout.logical(selected - step), (logical - step + count * 2) % count)
+                }
+            }
+        }
     }
 }

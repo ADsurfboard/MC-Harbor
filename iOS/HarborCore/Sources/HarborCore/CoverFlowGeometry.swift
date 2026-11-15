@@ -1,11 +1,14 @@
 import Foundation
 
-/// Shared layout math, independent of UIKit and screen scale. Three bounded
-/// copies provide real previous/next covers at the ends without fake instances.
+/// Shared layout math, independent of UIKit and screen scale. Bounded copies
+/// provide real previous/next covers at the ends without fake instances.
 public struct CoverFlowGeometry: Sendable {
     public let width: Double, height: Double, count: Int
     public let cardWidth: Double, cardHeight: Double, pitch: Double
-    public var slots: Int { count > 1 ? count * 3 : count }
+    // Seven visible positions need three neighbors on each side. Two logical
+    // instances therefore need five copies; three or more only need three.
+    public var copyCount: Int { count > 1 ? (count == 2 ? 5 : 3) : 1 }
+    public var slots: Int { count * copyCount }
     public var contentWidth: Double { width + Double(max(0, slots - 1)) * pitch }
     public init(width: Double, height: Double, count: Int) {
         self.width = max(1, width); self.height = max(1, height); self.count = max(0, min(10_000, count))
@@ -16,12 +19,12 @@ public struct CoverFlowGeometry: Sendable {
         pitch = cardWidth * 0.90
     }
     public func logical(_ slot: Int) -> Int { count > 0 ? ((slot % count) + count) % count : 0 }
-    public func middle(_ logical: Int) -> Int { count > 1 ? count + self.logical(logical) : 0 }
+    public func middle(_ logical: Int) -> Int { count > 1 ? (copyCount / 2) * count + self.logical(logical) : 0 }
     public func nearest(_ offset: Double) -> Int { max(0, min(slots - 1, Int((offset / pitch).rounded()))) }
     public func offset(_ slot: Int) -> Double { Double(max(0, min(slots - 1, slot))) * pitch }
     public func closestSlot(for logical: Int, around slot: Int, direction: Int = 0) -> Int {
         guard count > 1 else { return 0 }
-        return [logical, logical + count, logical + 2 * count].min {
+        return (0..<copyCount).map { self.logical(logical) + $0 * count }.min {
             if abs($0 - slot) != abs($1 - slot) { return abs($0 - slot) < abs($1 - slot) }
             return direction > 0 ? $0 > $1 : $0 < $1
         } ?? middle(logical)
