@@ -19,6 +19,11 @@ struct HarborResourcesView: View {
                         ForEach(ResourceKind.allCases, id: \.rawValue) { Text($0.title).tag($0) }
                     }.pickerStyle(.segmented).accessibilityIdentifier("resources.kind")
                     installMenu
+                    if let instance {
+                        NavigationLink { HarborLocalizationView(services: model.services, instance: instance) } label: {
+                            Image(systemName: "character.book.closed").frame(width: 44, height: 44).contentShape(Rectangle())
+                        }.buttonStyle(.plain).accessibilityLabel("实例资源汉化").accessibilityIdentifier("resources.localization")
+                    }
                     NavigationLink { HarborResourceSettings() } label: { Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44).contentShape(Rectangle()) }
                         .buttonStyle(.plain).accessibilityLabel("资源与翻译设置").accessibilityIdentifier("resources.settings")
                 }
@@ -36,9 +41,6 @@ struct HarborResourcesView: View {
                 if let instance {
                     Text("\(instance.name) · \(instance.gameVersion ?? instance.version) · \(instance.loader)")
                         .font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                    NavigationLink { HarborLocalizationView(services: model.services, instance: instance) } label: {
-                        Label("实例资源汉化", systemImage: "character.book.closed").frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    }.accessibilityIdentifier("resources.localization")
                 }
                 if model.kind == .mod, let instance, !["fabric", "forge", "quilt", "neoforge"].contains(instance.loader.lowercased()) {
                     Text("此实例为原版。可以浏览模组；安装前请先为实例安装对应的模组加载器。")

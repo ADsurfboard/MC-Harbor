@@ -211,6 +211,20 @@ struct HarborPhoneRoot: View {
                   if matchesSettings("外观 性能 动画 独家优化 Liquid Glass 玻璃") {
                     HarborPerformanceSettings()
                   }
+                  if matchesSettings("壁纸 背景 图片 视频 动态 预览 命名 外观") {
+                    Section("壁纸") {
+                        NavigationLink { HarborWallpapersView() } label: {
+                            Label("壁纸库", systemImage: "photo.on.rectangle.angled").frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                        }.accessibilityIdentifier("settings.wallpapers")
+                    }
+                  }
+                  if matchesSettings("欢迎 音频 声音 男声 女声 音量 语音 Clara Adam Morgan") {
+                    Section("声音") {
+                        NavigationLink { HarborWelcomeAudioSettings() } label: {
+                            Label("欢迎音频", systemImage: "waveform").frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                        }.accessibilityIdentifier("settings.welcome")
+                    }
+                  }
                   if matchesSettings("游戏库 实例 封面流 Cover Flow 列表 音效 触感 振动") {
                     HarborLibraryPresentationSettings()
                   }
@@ -260,6 +274,7 @@ struct HarborPhoneRoot: View {
                     to: services.harborHomeURL.appendingPathComponent(".native-smoke-ready"), options: .atomic)
             }
         }
+        .task { await HarborWallpaperState.shared.configure(home: services.harborHomeURL); HarborWelcomeAudio.shared.welcome() }
     }
     private func matchesSettings(_ keywords: String) -> Bool {
         settingsQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || keywords.localizedCaseInsensitiveContains(settingsQuery.trimmingCharacters(in: .whitespacesAndNewlines))

@@ -52,6 +52,22 @@ struct HarnessRoot: UIViewControllerRepresentable {
             }
             try? FileManager.default.createDirectory(at: root.appendingPathComponent("mods"), withIntermediateDirectories: true)
         }
+        if ProcessInfo.processInfo.environment["HARBOR_WALLPAPER_FIXTURE"] == "1" {
+            let folder = harborHomeURL.appendingPathComponent("harbor-wallpapers"), index = folder.appendingPathComponent("library.json")
+            if !FileManager.default.fileExists(atPath: index.path) {
+                let id = "12345678-1234-4321-8765-123456789ABC"
+                try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                let image = UIGraphicsImageRenderer(size: CGSize(width: 64, height: 48)).image { context in
+                    UIColor.systemTeal.setFill(); context.fill(CGRect(x: 0, y: 0, width: 64, height: 48))
+                }
+                if let data = image.pngData() {
+                    try? data.write(to: folder.appendingPathComponent(id + ".png"))
+                    try? data.write(to: folder.appendingPathComponent(id + ".preview.png"))
+                    let object: [String: Any] = ["items": [["id": id, "name": "QA Wallpaper", "filename": id + ".png", "video": false, "added": Date().timeIntervalSinceReferenceDate]]]
+                    if let json = try? JSONSerialization.data(withJSONObject: object) { try? json.write(to: index) }
+                }
+            }
+        }
     }
     func instanceListJSON() -> Data {
         Data("""

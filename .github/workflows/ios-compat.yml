@@ -8,7 +8,8 @@ permissions:
   contents: read
 concurrency:
   group: ios-port-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Finish native acceptance tests before starting the next source revision.
+  cancel-in-progress: false
 jobs:
   device-and-core:
     # Cross-build iPhone ARM64 on Intel to avoid requesting four scarce ARM VMs.
@@ -66,6 +67,8 @@ jobs:
         run: python3 iOS/tools/test-social-client.py
       - name: Verify exported localization ZIPs with an independent decoder
         run: python3 iOS/tools/test-localization-zip.py
+      - name: Decode the four bundled welcome MP3s without playback
+        run: python3 iOS/tools/test-welcome-audio.py
       - uses: actions/setup-java@v4
         with:
           distribution: zulu

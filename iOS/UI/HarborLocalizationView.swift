@@ -101,12 +101,11 @@ struct HarborLocalizationView: View {
             }
         }.harborPageBackground().navigationTitle("实例资源汉化").navigationBarTitleDisplayMode(.inline)
             .searchable(text: $query, prompt: "搜索语言键、原文、译文或资源")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button { model.scan() } label: { Image(systemName: "arrow.clockwise").frame(width: 44, height: 44).contentShape(Rectangle()) }
-                        .accessibilityLabel("读取实例语言").accessibilityIdentifier("localization.scan").disabled(model.busy)
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
+            .safeAreaInset(edge: .top) {
+                HStack(spacing: 14) {
+                    Button { model.scan() } label: { Label("读取实例", systemImage: "arrow.clockwise").frame(minHeight: 44).contentShape(Rectangle()) }
+                        .harborGlassButton().accessibilityLabel("读取实例语言").accessibilityIdentifier("localization.scan").disabled(model.busy)
+                    Spacer(minLength: 8)
                     Menu {
                         Button("名称与资源包格式") { configure = true }
                         Button("导入译文 JSON 或资源包 ZIP") { importing = true }
@@ -115,8 +114,8 @@ struct HarborLocalizationView: View {
                         Button("备份并应用任务 / 数据包译文") { confirmApply = true }
                         NavigationLink { HarborResourceSettings() } label: { Text("翻译来源设置") }
                     } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44).contentShape(Rectangle()) }
-                        .accessibilityLabel("汉化操作").disabled(model.busy || model.project == nil)
-                }
+                        .harborGlassButton().accessibilityLabel("汉化操作").disabled(model.busy || model.project == nil)
+                }.padding(.horizontal, 18).padding(.vertical, 8)
             }
             .task { await model.load() }
             .onChange(of: phase) { if $0 == .background { model.cancel() } }

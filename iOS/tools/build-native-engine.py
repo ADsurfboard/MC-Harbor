@@ -490,7 +490,19 @@ with zipfile.ZipFile(package) as archive:
     assert stat.S_IMODE(executable.external_attr>>16)&0o111,'Packaged app lost its executable permissions'
     assert archive.testzip() is None,'Packaged app failed ZIP integrity verification'
 with package.open('rb') as stream: digest=hashlib.file_digest(stream,'sha256').hexdigest()
+voice_assets={}
+for original in sorted((REPO/'Assets/Voice').glob('*.mp3')):
+    copies=list((destination/'Frameworks/HarborIOSUI.framework').rglob(original.name))
+    assert len(copies)==1,'Welcome audio missing or duplicated: '+original.name
+    expected=hashlib.sha256(original.read_bytes()).hexdigest()
+    assert hashlib.sha256(copies[0].read_bytes()).hexdigest()==expected,'Welcome audio changed during packaging: '+original.name
+    with zipfile.ZipFile(package) as archive:
+        members=[entry for entry in archive.infolist() if '/HarborIOSUI.framework/' in entry.filename and entry.filename.endswith('/'+original.name)]
+        assert len(members)==1 and members[0].file_size==original.stat().st_size,'Packaged welcome audio missing or duplicated: '+original.name
+        assert hashlib.sha256(archive.read(members[0])).hexdigest()==expected,'MP3 bytes inside the package do not match: '+original.name
+    voice_assets[original.name]={'sha256':expected,'bytes':original.stat().st_size}
+assert len(voice_assets)==4,'The complete native app must retain all four welcome MP3s'
 report={'upstream':UPSTREAM,'platform':args.platform,'app':str(destination),'nativeExecutable':(destination/'AngelAuraAmethyst').is_file(),'frameworks':[x.name for x in (destination/'Frameworks').glob('Harbor*.framework')],'javaRuntimes':[x.name for x in (destination/'java_runtimes').iterdir() if x.is_dir()],'package':package.name,'packageBytes':package.stat().st_size,'packageSHA256':digest,'signing':'ad-hoc; device installation requires personal developer signing','minecraftGameplayVerified':False}
-report.update(nativeBuildMetadata=native_build_metadata, nativeLiquidGlassSDK=True)
+report.update(nativeBuildMetadata=native_build_metadata, nativeLiquidGlassSDK=True, uiConfiguration='Release', welcomeAudio=voice_assets)
 (EVIDENCE/('native-build-'+args.platform+'.json')).write_text(json.dumps(report,indent=2))
 print(json.dumps(report),flush=True)

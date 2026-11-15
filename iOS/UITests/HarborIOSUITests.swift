@@ -3,6 +3,44 @@ import XCTest
 @MainActor final class HarborIOSUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false; XCUIDevice.shared.orientation = .portrait }
     override func tearDownWithError() throws { XCUIDevice.shared.orientation = .portrait }
+    func testWallpaperLibraryUsesPreviewAndPersistsSelection() throws {
+        let app = XCUIApplication(); app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"; app.launchEnvironment["HARBOR_WALLPAPER_FIXTURE"] = "1"; app.launch()
+        func openLibrary() {
+            openSettingsEntry("settings.wallpapers", app: app)
+            XCTAssertTrue(app.buttons["wallpapers.import"].waitForExistence(timeout: 10))
+        }
+        openLibrary()
+        XCTAssertGreaterThanOrEqual(app.buttons["wallpapers.import"].frame.height, 44)
+        let identifier = "wallpapers.item.12345678-1234-4321-8765-123456789ABC"
+        let item = app.buttons[identifier]
+        for _ in 0..<5 { if item.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(item.waitForExistence(timeout: 10)); item.tap()
+        let use = app.buttons["使用此壁纸"]
+        XCTAssertTrue(use.waitForExistence(timeout: 10)); XCTAssertGreaterThanOrEqual(use.frame.height, 44); use.tap()
+        XCTAssertTrue(app.buttons["正在使用"].waitForExistence(timeout: 10)); capture("wallpaper-preview-selected")
+        app.terminate(); app.launch(); openLibrary()
+        let restored = app.buttons[identifier]
+        XCTAssertTrue(restored.waitForExistence(timeout: 10)); waitForValue("使用中", in: restored)
+        let defaults = app.buttons["wallpapers.default"]; defaults.tap(); waitForValue("已选中", in: defaults)
+        capture("wallpaper-default-restored")
+    }
+    func testWelcomeAudioListsFourOriginalVoicesAndPersistsChoice() throws {
+        let app = XCUIApplication(); app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"; app.launch()
+        openSettingsEntry("settings.welcome", app: app)
+        let picker = app.buttons["welcome.voice"]
+        XCTAssertTrue(picker.waitForExistence(timeout: 10)); picker.tap()
+        for title in ["女声 1 · Clara", "女声 2 · Clara", "男声 1 · Adam", "男声 2 · Morgan"] { XCTAssertTrue(app.buttons[title].waitForExistence(timeout: 5)) }
+        app.buttons["男声 2 · Morgan"].tap()
+        let chosen = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            (picker.label + " " + (picker.value as? String ?? "")).contains("Morgan")
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [chosen], timeout: 5), .completed)
+        capture("welcome-four-voices")
+        app.terminate(); app.launch(); openSettingsEntry("settings.welcome", app: app)
+        let restored = app.buttons["welcome.voice"]
+        XCTAssertTrue(restored.waitForExistence(timeout: 10)); XCTAssertTrue((restored.label + " " + (restored.value as? String ?? "")).contains("Morgan"))
+        restored.tap(); app.buttons["女声 1 · Clara"].tap()
+    }
     func testLocalizationReadsRealLooseFixturesAndPersistsManualDraft() throws {
         let app = XCUIApplication(); app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"; app.launchEnvironment["HARBOR_LOCALIZATION_FIXTURE"] = "1"; app.launch()
         func openWorkspace() {
@@ -252,6 +290,13 @@ import XCTest
         XCTAssertTrue(touch.waitForExistence(timeout: 5)); touch.tap()
         XCTAssertEqual(app.textFields["touch.layout.name"].value as? String, "Harbor Touch QA")
         capture("touch-editor-restored")
+    }
+    private func openSettingsEntry(_ identifier: String, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let settings = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "设置")).firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: 15), file: file, line: line); settings.tap()
+        let entry = app.buttons[identifier]
+        for _ in 0..<8 { if entry.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(entry.waitForExistence(timeout: 10), file: file, line: line); XCTAssertTrue(entry.isHittable, file: file, line: line); entry.tap()
     }
     private func waitForValue(_ expected: String, in element: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
         // Keep the exact-value assertion. Wait only for UIKit/SwiftUI to

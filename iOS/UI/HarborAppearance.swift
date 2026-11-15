@@ -84,6 +84,8 @@ struct HarborGlassGroup<Content: View>: View {
 /// No display link or perpetual animation is introduced by the background.
 struct HarborPageBackdrop: View {
     @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var wallpaper = HarborWallpaperState.shared
+    @AppStorage(HarborAppearance.exclusiveOptimizationKey) private var exclusive = false
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -98,8 +100,18 @@ struct HarborPageBackdrop: View {
                     .clear
                 ], center: .bottomTrailing, startRadius: 0,
                    endRadius: max(geometry.size.width, geometry.size.height) * 0.65)
+                if let image = wallpaper.image {
+                    Image(uiImage: image).resizable().scaledToFill().frame(width: geometry.size.width, height: geometry.size.height).clipped()
+                }
+                if let player = wallpaper.player, !exclusive {
+                    HarborWallpaperVideo(player: player).frame(width: geometry.size.width, height: geometry.size.height).clipped()
+                }
+                if wallpaper.image != nil || wallpaper.player != nil {
+                    Color(uiColor: .systemGroupedBackground).opacity(colorScheme == .dark ? 0.56 : 0.42)
+                }
             }
         }.ignoresSafeArea().allowsHitTesting(false).accessibilityHidden(true)
+            .onChange(of: exclusive) { wallpaper.setPolicy(exclusive: $0) }
     }
 }
 
