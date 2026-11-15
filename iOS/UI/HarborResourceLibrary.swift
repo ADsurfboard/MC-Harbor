@@ -83,9 +83,9 @@ enum HarborResourcePreferences {
                 struct Access: Decodable { let token: String; let directory: String }
                 let access = try JSONDecoder().decode(Access.self, from: services.beginResourceAccess(profile: instance.id, kind: kind.directory))
                 defer { services.endModAccess(token: access.token) }
-                let count = try await installer.install(plan, kind: kind, destination: URL(fileURLWithPath: access.directory), route: route) { done, total, file in
+                let count = try await installer.install(plan, kind: kind, destination: URL(fileURLWithPath: access.directory), route: route, progress: { done, total, file in
                     await MainActor.run { self.progress = Double(done) / Double(max(1, total)); self.progressText = file }
-                }
+                })
                 showNotice(count == 0 ? "这些文件已经安装，已校验内容一致。" : "\(project.title) 与必要前置已安装，共 \(count) 个文件。")
             } catch is CancellationError { showNotice("下载已取消，已有资源已保留。") }
             catch { self.error = error.localizedDescription }
