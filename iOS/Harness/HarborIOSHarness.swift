@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import HarborIOSUI
+import HarborCore
 
 /// Disposable native UI host. It never claims to run Java or to authenticate a real
 /// account; game-engine integration is tested separately in the native app target.
@@ -15,7 +16,21 @@ struct HarnessRoot: UIViewControllerRepresentable {
     func updateUIViewController(_ controller: UIViewController, context: Context) {}
 }
 
-@MainActor final class HarnessServices: NSObject, HarborNativeServices {
+@MainActor final class HarnessServices: NSObject, HarborNativeServices, HarborSocialTransportProvider {
+    var socialCredential: String? { ProcessInfo.processInfo.environment["HARBOR_FRIENDS_FIXTURE"] == "1" ? String(repeating: "a", count: 96) : nil }
+    var socialTransport: ResourceTransport? {
+        guard socialCredential != nil else { return nil }
+        return { request, _ in
+            let person: @Sendable (Int) -> [String: Any] = { index in
+                ["id": String(format: "00000000-0000-4000-8000-%012d", index), "code": String(format: "%012d", index), "name": String(format: "隔离测试好友 %02d", index), "sharing": true, "skinHash": "", "skinModel": "default"]
+            }
+            let object: Any
+            if request.url?.path == "/health" { object = ["ok": true, "chat": true, "realtime": false] }
+            else if request.url?.path == "/v1/friends" { object = ["me": person(999), "friends": (1...48).map(person), "requests": [], "sent": []] }
+            else { object = [] as [String] }
+            return ResourceHTTPResult(data: try JSONSerialization.data(withJSONObject: object), status: 200)
+        }
+    }
     let harborHomeURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("NativeUITest")
     let runtimeDescription = "隔离界面测试环境，不包含游戏 JVM，不使用玩家账号或存档。"
     override init() {

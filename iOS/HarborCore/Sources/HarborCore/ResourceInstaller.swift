@@ -122,33 +122,36 @@ public actor ResourceInstaller {
         let available = try stage.resourceValues(forKeys: [.volumeAvailableCapacityKey]).volumeAvailableCapacity ?? 0
         guard Int64(available) > needed + 128 * 1024 * 1024 else { throw ResourceError.invalid("空间不足，请至少保留下载大小以外的 128 MB 空间。") }
         await progress(0, files.count, "下载与校验")
-        try await withThrowingTaskGroup(of: String.self) { group in
+        // Return failures as values, drain every child, and throw only after the
+        // group has left scope. This also avoids a Swift 6.3 x86_64 allocator
+        // abort observed while unwinding the corrupt-download regression.
+        let failure: Error? = await withTaskGroup(of: Result<String, Error>.self) { group in
             var next = 0, finished = 0
-            func enqueue(_ file: ResourceFile) {
+            var failure: Error?
+            for file in files.prefix(3) {
                 let target = stage.appendingPathComponent(file.name)
-                group.addTask {
-                    let transferFiles = FileManager()
-                    var last: Error = ResourceError.unavailable("所有下载来源均暂不可用。")
-                    for url in ResourceNetwork.candidates(file.url, route: route) {
-                        try Task.checkCancellation()
-                        do {
-                            try await download(url, target, file.size)
-                            try Task.checkCancellation()
-                            guard try ResourceFiles.verify(target, file: file) else { throw ResourceError.invalid("\(file.name) 校验失败。") }
-                            return file.name
-                        } catch {
-                            last = error; try? transferFiles.removeItem(at: target); try Task.checkCancellation()
+                group.addTask { await Self.fetch(file, target: target, route: route, download: download) }
+                next += 1
+            }
+            while let result = await group.next() {
+                switch result {
+                case .success(let name):
+                    finished += 1
+                    if failure == nil {
+                        await progress(finished, files.count, name)
+                        if next < files.count {
+                            let file = files[next], target = stage.appendingPathComponent(files[next].name)
+                            next += 1
+                            group.addTask { await Self.fetch(file, target: target, route: route, download: download) }
                         }
                     }
-                    throw last
+                case .failure(let error):
+                    if failure == nil { failure = error; group.cancelAll() }
                 }
             }
-            while next < min(3, files.count) { enqueue(files[next]); next += 1 }
-            while let name = try await group.next() {
-                finished += 1; await progress(finished, files.count, name)
-                if next < files.count { enqueue(files[next]); next += 1 }
-            }
+            return failure
         }
+        if let failure { throw failure }
         try Task.checkCancellation(); try safe(destination)
         try fm.createDirectory(at: destination, withIntermediateDirectories: true)
         let existing = try fm.contentsOfDirectory(atPath: destination.path)
@@ -172,5 +175,20 @@ public actor ResourceInstaller {
             for url in moved.reversed() { try? fm.removeItem(at: url) }
             throw error
         }
+    }
+    private static func fetch(_ file: ResourceFile, target: URL, route: ResourceRoute, download: ResourceDownload) async -> Result<String, Error> {
+        let fm = FileManager()
+        var last: Error = ResourceError.unavailable("所有下载来源均暂不可用。")
+        for url in ResourceNetwork.candidates(file.url, route: route) {
+            do {
+                try Task.checkCancellation(); try await download(url, target, file.size); try Task.checkCancellation()
+                guard try ResourceFiles.verify(target, file: file) else { throw ResourceError.invalid("\(file.name) 校验失败。") }
+                return .success(file.name)
+            } catch {
+                last = error; try? fm.removeItem(at: target)
+                if Task.isCancelled { return .failure(CancellationError()) }
+            }
+        }
+        return .failure(last)
     }
 }

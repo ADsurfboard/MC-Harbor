@@ -117,7 +117,7 @@ struct HarborResourceSettings: View {
                     .font(.footnote).foregroundStyle(.secondary)
             }
             Section("中文搜索与简介") {
-                Toggle("简介自动汉化", isOn: $summaries).accessibilityIdentifier("resources.translate")
+                HarborSettingsToggle("简介自动汉化", isOn: $summaries).accessibilityIdentifier("resources.translate")
                 Picker("翻译服务", selection: $provider) {
                     ForEach(ResourceTranslationProvider.allCases, id: \.rawValue) { Text($0.title).tag($0.rawValue) }
                 }.accessibilityIdentifier("resources.provider")

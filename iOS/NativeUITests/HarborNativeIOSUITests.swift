@@ -128,6 +128,7 @@ import CoreGraphics
         add(screenshot)
         cancel.tap()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+        XCTAssertTrue(menu.waitForExistence(timeout: 10)); XCTAssertTrue(menu.isHittable); menu.tap()
         XCTAssertTrue(importer.waitForExistence(timeout: 10))
     }
 }

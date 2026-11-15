@@ -4,6 +4,13 @@ import SwiftUI
 import HarborCore
 import CryptoKit
 
+/// Optional dependency injection for a host that supplies its own social
+/// transport. The complete native launcher uses the bundled public service.
+@MainActor public protocol HarborSocialTransportProvider {
+    var socialTransport: ResourceTransport? { get }
+    var socialCredential: String? { get }
+}
+
 @MainActor @objc public protocol HarborNativeServices: AnyObject {
     var harborHomeURL: URL { get }
     var runtimeDescription: String { get }
@@ -101,6 +108,7 @@ struct HarborPhoneRoot: View {
     @StateObject private var library: PhoneLibrary
     @StateObject private var folders: HarborFolderLibrary
     @StateObject private var resources: HarborResourceLibrary
+    @StateObject private var social: HarborSocialLibrary
     @State private var settingsQuery = ""
     @State private var page: NativePage?
     @AppStorage(HarborLibraryOptions.coverFlow) private var coverFlow = false
@@ -111,6 +119,8 @@ struct HarborPhoneRoot: View {
         _library = StateObject(wrappedValue: PhoneLibrary(services))
         _folders = StateObject(wrappedValue: HarborFolderLibrary(services: services))
         _resources = StateObject(wrappedValue: HarborResourceLibrary(services: services))
+        let provider = services as? HarborSocialTransportProvider
+        _social = StateObject(wrappedValue: HarborSocialLibrary(home: services.harborHomeURL, transport: provider?.socialTransport, credential: provider?.socialCredential))
     }
     var body: some View {
         TabView {
@@ -174,6 +184,8 @@ struct HarborPhoneRoot: View {
             }.tabItem { Label("资源", systemImage: "arrow.down.circle") }
             NavigationStack { HarborFoldersView(model: folders) }
                 .tabItem { Label("模组夹", systemImage: "folder") }
+            NavigationStack { HarborFriendsView(model: social, instances: library.instances) }
+                .tabItem { Label("好友", systemImage: "person.2") }
             NavigationStack {
                 List {
                   if matchesSettings("触控 摇杆 手柄 键鼠 控制 布局") {
@@ -229,10 +241,11 @@ struct HarborPhoneRoot: View {
             NativePresentationContent(services: services, page: selected)
         }.harborMotionPolicy()
         .onChange(of: scenePhase) { phase in
-            if phase == .active { library.refresh() }
-            if phase == .background { resources.cancel() }
+            if phase == .active { library.refresh(); social.activate() }
+            if phase == .background { resources.cancel(); social.suspend() }
         }
         .onAppear {
+            social.activate()
             if ProcessInfo.processInfo.environment["HARBOR_SMOKE_TEST"] == "1" {
                 NSLog("[MC Harbor] HARBOR_ROOT_READY")
                 try? Data("HARBOR_ROOT_READY".utf8).write(

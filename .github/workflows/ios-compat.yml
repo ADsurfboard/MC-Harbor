@@ -39,6 +39,8 @@ jobs:
         run: python3 iOS/tools/test-modpack-transaction.py
       - name: Test real mod-folder persistence, atomic copies and metadata readers
         run: python3 iOS/tools/test-mod-folders.py
+      - name: Test production friend client with isolated identities and redirect protection
+        run: python3 iOS/tools/test-social-client.py
       - uses: actions/setup-java@v4
         with:
           distribution: zulu

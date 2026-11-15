@@ -3,6 +3,32 @@ import XCTest
 @MainActor final class HarborIOSUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false; XCUIDevice.shared.orientation = .portrait }
     override func tearDownWithError() throws { XCUIDevice.shared.orientation = .portrait }
+    func testManyFriendsRemainSeparatedAndNotesPersist() throws {
+        let app = XCUIApplication(); app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"; app.launchEnvironment["HARBOR_FRIENDS_FIXTURE"] = "1"; app.launch()
+        func openFriends() {
+            let tab = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "好友")).firstMatch
+            XCTAssertTrue(tab.waitForExistence(timeout: 15)); tab.tap()
+        }
+        openFriends()
+        let search = app.searchFields["搜索昵称、备注或好友码"]
+        XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("36")
+        let person = app.staticTexts["隔离测试好友 36"]
+        for _ in 0..<4 { if person.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(person.waitForExistence(timeout: 10)); XCTAssertTrue(person.isHittable); person.tap()
+        let note = app.textFields["friends.note"]
+        XCTAssertTrue(note.waitForExistence(timeout: 10)); note.tap(); note.typeText("MobileQA36")
+        let save = app.buttons["保存备注"]
+        if !save.isHittable { app.swipeUp() }
+        XCTAssertTrue(save.isHittable); XCTAssertGreaterThanOrEqual(save.frame.height, 44); save.tap()
+        capture("friends-48-fixture-note")
+        app.terminate(); app.launch(); openFriends()
+        let restoredSearch = app.searchFields["搜索昵称、备注或好友码"]
+        XCTAssertTrue(restoredSearch.waitForExistence(timeout: 10)); restoredSearch.tap(); restoredSearch.typeText("MobileQA36")
+        let restored = app.staticTexts["MobileQA36"]
+        for _ in 0..<4 { if restored.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(restored.waitForExistence(timeout: 10)); XCTAssertTrue(restored.isHittable)
+        capture("friends-48-fixture-note-restored")
+    }
     func testResourceSearchControlsAndTranslationSettingsPersist() throws {
         let app = XCUIApplication(); app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"; app.launch()
         func openResources() {

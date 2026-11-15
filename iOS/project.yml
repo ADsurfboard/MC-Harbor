@@ -36,6 +36,10 @@ targets:
         buildPhase: resources
       - path: ../Assets/Brand/Mark-dark.png
         buildPhase: resources
+      - path: ../Assets/Services.json
+        buildPhase: resources
+      - path: ../Assets/Skins/wide/steve.png
+        buildPhase: resources
     dependencies:
       - target: HarborCore
     settings:
