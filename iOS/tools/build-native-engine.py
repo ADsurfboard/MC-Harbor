@@ -111,6 +111,11 @@ replace('Natives/LauncherSplitViewController.m',
 - (void)splitViewController:(UISplitViewController *)svc willChangeToDisplayMode:''')
 replace('Natives/SurfaceViewController.m','#import "SurfaceViewController.h"','#import "SurfaceViewController.h"\n#import "HarborEngineAdapter.h"')
 replace('Natives/SurfaceViewController.m','[super viewDidAppear:animated];','[super viewDidAppear:animated];\n    HBRInstallGameControls(self);')
+replace('Natives/SurfaceViewController.m','- (void)updateAudioSettings {','''- (void)viewDidDisappear:(BOOL)animated {
+    [super viewDidDisappear:animated];
+    if (!self.view.window) HBRNotifyGameStopped();
+}
+- (void)updateAudioSettings {''')
 replace('Natives/SurfaceViewController.m','- (void)updateGrabState {','- (void)updateGrabState {\n    HBRUpdateGameGrabState();')
 replace('Natives/SurfaceViewController.m','    CGFloat screenScale = self.screenScale;','    if (event == ACTION_MOVE_MOTION && isGrabbing) location = HBRApplyLookDelta(location);\n    CGFloat screenScale = self.screenScale;')
 replace('Natives/installer/ForgeInstallViewController.m', '#import "AFNetworking.h"',

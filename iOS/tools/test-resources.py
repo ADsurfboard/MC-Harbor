@@ -9,12 +9,13 @@ import argparse, re, subprocess, tempfile
 
 root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
-parser.add_argument('--suite', choices=['resources', 'social'], default='resources')
+parser.add_argument('--suite', choices=['resources', 'social', 'history'], default='resources')
+parser.add_argument('--arch', choices=['host', 'x86_64'], default='host')
 args = parser.parse_args()
-test_class = 'ResourceTests' if args.suite == 'resources' else 'SocialTests'
+test_class = {'resources': 'ResourceTests', 'social': 'SocialTests', 'history': 'SocialPlayHistoryTests'}[args.suite]
 tests = (root / ('HarborCore/Tests/HarborCoreTests/' + test_class + '.swift')).read_text()
 names = re.findall(r'    func (test\w+)\(\)([^\{]+)\{', tests)
-assert len(names) >= (12 if args.suite == 'resources' else 8)
+assert len(names) >= {'resources': 12, 'social': 8, 'history': 6}[args.suite]
 tests = tests.replace('import XCTest', 'import Foundation').replace('@testable import HarborCore', '')
 shim = r'''
 @MainActor class XCTestCase {}
@@ -48,6 +49,9 @@ with tempfile.TemporaryDirectory(prefix='harbor-resource-checks-') as temporary:
     source = Path(temporary) / 'Checks.swift'; source.write_text(shim + tests + runner)
     binary = Path(temporary) / 'checks'
     production = sorted((root / 'HarborCore/Sources/HarborCore').glob('Resource*.swift'))
-    if args.suite == 'social': production.append(root / 'HarborCore/Sources/HarborCore/SocialClient.swift')
-    subprocess.run(['xcrun', 'swiftc', '-swift-version', '6', '-parse-as-library', *map(str, production), str(source), '-o', str(binary)], check=True)
-    subprocess.run([str(binary)], check=True, timeout=90)
+    if args.suite in ['social', 'history']: production.append(root / 'HarborCore/Sources/HarborCore/SocialClient.swift')
+    if args.suite == 'history': production.append(root / 'HarborCore/Sources/HarborCore/SocialPlayHistory.swift')
+    architecture = ['-target', 'x86_64-apple-macos13.0'] if args.arch == 'x86_64' else []
+    subprocess.run(['xcrun', 'swiftc', '-swift-version', '6', '-parse-as-library', *architecture, *map(str, production), str(source), '-o', str(binary)], check=True)
+    run = ['arch', '-x86_64', str(binary)] if args.arch == 'x86_64' else [str(binary)]
+    subprocess.run(run, check=True, timeout=90)

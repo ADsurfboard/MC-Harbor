@@ -4,6 +4,16 @@ import HarborCore
 import CryptoKit
 import Security
 
+enum HarborGameEvents {
+    static let started = Notification.Name("net.morben.harbor.game.started")
+    static let stopped = Notification.Name("net.morben.harbor.game.stopped")
+}
+private final class HarborSocialObservation: @unchecked Sendable {
+    let token: NSObjectProtocol
+    init(_ token: NSObjectProtocol) { self.token = token }
+    deinit { NotificationCenter.default.removeObserver(token) }
+}
+
 private enum SocialCredential {
     static func query(_ endpoint: URL) -> [CFString: Any] {
         let account = SHA256.hash(data: Data(endpoint.absoluteString.utf8)).map { String(format: "%02x", $0) }.joined()
@@ -27,7 +37,8 @@ private enum SocialCredential {
 @MainActor final class HarborSocialLibrary: ObservableObject {
     static let defaultAvatar: UIImage? = {
         let bundle = Bundle(for: HarborRootFactory.self)
-        return bundle.url(forResource: "steve", withExtension: "png").flatMap { try? Data(contentsOf: $0) }.flatMap(HarborSocialLibrary.face)
+        guard let url = bundle.url(forResource: "steve", withExtension: "png"), let data = try? Data(contentsOf: url) else { return nil }
+        return HarborSocialLibrary.face(data)
     }()
     @Published var snapshot: SocialSnapshot?
     @Published var busy = false
@@ -41,12 +52,21 @@ private enum SocialCredential {
     @Published var unread: Set<String> = []
     @Published var drafts: [String: String] = [:]
     @Published var selectedCompanions: Set<String> = []
+    @Published var localHistory: [SocialPlaySession] = []
     let endpoint: URL
     private let settingsDirectory: URL
     private var localIdentity: String?
     private var settingsURL: URL? { localIdentity.map { settingsDirectory.appendingPathComponent($0 + ".json") } }
     private var secret: String?
     private let transport: ResourceTransport?
+    private let home: URL
+    private var historyStore: SocialPlayHistory?
+    private var historyLoading: Task<SocialPlayHistory, Error>?
+    private var historyLifecycle: Task<Void, Never>?
+    private var historyTick: Task<Void, Never>?
+    private var observations: [HarborSocialObservation] = []
+    private var uploaded: [String: String] = [:]
+    private var uploading = false
     private var operation: Task<Void, Never>?
     private var connection: Task<Void, Never>?
     private var ping: Task<Void, Never>?
@@ -62,6 +82,7 @@ private enum SocialCredential {
     private var refreshing = false
     private var active = false
     init(home: URL, transport: ResourceTransport? = nil, credential: String? = nil) {
+        self.home = home
         self.transport = transport
         settingsDirectory = home.appendingPathComponent("harbor-social", isDirectory: true)
         let bundle = Bundle(for: HarborRootFactory.self)
@@ -69,22 +90,36 @@ private enum SocialCredential {
         let object = services.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: String] }
         endpoint = URL(string: object?["friends"] ?? "https://mc-harbor-friends.dinakesidkeiwkkeksos.workers.dev")!
         secret = credential ?? SocialCredential.read(endpoint)
+        let started = NotificationCenter.default.addObserver(forName: HarborGameEvents.started, object: nil, queue: .main) { [weak self] notification in
+            guard let profile = notification.userInfo?["profile"] as? String, let instances = notification.userInfo?["instances"] as? Data else { return }
+            Task { @MainActor [weak self] in self?.gameStarted(profile: profile, instances: instances) }
+        }
+        let stopped = NotificationCenter.default.addObserver(forName: HarborGameEvents.stopped, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.gameStopped() }
+        }
+        let foreground = NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.activate() }
+        }
+        let background = NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.suspend() }
+        }
+        observations = [started, stopped, foreground, background].map(HarborSocialObservation.init)
     }
     private func loadLocal(for identity: String) {
         guard identity != localIdentity else { return }
-        localIdentity = identity; notes = [:]; reads = [:]
+        localIdentity = identity; notes = [:]; reads = [:]; uploaded = [:]
         guard let settingsURL else { return }
         if let size = try? settingsURL.resourceValues(forKeys: [.fileSizeKey]).fileSize, size <= 1024 * 1024,
            let data = try? Data(contentsOf: settingsURL), let saved = try? JSONDecoder().decode(LocalSettings.self, from: data) {
-            notes = saved.notes; reads = saved.reads
+            notes = saved.notes; reads = saved.reads; uploaded = saved.uploaded ?? [:]
         }
     }
-    private struct LocalSettings: Codable { var notes: [String: String]; var reads: [String: Double] }
+    private struct LocalSettings: Codable { var notes: [String: String]; var reads: [String: Double]; var uploaded: [String: String]? }
     private func save() {
         guard let settingsURL else { return }
         do {
             try FileManager.default.createDirectory(at: settingsURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try JSONEncoder().encode(LocalSettings(notes: notes, reads: reads)).write(to: settingsURL, options: .atomic)
+            try JSONEncoder().encode(LocalSettings(notes: notes, reads: reads, uploaded: uploaded)).write(to: settingsURL, options: .atomic)
         } catch { self.error = "本机备注保存失败：" + error.localizedDescription }
     }
     private func client(token: String? = nil) throws -> SocialClient { try SocialClient(endpoint: endpoint, token: token ?? secret, transport: transport) }
@@ -120,12 +155,22 @@ private enum SocialCredential {
             let valid = token.trimmingCharacters(in: .whitespacesAndNewlines)
             try SocialCredential.write(valid, endpoint: self.endpoint)
             self.suspend(); self.secret = valid; self.snapshot = value; self.histories = [:]; self.messages = [:]; self.avatars = [:]; self.avatarHashes = [:]; self.unread = []
-            self.loadLocal(for: value.me.id); self.pending = [:]; self.sending = []; self.drafts = [:]
+            self.loadLocal(for: value.me.id); self.pending = [:]; self.sending = []; self.drafts = [:]; self.selectedCompanions = []
             self.active = true; self.generation = UUID(); self.startLive()
         }
     }
     func activate() {
         active = true
+        let previous = historyLifecycle
+        historyLifecycle = Task {
+            await previous?.value
+            guard active else { return }
+            do {
+                let store = try await prepareHistory(); localHistory = try await store.resume()
+                if await store.hasActiveSession() { startHistoryTick() }
+                try await syncHistory()
+            } catch { self.error = error.localizedDescription }
+        }
         guard secret != nil else { return }
         if connection == nil { perform { try await self.reload(); self.startLive() } }
     }
@@ -134,6 +179,13 @@ private enum SocialCredential {
         operation?.cancel(); connection?.cancel(); ping?.cancel(); fallback?.cancel()
         socket?.cancel(with: .goingAway, reason: nil); session?.invalidateAndCancel()
         connection = nil; ping = nil; fallback = nil; socket = nil; session = nil
+        historyTick?.cancel(); historyTick = nil
+        let previous = historyLifecycle
+        historyLifecycle = Task {
+            await previous?.value
+            do { if let historyStore { localHistory = try await historyStore.pause() } }
+            catch { self.error = error.localizedDescription }
+        }
     }
     func reload() async throws {
         guard !refreshing else { return }; refreshing = true; defer { refreshing = false }
@@ -151,11 +203,12 @@ private enum SocialCredential {
         avatarHashes = avatarHashes.filter { avatars[$0.key] != nil }
         selectedCompanions.formIntersection(allowed); unread.formIntersection(allowed)
         status = "好友资料已同步"
+        do { try await syncHistory() } catch { status = "好友可用；游戏动态同步暂不可用，可稍后刷新。" }
     }
     func request(_ code: String) { perform { try await self.client().request(code: code); try await self.reload() } }
     func respond(_ person: SocialPerson, accept: Bool) { perform { try await self.client().respond(id: person.id, accept: accept); try await self.reload() } }
     func remove(_ person: SocialPerson) { perform { try await self.client().remove(id: person.id); try await self.reload() } }
-    func share(_ value: Bool) { perform { try await self.client().setSharing(value); try await self.reload() } }
+    func share(_ value: Bool) { perform { try await self.client().setSharing(value); if !value { self.uploaded = [:]; self.save() }; try await self.reload() } }
     func clearSkin() { perform { try await self.client().clearSkin(); try await self.reload() } }
     func shareSkin(_ data: Data, slim: Bool) {
         perform {
@@ -206,6 +259,69 @@ private enum SocialCredential {
     }
     func markRead(_ person: SocialPerson) {
         if let latest = messages[person.id]?.last { reads[person.id] = latest.created; unread.remove(person.id); save() }
+    }
+    private func prepareHistory() async throws -> SocialPlayHistory {
+        if let historyStore { return historyStore }
+        if let historyLoading { return try await historyLoading.value }
+        let home = home
+        let loading = Task.detached(priority: .utility) { try SocialPlayHistory(home: home) }
+        historyLoading = loading; defer { historyLoading = nil }
+        let store = try await loading.value
+        historyStore = store; localHistory = await store.snapshot(); return store
+    }
+    private func gameStarted(profile: String, instances: Data) {
+        guard instances.count <= 4 * 1024 * 1024, let values = try? JSONDecoder().decode([PhoneInstance].self, from: instances), let instance = values.first(where: { $0.id == profile }) else { return }
+        let allowed = Set(snapshot?.friends.map(\.id) ?? [])
+        let previous = historyLifecycle, companions = Array(selectedCompanions.intersection(allowed).prefix(100))
+        historyLifecycle = Task {
+            await previous?.value
+            do {
+                let store = try await prepareHistory()
+                localHistory = try await store.start(profile: profile, instance: instance.name, version: instance.gameVersion ?? instance.version, loader: instance.loader, friends: companions, running: UIApplication.shared.applicationState == .active)
+                if UIApplication.shared.applicationState == .active { active = true; startHistoryTick() }
+                try await syncHistory()
+            } catch { self.error = error.localizedDescription }
+        }
+    }
+    private func gameStopped() {
+        historyTick?.cancel(); historyTick = nil
+        let previous = historyLifecycle
+        historyLifecycle = Task {
+            await previous?.value
+            do { let store = try await prepareHistory(); localHistory = try await store.finish(); try await syncHistory() }
+            catch { self.error = error.localizedDescription }
+        }
+    }
+    private func startHistoryTick() {
+        guard historyTick == nil else { return }
+        historyTick = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30)); guard !Task.isCancelled else { return }
+                guard let self, self.active else { return }
+                do { let store = try await self.prepareHistory(); self.localHistory = try await store.checkpoint(); try await self.syncHistory() }
+                catch { self.status = "本机游戏记录或动态同步暂不可用，请返回好友页检查。" }
+            }
+        }
+    }
+    private func syncHistory() async throws {
+        guard active, !uploading, let me = snapshot?.me, me.sharing else { return }
+        uploading = true; defer { uploading = false }
+        let id = generation, client = try client()
+        var pending: [(SocialPlaySession, String)] = []
+        let encoder = JSONEncoder(); encoder.outputFormatting = .sortedKeys
+        for value in localHistory.prefix(100) {
+            let hash = SHA256.hash(data: try encoder.encode(value)).map { String(format: "%02x", $0) }.joined()
+            if uploaded[value.id] != hash { pending.append((value, hash)) }
+        }
+        for start in stride(from: 0, to: pending.count, by: 25) {
+            try Task.checkCancellation()
+            guard id == generation, snapshot?.me.id == me.id, snapshot?.me.sharing == true else { return }
+            let batch = Array(pending[start..<min(start + 25, pending.count)])
+            try await client.uploadHistory(batch.map(\.0))
+            guard id == generation, snapshot?.me.id == me.id else { return }
+            for (record, hash) in batch { uploaded[record.id] = hash }
+            let keep = Set(localHistory.map(\.id)); uploaded = uploaded.filter { keep.contains($0.key) }; save()
+        }
     }
     func send(_ text: String, to person: SocialPerson, invite: SocialInvitation? = nil) async throws {
         guard snapshot?.friends.contains(where: { $0.id == person.id }) == true else { throw ResourceError.invalid("请先确认双方好友关系。") }

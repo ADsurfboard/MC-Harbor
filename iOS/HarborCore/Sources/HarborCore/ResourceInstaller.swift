@@ -123,8 +123,8 @@ public actor ResourceInstaller {
         guard Int64(available) > needed + 128 * 1024 * 1024 else { throw ResourceError.invalid("空间不足，请至少保留下载大小以外的 128 MB 空间。") }
         await progress(0, files.count, "下载与校验")
         // Return failures as values, drain every child, and throw only after the
-        // group has left scope. This also avoids a Swift 6.3 x86_64 allocator
-        // abort observed while unwinding the corrupt-download regression.
+        // group has left scope. Keep cleanup independent of a child failure;
+        // the x86_64 XCTest runtime regression is traced separately in CI.
         let failure: Error? = await withTaskGroup(of: Result<String, Error>.self) { group in
             var next = 0, finished = 0
             var failure: Error?

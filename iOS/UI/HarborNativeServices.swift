@@ -31,6 +31,11 @@ import CryptoKit
 }
 
 @MainActor @objc(HarborRootFactory) public final class HarborRootFactory: NSObject {
+    @objc(gameDidStartWithServices:profile:) public static func gameDidStart(services: HarborNativeServices, profile: String) {
+        guard !profile.isEmpty else { return }
+        NotificationCenter.default.post(name: HarborGameEvents.started, object: nil, userInfo: ["profile": profile, "instances": services.instanceListJSON()])
+    }
+    @objc public static func gameDidStop() { NotificationCenter.default.post(name: HarborGameEvents.stopped, object: nil) }
     @objc(makeControllerWithServices:) public static func makeController(services: HarborNativeServices) -> UIViewController {
         UIHostingController(rootView: HarborPhoneRoot(services: services))
     }
@@ -242,7 +247,7 @@ struct HarborPhoneRoot: View {
         }.harborMotionPolicy()
         .onChange(of: scenePhase) { phase in
             if phase == .active { library.refresh(); social.activate() }
-            if phase == .background { resources.cancel(); social.suspend() }
+            if phase == .background { resources.cancel() }
         }
         .onAppear {
             social.activate()

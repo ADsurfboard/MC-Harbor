@@ -16,6 +16,11 @@ struct HarborFriendsView: View {
     }
     var body: some View {
         List {
+            Section {
+                NavigationLink { HarborLocalPlayHistoryView(model: model) } label: {
+                    Label("本机最近游戏", systemImage: "clock.arrow.circlepath").frame(minHeight: 48)
+                }.accessibilityIdentifier("friends.localHistory")
+            }
             if let snapshot = model.snapshot {
                 Section {
                     HStack(spacing: 14) {
@@ -169,9 +174,32 @@ struct HarborPlayHistoryRow: View {
             HStack {
                 Text(Date(timeIntervalSince1970: value.started), style: .date)
                 Spacer()
-                Text("\(Int(value.seconds) / 3600)小时\(Int(value.seconds) % 3600 / 60)分钟")
+                Text(value.seconds < 60 ? "\(Int(value.seconds))秒" : "\(Int(value.seconds) / 3600)小时\(Int(value.seconds) % 3600 / 60)分钟")
             }.font(.caption).foregroundStyle(.secondary)
         }.padding(.vertical, 10)
+    }
+}
+
+struct HarborLocalPlayHistoryView: View {
+    @ObservedObject var model: HarborSocialLibrary
+    @State private var companion = ""
+    var body: some View {
+        List {
+            Section {
+                Picker("筛选同行好友", selection: $companion) {
+                    Text("全部游戏").tag("")
+                    Text("和好友一起").tag("together")
+                    ForEach(model.snapshot?.friends ?? []) { Text(model.name($0)).tag($0.id) }
+                }
+                Text("记录来自实际游戏界面的启动与退出，时长按前台会话计时；后台不累加。每30秒保存，强退按最后保存点恢复。没有读到的存档名称会留空，不推测正在玩的世界。")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+            Section("最近游戏") {
+                let rows = model.localHistory.filter { companion.isEmpty || (companion == "together" ? !$0.friends.isEmpty : $0.friends.contains(companion)) }
+                if rows.isEmpty { Text("还没有匹配的本机游戏记录。").foregroundStyle(.secondary).padding(.vertical, 16) }
+                ForEach(rows) { HarborPlayHistoryRow(value: $0) }
+            }
+        }.harborPageBackground().navigationTitle("本机最近游戏").navigationBarTitleDisplayMode(.inline)
     }
 }
 

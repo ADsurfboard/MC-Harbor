@@ -20,6 +20,9 @@ private actor ResourceProbe {
 }
 
 @MainActor final class ResourceTests: XCTestCase {
+    private func trace(_ text: String) {
+        if ProcessInfo.processInfo.environment["HARBOR_RESOURCE_TEST_TRACE"] == "1" { FileHandle.standardError.write(Data(("[resource-boundary] " + text + "\n").utf8)) }
+    }
     private func bytes(_ object: Any) throws -> Data { try JSONSerialization.data(withJSONObject: object) }
     private func versionJSON(_ id: String = "version1", project: String = "project1", dependencies: [[String: Any]] = []) -> [String: Any] {
         ["id": id, "project_id": project, "name": "Example", "version_number": "1.0", "game_versions": ["1.20.1"], "loaders": ["fabric"], "dependencies": dependencies,
@@ -116,13 +119,17 @@ private actor ResourceProbe {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).resolvingSymlinksInPath()
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true); defer { try? FileManager.default.removeItem(at: root) }
         let destination = root.appendingPathComponent("instance/mods"), installer = ResourceInstaller(home: root)
+        trace("before corrupt file transfer")
         do {
             _ = try await installer.install([file()], kind: .mod, destination: destination, route: .domesticFirst, download: { _, target, _ in try Data("fake".utf8).write(to: target) })
             XCTFail("corrupt file accepted")
         } catch { }
+        trace("corrupt file rejected")
         XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
         try FileManager.default.createSymbolicLink(atPath: root.appendingPathComponent("linked").path, withDestinationPath: "/tmp")
+        trace("before symlink early rejection")
         do { _ = try await installer.install([file()], kind: .mod, destination: root.appendingPathComponent("linked/mods"), route: .domesticFirst); XCTFail("symlink accepted") } catch { }
+        trace("symlink rejected")
     }
     func testCancellationStopsBeforeCommit() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).resolvingSymlinksInPath()

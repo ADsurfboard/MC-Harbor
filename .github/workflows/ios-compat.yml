@@ -28,7 +28,25 @@ jobs:
           swift --version
       - name: Test multi-touch, layouts and modpack storage boundaries
         working-directory: iOS/HarborCore
-        run: swift test --jobs 3
+        env:
+          HARBOR_RESOURCE_TEST_TRACE: '1'
+        run: |
+          mkdir -p ../evidence
+          set -o pipefail
+          swift test --jobs 3 2>&1 | tee ../evidence/core-tests.log
+      - name: Retain owned core-test crash reports on failure
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil
+          destination=Path('iOS/evidence/core-crashes');destination.mkdir(parents=True,exist_ok=True)
+          source=Path.home()/'Library/Logs/DiagnosticReports'
+          for path in list(source.glob('*.ips'))+list(source.glob('*.crash')):
+              if path.stat().st_size>4*1024*1024:continue
+              text=path.read_text(errors='replace')
+              if 'HarborCorePackageTests' in text:shutil.copy2(path,destination/path.name)
+          PY
       - name: Test production account-token storage without real Keychain access
         run: python3 iOS/tools/test-account-tokens.py
       - name: Test opt-in native motion policy without persistent preference changes
@@ -60,6 +78,7 @@ jobs:
           name: ios-native-engine-verification-device
           compression-level: 0
           path: |
+            iOS/evidence/core-*
             iOS/evidence/native-*.json
             iOS/build/*.ipa
             iOS/.build/engine-device/patch-proof.json

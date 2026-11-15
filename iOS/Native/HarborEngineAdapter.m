@@ -361,6 +361,11 @@ void HBRInstallGameControls(UIViewController *controller) {
     [surface performSelector:@selector(updatePreferenceChanges)];
     [surface.ctrlView removeFromSuperview];
     adapter.overlay=[HarborRootFactory installGameControlsOn:surface.rootView services:adapter profile:PLProfiles.current.selectedProfileName];
+    [HarborRootFactory gameDidStartWithServices:adapter profile:PLProfiles.current.selectedProfileName ?: @""];
+}
+void HBRNotifyGameStopped(void) {
+    [HarborEngineAdapter.shared.overlay cancelAllInputs];
+    [HarborRootFactory gameDidStop];
 }
 void HBRUpdateGameGrabState(void) {
     dispatch_async(dispatch_get_main_queue(), ^{ [HarborEngineAdapter.shared.overlay updateGrabState:isGrabbing == JNI_TRUE]; });
