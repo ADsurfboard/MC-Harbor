@@ -76,7 +76,11 @@ static __weak UIWindow *harborWindow;
     });
 }
 - (NSData *)beginModAccessForProfile:(NSString *)profile error:(NSError **)error {
+    return [self beginResourceAccessForProfile:profile kind:@"mods" error:error];
+}
+- (NSData *)beginResourceAccessForProfile:(NSString *)profile kind:(NSString *)kind error:(NSError **)error {
     NSString *failure=nil;
+    if (![@[@"mods",@"resourcepacks",@"shaderpacks"] containsObject:kind]) failure=@"不支持此实例资源目录。";
     if (self.modAccessToken || (self.surface && self.surface.view.window) || UIApplication.sharedApplication.idleTimerDisabled)
         failure=@"请先停止游戏、等待下载完成，再操作实例中的模组文件。";
     NSDictionary *record=PLProfiles.current.profiles[profile];
@@ -93,7 +97,7 @@ static __weak UIWindow *harborWindow;
     }
     NSString *home=self.harborHomeURL.path.stringByResolvingSymlinksInPath;
     NSString *root=[[home stringByAppendingPathComponent:@"instances"] stringByAppendingPathComponent:base ?: @""];
-    NSString *directory=[[[root stringByAppendingPathComponent:relative] stringByAppendingPathComponent:@"mods"] stringByStandardizingPath];
+    NSString *directory=[[[root stringByAppendingPathComponent:relative] stringByAppendingPathComponent:kind] stringByStandardizingPath];
     if (![directory hasPrefix:[root stringByAppendingString:@"/"]] || ![directory isEqual:directory.stringByResolvingSymlinksInPath])
         failure=@"实例模组目录包含越界路径或符号链接。";
     NSMutableArray *files=[NSMutableArray array];
@@ -160,11 +164,13 @@ static __weak UIWindow *harborWindow;
         if (![profile isKindOfClass:NSDictionary.class]) continue;
         NSString *version = [profile[@"lastVersionId"] isKindOfClass:NSString.class] ? profile[@"lastVersionId"] : @"";
         NSString *loader = @"原版";
+        NSString *gameVersion = version;
         NSString *path = [NSString stringWithFormat:@"%s/versions/%@/%@.json",getenv("GAME_DIR"),version,version];
         NSDictionary *attributes = [NSFileManager.defaultManager attributesOfItemAtPath:path error:nil];
         if (![version containsString:@"/"] && ![version containsString:@"\\"] && ![version isEqual:@".."] && ![version isEqual:@"."] && [attributes[NSFileSize] unsignedLongLongValue] < 4 * 1024 * 1024) {
             NSData *data = [NSData dataWithContentsOfFile:path];
             id metadata = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
+            if ([metadata isKindOfClass:NSDictionary.class] && [metadata[@"inheritsFrom"] isKindOfClass:NSString.class]) gameVersion=metadata[@"inheritsFrom"];
             NSArray *libraries = [metadata isKindOfClass:NSDictionary.class] && [metadata[@"libraries"] isKindOfClass:NSArray.class] ? metadata[@"libraries"] : @[];
             for (NSDictionary *library in libraries) {
                 if (![library isKindOfClass:NSDictionary.class]) continue;
@@ -175,7 +181,7 @@ static __weak UIWindow *harborWindow;
                 if ([name hasPrefix:@"net.minecraftforge:forge:"]) loader=@"Forge";
             }
         }
-        [result addObject:@{@"id":key,@"name":[profile[@"name"] isKindOfClass:NSString.class] ? profile[@"name"] : key,@"version":version,@"loader":loader}];
+        [result addObject:@{@"id":key,@"name":[profile[@"name"] isKindOfClass:NSString.class] ? profile[@"name"] : key,@"version":version,@"gameVersion":gameVersion,@"loader":loader}];
     }
     return [NSJSONSerialization dataWithJSONObject:result options:0 error:nil] ?: [@"[]" dataUsingEncoding:NSUTF8StringEncoding];
 }

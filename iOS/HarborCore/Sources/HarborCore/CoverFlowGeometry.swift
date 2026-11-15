@@ -44,12 +44,12 @@ public struct CoverFlowGeometry: Sendable {
         let progress = min(1, abs(distance))
         let side = progress * progress * (3 - 2 * progress)
         let extra = max(0, abs(distance) - 1)
-        // The nearest covers turn inward. Further covers ease back toward the
-        // player instead of all forming the same rigid, edge-on stack. Both
-        // sides of the peak have zero slope, so crossing it stays smooth.
-        let turn = side * exp(-0.60 * extra * extra)
+        // Relax the far covers without turning them fully front-on. The far
+        // shelf retains a 15-degree inclination; the third neighbor is about
+        // 19 degrees. Preserve the smooth peak at the nearest cover.
+        let turn = side * (0.26 + (1.03 - 0.26) * exp(-0.60 * extra * extra))
         return .init(centerX: Double(slot) * pitch + width / 2, centerY: height / 2 + side * 6,
-                     angle: -sign * turn * 1.03, depth: -side * 44 - min(2, extra) * 20,
+                     angle: -sign * turn, depth: -side * 44 - min(2, extra) * 20,
                      scale: 1 - side * 0.08, opacity: max(0.32, 1 - side * 0.15 - extra * 0.15),
                      zIndex: 1000 - Int(abs(distance) * 100))
     }

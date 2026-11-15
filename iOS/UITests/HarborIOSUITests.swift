@@ -3,6 +3,31 @@ import XCTest
 @MainActor final class HarborIOSUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false; XCUIDevice.shared.orientation = .portrait }
     override func tearDownWithError() throws { XCUIDevice.shared.orientation = .portrait }
+    func testResourceSearchControlsAndTranslationSettingsPersist() throws {
+        let app = XCUIApplication(); app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"; app.launch()
+        func openResources() {
+            let tab = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "资源")).firstMatch
+            XCTAssertTrue(tab.waitForExistence(timeout: 15)); tab.tap()
+        }
+        openResources()
+        let menu = app.buttons["resources.install.menu"]
+        let settings = app.buttons["resources.settings"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 15)); XCTAssertTrue(menu.isHittable)
+        XCTAssertTrue(settings.isHittable); XCTAssertGreaterThanOrEqual(menu.frame.height, 44); XCTAssertGreaterThanOrEqual(settings.frame.height, 44)
+        XCTAssertTrue(app.searchFields["中英文名称或关键词"].exists)
+        settings.tap()
+        let translate = app.switches["resources.translate"]
+        XCTAssertTrue(translate.waitForExistence(timeout: 10))
+        let original = translate.value as? String
+        translate.tap()
+        let saved = translate.value as? String
+        XCTAssertNotEqual(saved, original)
+        capture("resource-translation-settings")
+        app.terminate(); app.launch(); openResources(); app.buttons["resources.settings"].tap()
+        let restored = app.switches["resources.translate"]
+        XCTAssertTrue(restored.waitForExistence(timeout: 10)); XCTAssertEqual(restored.value as? String, saved)
+        restored.tap(); XCTAssertEqual(restored.value as? String, original)
+    }
     func testModFolderForegroundEmptyStateAndPersistence() throws {
         let app = XCUIApplication(); app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"; app.launch()
         func openFolders() {

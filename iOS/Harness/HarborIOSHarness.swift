@@ -48,4 +48,7 @@ struct HarnessRoot: UIViewControllerRepresentable {
         throw NSError(domain: "HarborQAHarness", code: 1, userInfo: [NSLocalizedDescriptionKey: "测试实例不包含游戏文件。"])
     }
     func endModAccess(token: String) {}
+    func beginResourceAccess(profile: String, kind: String) throws -> Data {
+        throw NSError(domain: "HarborQAHarness", code: 1, userInfo: [NSLocalizedDescriptionKey: "测试实例不包含游戏文件。"])
+    }
 }

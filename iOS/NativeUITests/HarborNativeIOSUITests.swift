@@ -90,6 +90,8 @@ import CoreGraphics
         let resources = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "资源")).firstMatch
         XCTAssertTrue(resources.waitForExistence(timeout: 15))
         resources.tap()
+        let menu = app.buttons["resources.install.menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 10)); XCTAssertTrue(menu.isHittable); menu.tap()
         let jar = app.buttons["native.page.import"]
         XCTAssertTrue(jar.waitForExistence(timeout: 10))
         XCTAssertTrue(jar.isHittable)
@@ -112,6 +114,8 @@ import CoreGraphics
         let resources = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "资源")).firstMatch
         XCTAssertTrue(resources.waitForExistence(timeout: 15))
         resources.tap()
+        let menu = app.buttons["resources.install.menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 10)); XCTAssertTrue(menu.isHittable); menu.tap()
         let importer = app.buttons["native.page.importPack"]
         XCTAssertTrue(importer.waitForExistence(timeout: 10))
         XCTAssertTrue(importer.isHittable)

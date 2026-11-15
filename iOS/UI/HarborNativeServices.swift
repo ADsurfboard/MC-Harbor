@@ -17,6 +17,8 @@ import CryptoKit
     func readModArchive(at url: URL, entry: String?, completion: @escaping (Data?, String?) -> Void)
     @objc(beginModAccessForProfile:error:)
     func beginModAccess(profile: String) throws -> Data
+    @objc(beginResourceAccessForProfile:kind:error:)
+    func beginResourceAccess(profile: String, kind: String) throws -> Data
     @objc(endModAccessWithToken:)
     func endModAccess(token: String)
 }
@@ -53,6 +55,12 @@ struct PhoneInstance: Decodable, Identifiable, Equatable {
     let name: String
     let version: String
     let loader: String
+    let gameVersion: String?
+    var resourceTarget: ResourceTarget? {
+        let value = gameVersion ?? version
+        guard !value.isEmpty else { return nil }
+        return ResourceTarget(gameVersion: value, loader: loader)
+    }
 }
 
 @MainActor final class PhoneLibrary: ObservableObject {
@@ -92,6 +100,7 @@ struct HarborPhoneRoot: View {
     let services: HarborNativeServices
     @StateObject private var library: PhoneLibrary
     @StateObject private var folders: HarborFolderLibrary
+    @StateObject private var resources: HarborResourceLibrary
     @State private var settingsQuery = ""
     @State private var page: NativePage?
     @AppStorage(HarborLibraryOptions.coverFlow) private var coverFlow = false
@@ -101,6 +110,7 @@ struct HarborPhoneRoot: View {
         self.services = services
         _library = StateObject(wrappedValue: PhoneLibrary(services))
         _folders = StateObject(wrappedValue: HarborFolderLibrary(services: services))
+        _resources = StateObject(wrappedValue: HarborResourceLibrary(services: services))
     }
     var body: some View {
         TabView {
@@ -160,21 +170,7 @@ struct HarborPhoneRoot: View {
                 }.refreshable { library.refresh() }
             }.tabItem { Label("游戏", systemImage: "square.stack.3d.up") }
             NavigationStack {
-                List {
-                    Section("实例资源") {
-                      HarborGlassPanel {
-                        nativeRow("Modrinth 整合包", symbol: "shippingbox", pageName: "resources")
-                        nativeRow("从文件导入整合包", symbol: "doc.zipper", pageName: "importPack")
-                        nativeRow("Fabric 与 Quilt", symbol: "square.stack.3d.down.right", pageName: "fabric")
-                        nativeRow("Forge 与 NeoForge", symbol: "square.stack.3d.down.right", pageName: "forge")
-                        nativeRow("打开 JAR 安装器", symbol: "square.and.arrow.down", pageName: "import")
-                      }
-                    }
-                    Section {
-                        Text("本地导入支持 .mrpack，以及包含 modrinth.index.json 的 ZIP。原文件会保留；下载与校验完成后才创建实例。Forge / NeoForge 整合包需要先安装对应的加载器。")
-                            .font(.footnote).foregroundStyle(.secondary)
-                    }
-                }.harborPageBackground().navigationTitle("资源")
+                HarborResourcesView(model: resources, instances: library.instances) { page = .init(name: $0) }
             }.tabItem { Label("资源", systemImage: "arrow.down.circle") }
             NavigationStack { HarborFoldersView(model: folders) }
                 .tabItem { Label("模组夹", systemImage: "folder") }
@@ -208,6 +204,13 @@ struct HarborPhoneRoot: View {
                         }
                     }
                   }
+                  if matchesSettings("资源 下载 镜像 国内 Modrinth CurseForge 中文 搜索 翻译 简介 阿里 Google MyMemory") {
+                    Section("实例资源") {
+                        NavigationLink { HarborResourceSettings() } label: {
+                            Label("资源与翻译", systemImage: "character.bubble").frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                        }.accessibilityIdentifier("settings.resources")
+                    }
+                  }
                   if matchesSettings("关于 作者 贡献 GitHub issues 开发者 ADsurfboard") {
                     Section("关于") {
                         LabeledContent("作者", value: "ADsurfboard")
@@ -225,7 +228,10 @@ struct HarborPhoneRoot: View {
         .sheet(item: $page, onDismiss: { library.refresh() }) { selected in
             NativePresentationContent(services: services, page: selected)
         }.harborMotionPolicy()
-        .onChange(of: scenePhase) { phase in if phase == .active { library.refresh() } }
+        .onChange(of: scenePhase) { phase in
+            if phase == .active { library.refresh() }
+            if phase == .background { resources.cancel() }
+        }
         .onAppear {
             if ProcessInfo.processInfo.environment["HARBOR_SMOKE_TEST"] == "1" {
                 NSLog("[MC Harbor] HARBOR_ROOT_READY")

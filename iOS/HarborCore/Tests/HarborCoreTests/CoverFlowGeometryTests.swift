@@ -25,7 +25,7 @@ final class CoverFlowGeometryTests: XCTestCase {
             XCTAssertLessThan(left.zIndex, middle.zIndex)
         }
     }
-    func testFarCoversProgressivelyFaceThePlayerWithoutClosingGaps() {
+    func testFarCoversRelaxButRetainAnInclinationWithoutClosingGaps() {
         let layout = CoverFlowGeometry(width: 1376, height: 300, count: 8)
         let selected = layout.middle(0), offset = layout.offset(selected)
         for direction in [-1, 1] {
@@ -40,7 +40,10 @@ final class CoverFlowGeometryTests: XCTestCase {
                 previousAngle = abs(pose.angle)
                 previousRight = distance + projectedHalf
             }
-            XCTAssertLessThan(previousAngle, 0.11, "The third cover should be nearly front facing")
+            XCTAssertGreaterThan(previousAngle, 0.30, "Far covers must keep a visible inclination")
+            XCTAssertLessThan(previousAngle, 0.40, "Far covers should relax from the near cover's steep tilt")
+            let distant = layout.pose(slot: selected + direction * 6, offset: offset, continuous: true)
+            XCTAssertEqual(abs(distant.angle), 0.26, accuracy: 0.001)
         }
     }
     func testTransformsStayContinuousAtCenterAndMaximumTilt() {
