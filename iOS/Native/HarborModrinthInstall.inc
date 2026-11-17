@@ -102,7 +102,7 @@
                 if (!validLoader(data)) {[downloader finishDownloadWithErrorString:@"加载器返回的版本信息无效，未创建实例。"];return;}
                 begin(data);
             }];
-            [task resume];
+            HBRStartPublicTransfer(task);
         });
     });
 }

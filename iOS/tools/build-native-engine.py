@@ -44,7 +44,7 @@ replace('JavaApp/Makefile', '# Prerequisite variables',
 replace('JavaApp/Makefile', 'check_empty_classes:',
         'check_empty_classes: $(CLASSES)')
 
-for name in ['HarborEngineAdapter.h','HarborEngineAdapter.m','HarborArchiveGuard.h','HarborArchiveGuard.m','HarborAccountTokenStore.h','HarborAccountTokenStore.m','HarborModpackMetadata.h','HarborModpackMetadata.m','HarborModpackTransaction.h','HarborModpackTransaction.m','HarborModArchive.h','HarborModArchive.m','HarborMotion.h']:
+for name in ['HarborEngineAdapter.h','HarborEngineAdapter.m','HarborArchiveGuard.h','HarborArchiveGuard.m','HarborAccountTokenStore.h','HarborAccountTokenStore.m','HarborModpackMetadata.h','HarborModpackMetadata.m','HarborModpackTransaction.h','HarborModpackTransaction.m','HarborModArchive.h','HarborModArchive.m','HarborMotion.h','HarborPublicDownloads.h','HarborPublicDownloads.m','HarborPublicTransfer.h','HarborPublicTransfer.m']:
     shutil.copy2(IOS/'Native'/name,ENGINE/'Natives'/name)
 replace('Natives/ios_uikit_bridge.m','#import "SurfaceViewController.h"','#import "SurfaceViewController.h"\n#import "HarborEngineAdapter.h"')
 replace('Natives/LauncherNavigationController.m','#import "LauncherNavigationController.h"','#import "LauncherNavigationController.h"\n#import "HarborEngineAdapter.h"')
@@ -183,7 +183,7 @@ content=content.replace('[self acquireAccessToken:self.tokenData[@"refreshToken"
 auth.write_text(content);patches.append({'file':'Natives/authenticator/MicrosoftAuthenticator.m','nonDestructiveKeychainUpdates':True})
 
 # Validate complete manifests before any downloaded / extracted payload is written.
-replace('Natives/installer/modpack/ModrinthAPI.m','#import "PLProfiles.h"','#import "PLProfiles.h"\n#import "utils.h"\n#import "HarborArchiveGuard.h"\n#import "HarborModpackMetadata.h"\n#import "HarborModpackTransaction.h"')
+replace('Natives/installer/modpack/ModrinthAPI.m','#import "PLProfiles.h"','#import "PLProfiles.h"\n#import "utils.h"\n#import "HarborArchiveGuard.h"\n#import "HarborModpackMetadata.h"\n#import "HarborModpackTransaction.h"\n#import "HarborPublicTransfer.h"')
 # Every import has independent storage, regardless of project-supplied titles.
 replace('Natives/MinecraftResourceDownloadTask.m','#import "MinecraftResourceDownloadTask.h"',
         '#import "MinecraftResourceDownloadTask.h"\n#import "HarborModpackMetadata.h"')
@@ -239,7 +239,113 @@ content=content[:a]+'''- (BOOL)checkSHAIgnorePref:(NSString *)sha forFile:(NSStr
     return valid;
 }
 '''+content[b:]
-download.write_text(content)
+# Public game files follow the selected mirror order. A failed or tampered
+# source falls back to the other one, and the previous file stays in place
+# until a download has been verified.
+a=content.index('    NSString *name = altName ?: path.lastPathComponent;\n    NSURLRequest *request =')
+b=content.index('\n- (NSURLSessionDownloadTask *)createDownloadTask:(NSString *)url size:(NSUInteger)size sha:(NSString *)sha altName:(NSString *)altName toPath:(NSString *)path {',a)
+content=content[:a]+'''    NSString *name = altName ?: path.lastPathComponent;
+    NSProgress *owner = self.progress;
+    BOOL verify = getPrefBool(@"general.check_sha");
+    NSString *sha1 = (verify && [sha isKindOfClass:NSString.class] && sha.length == 40) ? sha : nil;
+    NSURL *source = [url isKindOfClass:NSString.class] ? [NSURL URLWithString:url] : nil;
+    __block NSProgress *current = nil;
+    return HBRCreatePublicTransfer(self.manager, source, [NSURL fileURLWithPath:path], verify ? size : 0, sha1, ^BOOL{
+        return owner.cancelled;
+    }, ^(NSURLSessionDownloadTask *attempt, NSUInteger number) {
+        NSLog(@"[MCDL] Downloading %@ from source %lu", name, (unsigned long)number);
+        current = [self harborTrackTransfer:attempt size:size replacing:current];
+        if (number == 1) [self.fileList addObject:name];
+    }, nil, ^(NSURLResponse *response, NSURL *file, NSError *error) {
+        if (owner.cancelled) {
+            // Ignore any further errors
+        } else if (error != nil) {
+            [self finishDownloadWithError:error file:name];
+        } else if (![self checkSHA:sha forFile:path altName:altName]) {
+            [self finishDownloadWithErrorString:[NSString stringWithFormat:@"Failed to verify file %@: checksum mismatch", path.lastPathComponent]];
+        } else {
+            if (current.completedUnitCount <= 0) current.completedUnitCount = 1;
+            current.totalUnitCount = current.completedUnitCount;
+            if (success) success();
+        }
+    });
+}
+
+- (NSProgress *)harborTrackTransfer:(NSURLSessionDownloadTask *)task size:(NSInteger)size replacing:(NSProgress *)previous {
+    NSProgress *progress = [self.manager downloadProgressForTask:task];
+    NSInteger units = size > 0 ? size : 1;
+    progress.kind = NSProgressKindFile;
+    if (size > 0) progress.totalUnitCount = units;
+    NSUInteger row = previous ? [self.progressList indexOfObjectIdenticalTo:previous] : NSNotFound;
+    if (row != NSNotFound) self.progressList[row] = progress;
+    else [self.progressList addObject:progress];
+    [self.progress addChild:progress withPendingUnitCount:units];
+    self.progress.totalUnitCount += units;
+    self.textProgress.totalUnitCount = self.progress.totalUnitCount;
+    if (previous) {
+        // Close the failed source only after its replacement is counted, so
+        // the install cannot report completion between two sources.
+        if (previous.totalUnitCount <= 0) previous.totalUnitCount = 1;
+        previous.completedUnitCount = previous.totalUnitCount;
+    }
+    return progress;
+}
+'''+content[b:]
+def swap(text,old,new,count=1):
+    assert text.count(old)==count,(text.count(old),old[:80])
+    return text.replace(old,new)
+# Queue starts, so the mirror idle timeout never measures time spent waiting.
+content=swap(content,'    [task resume];','    HBRStartPublicTransfer(task);',3)
+for batch in ('libTasks','assetTasks'):
+    content=swap(content,'[%s makeObjectsPerformSelector:@selector(resume)];'%batch,'for (NSURLSessionDownloadTask *queued in %s) HBRStartPublicTransfer(queued);'%batch)
+content=swap(content,'    configuration.timeoutIntervalForRequest = 86400;','    configuration.timeoutIntervalForRequest = 86400;\n    configuration.HTTPMaximumConnectionsPerHost = 16;')
+content='#import "HarborPublicTransfer.h"\n'+content
+download.write_text(content);patches.append({'file':'Natives/MinecraftResourceDownloadTask.m','publicMirrorTransfers':True})
+
+# Version lists and loader metadata use the same mirror order and fallback.
+fabric=ENGINE/'Natives/installer/FabricInstallViewController.m';content=fabric.read_text()
+content=swap(content,'    AFHTTPSessionManager *manager = [AFHTTPSessionManager manager];\n','',2)
+for key in ('game','loader'):
+    content=swap(content,re.search(r'\[manager GET:endpoint\[@"%s"\] parameters:nil headers:nil progress:nil +success:\^'%key,content).group(0),'HBRPublicGET(endpoint[@"%s"], HBRMetadataArray, ^'%key)
+content=swap(content,'    } failure:errorCallback];','    }, errorCallback);',2)
+content=swap(content,re.search(r'\[manager GET:path parameters:nil headers:nil progress:nil +success:\^',content).group(0),'HBRPublicGET(path, HBRMetadataDictionary, ^')
+content=swap(content,'''    } failure:^(NSURLSessionTask *operation, NSError *error) {
+        sender.enabled = YES;
+        NSDebugLog(@"Error: %@", error);
+        showDialog(localize(@"Error", nil), error.localizedDescription);
+    }];''','''    }, ^(NSURLSessionTask *operation, NSError *error) {
+        sender.enabled = YES;
+        NSDebugLog(@"Error: %@", error);
+        showDialog(localize(@"Error", nil), error.localizedDescription);
+    });''')
+assert 'manager' not in content.replace('AFHTTPSessionManager','')
+fabric.write_text('#import "HarborPublicDownloads.h"\n'+content);patches.append({'file':'Natives/installer/FabricInstallViewController.m','publicMirrorMetadata':True})
+
+forge=ENGINE/'Natives/installer/ForgeInstallViewController.m';content=forge.read_text()
+content=swap(content,'        NSXMLParser *parser = [[NSXMLParser alloc] initWithContentsOfURL:url];','''        NSData *publicMetadata = HBRReadPublicXML(url, nil);
+        NSXMLParser *parser = [[NSXMLParser alloc] initWithData:publicMetadata ?: [NSData data]];
+        parser.shouldResolveExternalEntities = NO;''')
+a=content.index('    NSURLRequest *request = [NSURLRequest requestWithURL:[NSURL URLWithString:jarURL]];')
+marker='completionHandler:^(NSURLResponse *response, NSURL *filePath, NSError *error) {'
+b=content.index(marker,a)+len(marker)
+content=content[:a]+'''    NSURLSessionDownloadTask *downloadTask = HBRCreatePublicTransfer(self.afManager, [NSURL URLWithString:jarURL], [NSURL fileURLWithPath:outPath], 0, nil, nil, nil, ^(NSProgress *progress) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.progressView.fractionCompleted = progress.fractionCompleted;
+        });
+    }, ^(NSURLResponse *response, NSURL *filePath, NSError *error) {'''+content[b:]
+end=content.index('[downloadTask resume];',a);close=content.rindex('}];',a,end)
+content=content[:close]+'});'+content[close+3:]
+forge.write_text('#import "HarborPublicDownloads.h"\n#import "HarborPublicTransfer.h"\n'+content);patches.append({'file':'Natives/installer/ForgeInstallViewController.m','publicMirrorInstaller':True})
+
+navigation=ENGINE/'Natives/LauncherNavigationController.m';content=navigation.read_text()
+a=content.index('    AFHTTPSessionManager *manager = [AFHTTPSessionManager manager];\n    [manager GET:@"https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"')
+marker='success:^(NSURLSessionTask *task, NSDictionary *responseObject) {'
+b=content.index(marker,a)+len(marker)
+content=content[:a]+'    HBRPublicGET(@"https://piston-meta.mojang.com/mc/game/version_manifest_v2.json", HBRMetadataDictionary, ^(NSURLSessionTask *task, NSDictionary *responseObject) {'+content[b:]
+marker='    } failure:^(NSURLSessionTask *operation, NSError *error) {'
+b=content.index(marker,a);content=content[:b]+'    }, ^(NSURLSessionTask *operation, NSError *error) {'+content[b+len(marker):]
+close=content.index('    }];',b);content=content[:close]+'    });'+content[close+7:]
+navigation.write_text('#import "HarborPublicDownloads.h"\n'+content);patches.append({'file':'Natives/LauncherNavigationController.m','publicMirrorVersionList':True})
 # Reuse the real engine's cancellable progress screen for Files imports. A busy
 # launcher cannot replace its active downloader / KVO ownership with another.
 replace('Natives/LauncherNavigationController.m', '    if ([BaseAuthenticator.current isKindOfClass:MicrosoftAuthenticator.class]) {', '''    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(receiveNotification:) name:@"HarborInstallLocalModpack" object:nil];
@@ -358,7 +464,7 @@ for native in (ENGINE/'Natives').rglob('*.m'):
 cmake=ENGINE/'Natives/CMakeLists.txt';s=cmake.read_text()
 target='arm64-apple-ios16.0' + ('-simulator' if args.platform=='simulator' else '')
 s=s.replace('-target arm64-apple-ios -mcpu=apple-a8','-target '+target)
-s+='''\n# MC Harbor native UI and real input adapter\ntarget_sources(AngelAuraAmethyst PRIVATE HarborEngineAdapter.m HarborArchiveGuard.m HarborAccountTokenStore.m HarborModpackMetadata.m HarborModpackTransaction.m HarborModArchive.m)\ntarget_compile_options(AngelAuraAmethyst PRIVATE "-F${CMAKE_CURRENT_LIST_DIR}/resources/Frameworks")\ntarget_link_libraries(AngelAuraAmethyst PUBLIC "-framework HarborIOSUI" "-framework HarborCore" "-framework Security")\n'''
+s+='''\n# MC Harbor native UI and real input adapter\ntarget_sources(AngelAuraAmethyst PRIVATE HarborEngineAdapter.m HarborArchiveGuard.m HarborAccountTokenStore.m HarborModpackMetadata.m HarborModpackTransaction.m HarborModArchive.m HarborPublicDownloads.m HarborPublicTransfer.m)\ntarget_compile_options(AngelAuraAmethyst PRIVATE "-F${CMAKE_CURRENT_LIST_DIR}/resources/Frameworks")\ntarget_link_libraries(AngelAuraAmethyst PUBLIC "-framework HarborIOSUI" "-framework HarborCore" "-framework Security")\n'''
 cmake.write_text(s)
 make=ENGINE/'Makefile';s=make.read_text().replace('-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0','-DCMAKE_OSX_DEPLOYMENT_TARGET=16.0')
 s=s.replace('-DCMAKE_C_FLAGS="-arch arm64"', '-DCMAKE_C_FLAGS="-arch arm64 -target '+target+'"')
