@@ -252,6 +252,13 @@ struct HarborPhoneRoot: View {
                         }.accessibilityIdentifier("settings.worlds")
                     }
                   }
+                  if matchesSettings("皮肤 LittleSkin 角色 预览 PNG 下载") {
+                    Section("皮肤") {
+                        NavigationLink { HarborSkinLibraryView() } label: {
+                            Label("LittleSkin 皮肤库", systemImage: "person.crop.square").frame(minHeight: 44)
+                        }.accessibilityIdentifier("settings.skins")
+                    }
+                  }
                   if matchesSettings("关于 作者 贡献 GitHub issues 开发者 ADsurfboard") {
                     Section("关于") {
                         LabeledContent("作者", value: "ADsurfboard")

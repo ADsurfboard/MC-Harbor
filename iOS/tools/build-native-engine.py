@@ -678,7 +678,17 @@ for original in sorted((REPO/'Assets/Voice').glob('*.mp3')):
         assert hashlib.sha256(archive.read(members[0])).hexdigest()==expected,'MP3 bytes inside the package do not match: '+original.name
     voice_assets[original.name]={'sha256':expected,'bytes':original.stat().st_size,'resourcePath':str(copies[0].relative_to(destination))}
 assert len(voice_assets)==4,'The complete native app must retain all four welcome MP3s'
+skin_viewer={}
+with zipfile.ZipFile(package) as archive:
+    for name in ('index.html','skinview3d.bundle.js','skinview3d.LICENSE','skinview-utils.LICENSE','three.LICENSE'):
+        source=REPO/'Assets/SkinViewer'/name
+        resource=destination/'Frameworks/HarborIOSUI.framework/SkinViewer'/name
+        expected=hashlib.sha256(source.read_bytes()).hexdigest()
+        assert hashlib.sha256(resource.read_bytes()).hexdigest()==expected, 'Skin viewer resource did not survive packaging: '+name
+        members=[entry for entry in archive.infolist() if entry.filename.endswith('/HarborIOSUI.framework/SkinViewer/'+name)]
+        assert len(members)==1 and hashlib.sha256(archive.read(members[0])).hexdigest()==expected, 'Invalid packaged skin viewer resource: '+name
+        skin_viewer[name]=expected
 report={'upstream':UPSTREAM,'platform':args.platform,'app':str(destination),'nativeExecutable':(destination/'AngelAuraAmethyst').is_file(),'frameworks':[x.name for x in (destination/'Frameworks').glob('Harbor*.framework')],'javaRuntimes':[x.name for x in (destination/'java_runtimes').iterdir() if x.is_dir()],'package':package.name,'packageBytes':package.stat().st_size,'packageSHA256':digest,'signing':'ad-hoc; device installation requires personal developer signing','minecraftGameplayVerified':False}
-report.update(nativeBuildMetadata=native_build_metadata, nativeLiquidGlassSDK=True, uiConfiguration='Release', welcomeAudio=voice_assets)
+report.update(nativeBuildMetadata=native_build_metadata, nativeLiquidGlassSDK=True, uiConfiguration='Release', welcomeAudio=voice_assets, skinViewer=skin_viewer)
 (EVIDENCE/('native-build-'+args.platform+'.json')).write_text(json.dumps(report,indent=2))
 print(json.dumps(report),flush=True)

@@ -40,6 +40,9 @@ targets:
         buildPhase: resources
       - path: ../Assets/Skins/wide/steve.png
         buildPhase: resources
+      - path: ../Assets/SkinViewer
+        type: folder
+        buildPhase: resources
       - path: ../Assets/Voice
         buildPhase: resources
     dependencies:
