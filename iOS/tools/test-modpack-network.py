@@ -33,6 +33,7 @@ try:
         manifest_path=temp/'manifest.json';manifest_path.write_text(json.dumps(manifest))
         subprocess.run(['xcrun','clang','-fobjc-arc','-fmodules','-fblocks','-Wall','-Werror','-framework','Foundation',
             '-I',str(root/'Native'),str(root/'Native/HarborModpackMetadata.m'),str(root/'Native/HarborModpackTransaction.m'),
+            str(root/'Native/HarborPublicDownloads.m'),
             str(root/'Tests/HarborModpackNetworkTests.m'),'-o',str(executable)],check=True,timeout=60)
         subprocess.run([str(executable),str(manifest_path),str(destination)],check=True,timeout=135)
         downloaded=destination/manifest['path']

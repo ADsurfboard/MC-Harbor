@@ -7,6 +7,7 @@ with tempfile.TemporaryDirectory(prefix='harbor-transaction-build-') as director
     executable=Path(directory)/'transaction-tests'
     subprocess.run(['xcrun','clang','-fobjc-arc','-fmodules','-fblocks','-Wall','-Werror','-framework','Foundation',
                     '-I',str(root/'Native'),str(root/'Native/HarborModpackMetadata.m'),
-                    str(root/'Native/HarborModpackTransaction.m'),str(root/'Tests/HarborModpackTransactionTests.m'),
+                    str(root/'Native/HarborModpackTransaction.m'),str(root/'Native/HarborPublicDownloads.m'),
+                    str(root/'Tests/HarborModpackTransactionTests.m'),
                     '-o',str(executable)],check=True,timeout=60)
     subprocess.run([str(executable)],check=True,timeout=30)

@@ -1,5 +1,6 @@
 #import "HarborModpackTransaction.h"
 #import "HarborModpackMetadata.h"
+#import "HarborPublicDownloads.h"
 
 static NSError *HBRImportError(NSString *message) {
     return [NSError errorWithDomain:@"net.morben.harbor.import" code:1 userInfo:@{NSLocalizedDescriptionKey:message}];
@@ -23,7 +24,7 @@ static NSError *HBRCancelled(void) { return [NSError errorWithDomain:NSURLErrorD
 - (void)start:(NSURL *)url {
     NSURLSessionConfiguration *config=NSURLSessionConfiguration.ephemeralSessionConfiguration;
     config.timeoutIntervalForRequest=30; config.timeoutIntervalForResource=180;
-    config.URLCache=nil; config.HTTPCookieStorage=nil;
+    config.URLCache=nil; config.HTTPCookieStorage=nil; config.URLCredentialStorage=nil; config.HTTPShouldSetCookies=NO;
     config.HTTPAdditionalHeaders=@{@"User-Agent":@"MC-Harbor/0.1 (+https://github.com/ADsurfboard/MC-Harbor)"};
     NSOperationQueue *callbacks=[NSOperationQueue new];callbacks.maxConcurrentOperationCount=1;
     self.session=[NSURLSession sessionWithConfiguration:config delegate:self delegateQueue:callbacks];
@@ -53,7 +54,7 @@ static NSError *HBRCancelled(void) { return [NSError errorWithDomain:NSURLErrorD
 }
 - (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task willPerformHTTPRedirection:(NSHTTPURLResponse *)response newRequest:(NSURLRequest *)request completionHandler:(void (^)(NSURLRequest *))completionHandler {
     NSURL *url=request.URL;
-    NSSet *hosts=[NSSet setWithArray:@[@"cdn.modrinth.com",@"github.com",@"raw.githubusercontent.com",@"gitlab.com",@"release-assets.githubusercontent.com",@"objects.githubusercontent.com",@"github-releases.githubusercontent.com"]];
+    NSSet *hosts=[NSSet setWithArray:@[@"cdn.modrinth.com",@"mod.mcimirror.top",@"github.com",@"raw.githubusercontent.com",@"gitlab.com",@"release-assets.githubusercontent.com",@"objects.githubusercontent.com",@"github-releases.githubusercontent.com"]];
     BOOL valid=++self.redirects<=8 && [url.scheme.lowercaseString isEqual:@"https"] && url.host.length && [hosts containsObject:url.host.lowercaseString] && !url.user && !url.password && (!url.port || url.port.integerValue==443);
     completionHandler(valid ? request:nil);
 }
@@ -70,6 +71,7 @@ static NSError *HBRCancelled(void) { return [NSError errorWithDomain:NSURLErrorD
 @property NSMutableDictionary<NSNumber *,NSNumber *> *attempts;
 @property NSMutableDictionary<NSNumber *,NSUUID *> *tickets;
 @property NSError *failure;
+@property NSString *downloadRoute;
 @property NSUInteger next,finished;
 @property BOOL started,ended,ownsStage,ownsDestination;
 @end
@@ -80,6 +82,7 @@ static NSError *HBRCancelled(void) { return [NSError errorWithDomain:NSURLErrorD
         _destination=destination.URLByStandardizingPath;
         _stage=[destination.URLByDeletingLastPathComponent URLByAppendingPathComponent:[@".import-" stringByAppendingString:NSUUID.UUID.UUIDString] isDirectory:YES];
         _files=[files copy];_apply=[apply copy];_commit=[commit copy];_completion=[completion copy];
+        _downloadRoute=HBRPublicDownloadRoute();
         _queue=dispatch_queue_create("net.morben.harbor.import",DISPATCH_QUEUE_SERIAL);
         _active=[NSMutableDictionary new];_attempts=[NSMutableDictionary new];_tickets=[NSMutableDictionary new];
         _progress=[NSProgress progressWithTotalUnitCount:files.count+2];
@@ -133,7 +136,12 @@ static NSError *HBRCancelled(void) { return [NSError errorWithDomain:NSURLErrorD
 }
 - (void)startFile:(NSUInteger)index {
     NSDictionary *file=self.files[index];NSNumber *key=@(index);
-    NSUInteger attempt=[self.attempts[key] unsignedIntegerValue];NSArray *urls=file[@"downloads"];
+    NSUInteger attempt=[self.attempts[key] unsignedIntegerValue];
+    NSMutableOrderedSet<NSURL *> *urls=[NSMutableOrderedSet orderedSet];
+    for (NSString *address in file[@"downloads"]) {
+        NSURL *url=[NSURL URLWithString:address];
+        [urls addObjectsFromArray:HBRPublicDownloadURLs(url,self.downloadRoute)];
+    }
     NSURL *target=[self.stage URLByAppendingPathComponent:file[@"path"]];
     self.progress.localizedDescription=[NSString stringWithFormat:@"下载并校验 %lu / %lu",(unsigned long)self.finished,(unsigned long)self.files.count];
     self.progress.localizedAdditionalDescription=file[@"path"];
@@ -160,10 +168,10 @@ static NSError *HBRCancelled(void) { return [NSError errorWithDomain:NSURLErrorD
         [self pump];
     });};
     HBRImportCancel cancel=nil;
-    if (self.fetch) cancel=self.fetch(file,[NSURL URLWithString:urls[attempt]],target,done);
+    if (self.fetch) cancel=self.fetch(file,urls[attempt],target,done);
     else {
         HBRImportHTTP *transfer=[HBRImportHTTP new];transfer.target=target;transfer.expectedBytes=[file[@"fileSize"] unsignedLongLongValue];transfer.completion=done;
-        [transfer start:[NSURL URLWithString:urls[attempt]]];cancel=^{[transfer.task cancel];};
+        [transfer start:urls[attempt]];cancel=^{[transfer.task cancel];};
     }
     self.active[key]=cancel ?: ^{};
 }

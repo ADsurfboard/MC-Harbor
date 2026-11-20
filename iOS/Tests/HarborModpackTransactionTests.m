@@ -31,7 +31,12 @@ static HBRImportFetch transport(NSMutableArray *calls,BOOL fail,BOOL corrupt,BOO
         void (^perform)(void)=^{ @synchronized(lock) {
             if (terminal) return;terminal=YES;
             if (fail || [url.path hasSuffix:@"first-error"]) {completion(problem());return;}
-            NSData *bytes=(corrupt || [url.path hasSuffix:@"first-corrupt"]) ? [@"not the correct payload" dataUsingEncoding:NSUTF8StringEncoding]:payload;
+            NSData *bytes=payload;
+            if (corrupt || [url.path hasSuffix:@"first-corrupt"]) {
+                NSMutableData *changed=payload.mutableCopy;
+                ((uint8_t *)changed.mutableBytes)[0]^=0xff;
+                bytes=changed;
+            }
             NSError *error=nil;[NSFileManager.defaultManager createDirectoryAtURL:target.URLByDeletingLastPathComponent withIntermediateDirectories:YES attributes:nil error:&error];
             if (!error) [bytes writeToURL:target options:NSDataWritingAtomic error:&error];completion(error);
         }};
@@ -40,6 +45,8 @@ static HBRImportFetch transport(NSMutableArray *calls,BOOL fail,BOOL corrupt,BOO
     };
 }
 int main(void) { @autoreleasepool {
+    // Volatile process-local order. Do not read or change the user's settings.
+    [NSUserDefaults.standardUserDefaults setVolatileDomain:@{@"harbor.ios.resources.route":@"domesticFirst"} forName:NSArgumentDomain];
     root=[NSTemporaryDirectory() stringByAppendingPathComponent:[@"harbor-txn-" stringByAppendingString:NSUUID.UUID.UUIDString]];
     [NSFileManager.defaultManager createDirectoryAtPath:root withIntermediateDirectories:YES attributes:nil error:nil];
     @try {
@@ -66,8 +73,21 @@ int main(void) { @autoreleasepool {
             NSMutableDictionary *f=file(@"mods/fallback.jar").mutableCopy;
             f[@"downloads"]=@[[@"https://cdn.modrinth.com/" stringByAppendingString:suffix],@"https://github.com/success"];
             calls=[NSMutableArray new];dest=destination();op=operation(dest,@[f],noOp,noOp);op.fetch=transport(calls,NO,NO,NO);
-            [op start];waitForCompletion();CHECK(!result);CHECK(calls.count==2);CHECK([[NSData dataWithContentsOfURL:[dest URLByAppendingPathComponent:f[@"path"]]] isEqual:payload]);cleanStage();
+            [op start];waitForCompletion();CHECK(!result);CHECK(calls.count==3);
+            CHECK([calls[0] hasPrefix:@"https://mod.mcimirror.top/"]);
+            CHECK([calls[1] hasPrefix:@"https://cdn.modrinth.com/"]);
+            CHECK([calls[2] isEqual:@"https://github.com/success"]);
+            CHECK([[NSData dataWithContentsOfURL:[dest URLByAppendingPathComponent:f[@"path"]]] isEqual:payload]);cleanStage();
         }
+        dest=destination();calls=[NSMutableArray new];op=operation(dest,@[file(@"mods/verified.jar")],noOp,noOp);
+        HBRImportFetch validSource=transport(calls,NO,NO,YES);
+        HBRImportFetch corruptSource=transport(calls,NO,YES,YES);
+        op.fetch=^HBRImportCancel(NSDictionary *f,NSURL *url,NSURL *target,void (^completion)(NSError *)) {
+            HBRImportFetch source=[url.host isEqual:@"mod.mcimirror.top"] ? corruptSource:validSource;
+            return source(f,url,target,completion);
+        };
+        [op start];waitForCompletion();CHECK(!result);CHECK(calls.count==2);
+        CHECK([calls[1] hasPrefix:@"https://cdn.modrinth.com/"]);cleanStage();
         // A cache hit may complete synchronously, even for an empty pack.
         // A delayed duplicate callback from an old source cannot consume the
         // newly started fallback attempt's active slot or commit incomplete data.
