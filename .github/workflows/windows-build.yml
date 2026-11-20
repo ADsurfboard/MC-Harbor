@@ -1,18 +1,26 @@
-name: Windows x64 build check
+name: Windows build check
 
 on:
   pull_request:
     branches: [windows]
   push:
-    branches: [windows, windows-x64-1.7.1]
+    branches: [windows, windows-x64-1.7.1, windows-arm64]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  windows-x64:
-    runs-on: windows-2022
+  windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: x64
+            runner: windows-2022
+          - architecture: arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
@@ -23,6 +31,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+          architecture: x64
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -30,6 +39,7 @@ jobs:
         run: |
           python tools/test-source-privacy.py
           python tools/check-source-privacy.py
+          python tools/test-windows-payload.py
       - name: Prepare WiX
         shell: pwsh
         run: |
@@ -42,16 +52,21 @@ jobs:
           $tool | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
       - name: Check local translation transport privacy
         run: dotnet run --project tests/windows-local-transport/LocalTransportChecks.csproj -c Release
+      - name: Check platform routing and native execution
+        run: dotnet run --project tests/windows-platform-checks/PlatformChecks.csproj -c Release -r win-${{ matrix.architecture }} --self-contained false -- --expect-architecture ${{ matrix.architecture }}
       - name: Build unsigned test payload without optional licensed interface sounds
         shell: pwsh
         run: |
-          tools/build-windows.ps1 -Mode Publish
-          tools/package-windows.ps1 -PublishDirectory build/MC-Harbor-Windows -Format Installer
-          python tools/check-source-privacy.py --zip build/MC-Harbor-Windows-x64-portable.zip
+          $architecture = '${{ matrix.architecture }}'
+          tools/build-windows.ps1 -Mode Publish -Architecture $architecture
+          $folder = if ($architecture -eq 'arm64') { 'build/MC-Harbor-Windows-arm64' } else { 'build/MC-Harbor-Windows' }
+          tools/package-windows.ps1 -PublishDirectory $folder -Architecture $architecture -Format Installer
+          python tools/check-windows-backend.py --directory $folder --architecture $architecture
+          python tools/check-source-privacy.py --zip "build/MC-Harbor-Windows-$architecture-portable.zip"
       - uses: ./.github/actions/upload-artifact-retry
         with:
-          name: windows-x64-ci-unsigned
+          name: windows-${{ matrix.architecture }}-ci-unsigned
           compression-level: 0
           path: |
-            build/MC-Harbor-Windows-x64-portable.zip
-            build/MC-Harbor-Windows-x64-Setup.msi
+            build/MC-Harbor-Windows-${{ matrix.architecture }}-portable.zip
+            build/MC-Harbor-Windows-${{ matrix.architecture }}-Setup.msi

@@ -165,13 +165,14 @@ internal sealed class SakuraClient : IAsyncDisposable
     {
         var meta = await QueryAsync("system/clients", null, null, cancellation);
         var frpc = meta?["frpc"];
-        var arch = frpc?["archs"]?["windows_amd64"];
+        var architecture = WindowsPlatform.NativeArchitecture;
+        var arch = frpc?["archs"]?[architecture == "arm64" ? "windows_arm64" : "windows_amd64"];
         var version = ReadString(frpc, "ver");
         var hash = ReadString(arch, "hash");
         if (version.Length == 0 || hash.Length != 32 || !hash.All(Uri.IsHexDigit)
             || arch?["size"]?.GetValue<int>() is not (> 0 and < 50_000_000 and var size)
             || !Uri.TryCreate(ReadString(arch, "url"), UriKind.Absolute, out var url) || url.Scheme != "https" || url.UserInfo.Length > 0)
-            throw new IOException("Sakura Frp 官方未返回可用的 x64 客户端。");
+            throw new IOException($"Sakura Frp 官方未返回可用的 {architecture} 客户端。");
         var folder = Path.Combine(AppPaths.DataDirectory, "network", "sakura");
         var target = Path.Combine(folder, $"frpc-{hash.ToLowerInvariant()}.exe");
         if (!File.Exists(target) || !Matches(await File.ReadAllBytesAsync(target, cancellation)))
@@ -188,7 +189,7 @@ internal sealed class SakuraClient : IAsyncDisposable
             var pe = BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(0x3c, 4));
             return pe >= 0 && pe <= bytes.Length - 6
                 && BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(pe, 4)) == 0x4550
-                && BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(pe + 4, 2)) == 0x8664
+                && BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(pe + 4, 2)) == WindowsPlatform.MachineFor(architecture)
                 && Convert.ToHexString(MD5.HashData(bytes)).Equals(hash, StringComparison.OrdinalIgnoreCase);
         }
     }

@@ -2,15 +2,15 @@
 
 正式负责人：**时咨月.**（[shiziyueyuan](https://github.com/shiziyueyuan)）。项目作者：**ADsurfboard**。
 
-本分支以原项目 windows 分支的 macOS 源码为基线，新增 WinUI 3 / .NET 10 Windows x64 客户端，并沿用仓库固定的 HMCL Java 后端。当前构建目标为 Windows 10 22H2 和 Windows 11 x64。窗口启动修复和便携发布已在 Windows 10 22H2 x64 上确认。账号续期、外置服务和不同网络环境下的联机仍须由用户实际账号验收。
+本分支以原项目 windows 分支的 macOS 源码为基线，新增 WinUI 3 / .NET 10 Windows x64 与 ARM64 客户端，并沿用仓库固定的 HMCL Java 后端。x64 面向 Windows 10 22H2 和 Windows 11；ARM64 面向 Windows 11 24H2 或更新版本，架构划分、兼容进程和验证边界见 [WINDOWS_ARM64.md](WINDOWS_ARM64.md)。窗口启动修复和便携发布已在 Windows 10 22H2 x64 上确认。账号续期、外置服务和不同网络环境下的联机仍须由用户实际账号验收。
 
 开发分支为 [windows](https://github.com/ADsurfboard/MC-Harbor/tree/windows)。逐项移植决策、替代方案和验收范围见 [WINDOWS_PORT_PLAN.md](WINDOWS_PORT_PLAN.md)，视觉布局见 [WINDOWS_VISUAL_PLAN.md](WINDOWS_VISUAL_PLAN.md)，源码与发行附件的发布流程见 [WINDOWS_RELEASE.md](WINDOWS_RELEASE.md)。
 
 ## 本地构建
 
-- Windows x64 与 PowerShell 5.1 或更新版本。
+- Windows x64 或 ARM64 与 PowerShell 5.1 或更新版本。x64 开发机可以交叉生成 ARM64 发行包；运行 ARM64 主程序需要 ARM64 Windows。
 - .NET SDK 10.0.404。global.json 固定 SDK 系列，可运行 tools/setup-dotnet-sdk.ps1 安装到仓库父目录 _tools/dotnet。
-- Eclipse Temurin JDK 21 x64。设置 JAVA_HOME 后，由 tools/build-windows.ps1 编译 Java 后端并使用 jlink 准备随包运行时。
+- 可在开发机运行的 JDK 21（推荐 Eclipse Temurin x64）。设置 JAVA_HOME 后编译 Java 后端；随包 Java 使用校验固定的 BellSoft Liberica 21.0.13.1+5，ARM64 运行时由原生 JavaFX jmods 交叉链接生成。
 - OpenJFX 21.0.8 Windows x64。构建脚本优先使用 HMCL 缓存，否则按 tools/windows-javafx.lock.json 下载并校验。
 - 可选的 JDSherbert 免费 UI 音效包；如需在本机构建版本中启用界面音效，将其 Mono/mp3 音频文件放入 voice-assets/jds-ui-free。原始音频不会进入源码包或发行包，构建时只嵌入 soundbank。
 - vendor/HMCLCore.jar 需由仓库固定文件提供。Python 3 用于执行现有 Java 后端打包脚本。
@@ -22,6 +22,13 @@
     tools\build-windows.ps1
     tools\build-windows.ps1 -Mode Publish
     tools\build-windows.ps1 -Mode Installer
+
+ARM64 使用同一入口，并明确指定目标架构。
+
+    tools\build-windows.ps1 -Architecture arm64 -Mode Publish
+    tools\build-windows.ps1 -Architecture arm64 -Mode Installer
+
+ARM64 输出为 `build/MC-Harbor-Windows-arm64-portable.zip` 与 `build/MC-Harbor-Windows-arm64-Setup.msi`，兼容限制见 [ARM64 说明](WINDOWS_ARM64.md)。
 
 `Publish` 生成便携 ZIP，`Installer` 生成中文 x64 MSI。MSI 构建使用 WiX 5.0.2 与同版本 `WixToolset.UI.wixext`，可以通过 `tools/package-windows.ps1` 的 `Wix` 和 `WixUiExtension` 参数指定本机工具路径。安装器默认将程序放到 `Program Files\MC Harbor`，创建开始菜单快捷方式，并支持 Windows 的修复与卸载入口。安装版数据放在 `%LOCALAPPDATA%\MCHarbor`。现有便携版数据可通过原便携目录继续使用。
 

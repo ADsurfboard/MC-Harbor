@@ -8,12 +8,16 @@ namespace MCHarbor.Windows.Services;
 
 internal sealed class TerracottaClient : IAsyncDisposable
 {
-    private const string Executable = "terracotta-0.4.2-windows-x86_64.exe";
-    private const string Sha256 = "07ebe139e3ca5f74576e58b1a96efe59abdfbe148d3f1a49bfdca8b6f70745f0";
-    private static readonly string ReleaseUrl =
-        "https://github.com/burningtnt/Terracotta/releases/download/v0.4.2/terracotta-0.4.2-windows-x86_64-pkg.tar.gz";
-    private static readonly Dictionary<string, string> FileHashes = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly bool IsArm64 = WindowsPlatform.NativeArchitecture == "arm64";
+    private static readonly string Executable = IsArm64 ? "terracotta-0.4.2-windows-arm64.exe" : "terracotta-0.4.2-windows-x86_64.exe";
+    private static readonly string Sha256 = IsArm64 ? "acfab0a87a02dedc6dab7c05303186c8907f56f815548b693fb3324358da7d14" : "07ebe139e3ca5f74576e58b1a96efe59abdfbe148d3f1a49bfdca8b6f70745f0";
+    private static readonly int ArchiveSize = IsArm64 ? 7_211_225 : 8_135_914;
+    private static readonly string ReleaseUrl = $"https://github.com/burningtnt/Terracotta/releases/download/v0.4.2/{Path.GetFileNameWithoutExtension(Executable)}-pkg.tar.gz";
+    private static readonly Dictionary<string, string> FileHashes = IsArm64 ? new(StringComparer.OrdinalIgnoreCase)
     {
+        [Executable] = "30a15c5c53e5817c5a3634532172559327474741d3b2c7ef4e8a30acc6f59cdcf3570bf5f583e3cbe9e2abc8253e977c1abda1e9f36c88c4e99240da257347d0",
+        ["VCRUNTIME140.DLL"] = "5cb5ce114614101d260f4754c09e8a0dd57e4da885ebb96b91e274326f3e1dd95ed0ade9f542f1922fad0ed025e88a1f368e791e1d01fae69718f0ec3c7b98c8"
+    } : new(StringComparer.OrdinalIgnoreCase) {
         [Executable] = "6e98d1f2380ed22fb5a2dd4aafce6c773e9cf69100c8bb8e49e7d6983756bdb9a31f80e06bcfbe5a2742144fe806d3d687dec54d8f09d87c659341f99dd9fd80",
         ["VCRUNTIME140.DLL"] = "3d4b24061f72c0e957c7b04a0c4098c94c8f1afb4a7e159850b9939c7210d73398be6f27b5ab85073b4e8c999816e7804fef0f6115c39cd061f4aaeb4dcda8cf"
     };
@@ -145,12 +149,12 @@ internal sealed class TerracottaClient : IAsyncDisposable
 
     private static async Task<string> PrepareBinaryAsync(CancellationToken cancellation)
     {
-        var directory = Path.Combine(AppPaths.DataDirectory, "network", "terracotta", "0.4.2-x64");
+        var directory = Path.Combine(AppPaths.DataDirectory, "network", "terracotta", "0.4.2-" + WindowsPlatform.NativeArchitecture);
         Directory.CreateDirectory(directory);
         var binary = Path.Combine(directory, Executable);
         if (FileHashes.All(file => IsVerified(Path.Combine(directory, file.Key), file.Value))) return binary;
-        var archive = await HarborHttp.RequestAsync(HarborHttp.Downloads, new Uri(ReleaseUrl), 8_135_914, cancellation: cancellation);
-        if (archive.Length != 8_135_914 || !Convert.ToHexString(SHA256.HashData(archive)).Equals(Sha256, StringComparison.OrdinalIgnoreCase))
+        var archive = await HarborHttp.RequestAsync(HarborHttp.Downloads, new Uri(ReleaseUrl), ArchiveSize, cancellation: cancellation);
+        if (archive.Length != ArchiveSize || !Convert.ToHexString(SHA256.HashData(archive)).Equals(Sha256, StringComparison.OrdinalIgnoreCase))
             throw new IOException("陶瓦发行包校验失败。");
         var files = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
         using var compressed = new GZipStream(new MemoryStream(archive, writable: false), CompressionMode.Decompress);

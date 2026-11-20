@@ -54,6 +54,12 @@ public final class NativeBridge {
             data=Path.of(System.getProperty("hmcl.dir")).toAbsolutePath().normalize();Files.createDirectories(data);
             org.jackhuang.hmcl.util.CacheRepository.getInstance().changeDirectory(data);
             String command=text("command","");
+            if(command.equals("platformInfo")){
+                result(Map.of("javaArchitecture",System.getProperty("os.arch"),"javaVersion",System.getProperty("java.version"),
+                    "currentPlatform",Platform.CURRENT_PLATFORM.toString(),"systemPlatform",Platform.SYSTEM_PLATFORM.toString(),
+                    "gamePlatform",gameRuntimePlatform().toString(),"javaFxModules",ModuleLayer.boot().findModule("javafx.controls").isPresent()));
+                System.exit(0);
+            }
             if(command.equals("login")){result(login());System.exit(0);}
             if (command.equals("offlineAccount")) {
                 String name = text("username", "");
@@ -192,7 +198,7 @@ public final class NativeBridge {
         if(required==null)required=GameJavaVersion.JAVA_8;
         if(request.has("javaExplicit")&&request.get("javaExplicit").getAsBoolean()){
             String selectedPath=text("gameJava","");if(selectedPath.isBlank())throw new IOException("请先选择此实例使用的 Java。");
-            JavaRuntime selected=readJava(Path.of(selectedPath));if(selected.getParsedVersion()!=required.majorVersion())throw new IOException("此实例需要 Java "+required.majorVersion());if(!javaArchitectureMatches(selected))throw new IOException("所选 Java 的架构与当前 Windows 客户端不匹配。");return selected;
+            JavaRuntime selected=readJava(Path.of(selectedPath));if(selected.getParsedVersion()!=required.majorVersion())throw new IOException("此实例需要 Java "+required.majorVersion());if(!javaArchitectureMatches(selected))throw new IOException("所选 Java 与游戏运行环境架构不匹配；Windows ARM64 版当前使用 x64 Java 兼容模式启动游戏。");return selected;
         }
         List<Path> candidates=new ArrayList<>();
         String selectedPath=text("gameJava","");if(!selectedPath.isBlank())candidates.add(Path.of(selectedPath));
@@ -211,11 +217,12 @@ public final class NativeBridge {
                 }
             }
         }
-        HMCLJavaRepository originalRuntimes=new HMCLJavaRepository(hmclUserHome().resolve("java"));Path originalCached=originalRuntimes.getJavaExecutable(Platform.SYSTEM_PLATFORM,required);if(originalCached!=null)candidates.add(0,originalCached);
-        HMCLJavaRepository runtimes=new HMCLJavaRepository(data.resolve("java"));Path cached=runtimes.getJavaExecutable(Platform.SYSTEM_PLATFORM,required);if(cached!=null)candidates.add(0,cached);
+        Platform gamePlatform=gameRuntimePlatform();
+        HMCLJavaRepository originalRuntimes=new HMCLJavaRepository(hmclUserHome().resolve("java"));Path originalCached=originalRuntimes.getJavaExecutable(gamePlatform,required);if(originalCached!=null)candidates.add(0,originalCached);
+        HMCLJavaRepository runtimes=new HMCLJavaRepository(data.resolve("java"));Path cached=runtimes.getJavaExecutable(gamePlatform,required);if(cached!=null)candidates.add(0,cached);
         Set<Path> checked=new HashSet<>();for(Path binary:candidates){try{Path normalized=binary.toAbsolutePath().normalize();if(!checked.add(normalized)||!Files.isRegularFile(normalized))continue;JavaRuntime java=readJava(normalized);if(java.getParsedVersion()==required.majorVersion() && javaArchitectureMatches(java))return java;}catch(IOException|RuntimeException ignored){}}
         if(Files.getFileStore(data).getUsableSpace()<400*1024*1024L)throw new IOException("下载 Java 运行时需要至少 400 MB 可用空间。");
-        stage("准备 Java "+required.majorVersion());Task<JavaRuntime> download=runtimes.getDownloadJavaTask(provider,Platform.SYSTEM_PLATFORM,required);perform(download);return download.getResult();
+        stage("准备 Java "+required.majorVersion());Task<JavaRuntime> download=runtimes.getDownloadJavaTask(provider,gamePlatform,required);perform(download);return download.getResult();
     }
     private static JavaRuntime gameJava(Version version)throws Exception{
         GameJavaVersion required=version.getJavaVersion()!=null?version.getJavaVersion():GameJavaVersion.getMinimumJavaVersion(org.jackhuang.hmcl.util.versioning.GameVersionNumber.asGameVersion(repository.getGameVersion(version).orElse("1.20.1")));
@@ -223,6 +230,11 @@ public final class NativeBridge {
     }
     private static boolean javaArchitectureMatches(JavaRuntime java) {
         return !isWindows() || java.getPlatform().equals(Platform.CURRENT_PLATFORM);
+    }
+    static Platform gameRuntimePlatform() {
+        // The chosen game bridge determines native libraries and Java architecture together.
+        // On Windows ARM64 the compatibility bridge is an x64 JVM; SYSTEM_PLATFORM remains ARM64.
+        return isWindows() ? Platform.CURRENT_PLATFORM : Platform.SYSTEM_PLATFORM;
     }
     private static Map<String,Object> launch()throws Exception{
         if(request.has("completeDependencies")&&request.get("completeDependencies").getAsBoolean()){

@@ -24,7 +24,8 @@ public sealed partial class MainWindow
                 {
                     XamlRoot = RootShell.XamlRoot,
                     Title = "准备本机补译",
-                    Content = "首次使用会下载约 325 MB 的英译中模型和运行库，需要约 1 GB 临时空间。配置完成后，翻译在本机执行。",
+                    Content = "首次使用会下载约 325 MB 的英译中模型和运行库，需要约 1 GB 临时空间。配置完成后，翻译在本机执行。"
+                        + (WindowsPlatform.LocalTranslationNotice.Length == 0 ? "" : "\n\n" + WindowsPlatform.LocalTranslationNotice),
                     PrimaryButtonText = "下载并开始",
                     CloseButtonText = "取消",
                     DefaultButton = ContentDialogButton.Primary

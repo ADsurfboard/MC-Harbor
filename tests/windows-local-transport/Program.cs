@@ -116,5 +116,6 @@ namespace MCHarbor.Windows.Services
     {
         internal static string DataDirectory => throw new InvalidOperationException("No player data in transport checks.");
         internal static string ApplicationDirectory => throw new InvalidOperationException("No application data in transport checks.");
+        internal static string BackendDirectory => throw new InvalidOperationException("No backend data in transport checks.");
     }
 }

@@ -1,0 +1,25 @@
+{
+  "version": "21.0.13.1+5",
+  "vendor": "BellSoft Liberica JDK Full",
+  "architecture": "arm64",
+  "url": "https://github.com/bell-sw/Liberica/releases/download/21.0.13.1%2B5/bellsoft-jdk21.0.13.1%2B5-windows-aarch64-full.zip",
+  "filename": "bellsoft-jdk21.0.13.1+5-windows-aarch64-full.zip",
+  "size": 219318336,
+  "sha256": "0bdd22347f701464b6f20f00d6b90f259a16079b52a4cf72111ced80a01eff21",
+  "directory": "jdk-21.0.13.1-full",
+  "modules": "java.se,jdk.crypto.ec,jdk.crypto.mscapi,jdk.httpserver,jdk.localedata,jdk.management,jdk.unsupported,jdk.zipfs,javafx.controls,javafx.fxml",
+  "excludedUnusedLibraries": [
+    {
+      "path": "bin/vcruntime140_1.dll",
+      "sha256": "42b5f76f1f0ae03c93fc4c107adf83c5f14e86032474860032cfe672d0836546"
+    }
+  ],
+  "gameCompatibility": {
+    "version": "21.0.13.1+5",
+    "url": "https://github.com/bell-sw/Liberica/releases/download/21.0.13.1%2B5/bellsoft-jre21.0.13.1%2B5-windows-amd64.zip",
+    "filename": "bellsoft-jre21.0.13.1+5-windows-amd64.zip",
+    "directory": "jre-21.0.13.1",
+    "size": 58975424,
+    "sha256": "254c3c25cfa7320011a549ff2cdb5211c6a25b2499f6b9153d34c870a0ee4bd4"
+  }
+}

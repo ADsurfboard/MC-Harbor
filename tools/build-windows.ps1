@@ -1,93 +1,100 @@
 param(
-    [ValidateSet("Build", "Publish", "Installer")]
-    [string]$Mode = "Build"
+    [ValidateSet('Build','Publish','Installer')][string]$Mode = 'Build',
+    [ValidateSet('x64','arm64')][string]$Architecture = 'x64'
 )
-
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $toolRoot = Split-Path -Parent $repo
-$cliHome = Join-Path $toolRoot "_tools\dotnet-home"
+$cliHome = Join-Path $toolRoot '_tools\dotnet-home'
 $env:DOTNET_CLI_HOME = $cliHome
-$env:NUGET_PACKAGES = Join-Path $toolRoot "_tools\nuget"
-$env:APPDATA = Join-Path $cliHome "Roaming"
-$env:LOCALAPPDATA = Join-Path $cliHome "Local"
-$env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE = "1"
-$env:DOTNET_CLI_TELEMETRY_OPTOUT = "1"
-New-Item -ItemType Directory -Force -Path $env:DOTNET_CLI_HOME,$env:NUGET_PACKAGES,$env:APPDATA,$env:LOCALAPPDATA | Out-Null
-
-$sdk = Join-Path $toolRoot "_tools\dotnet\dotnet.exe"
+$env:NUGET_PACKAGES = Join-Path $toolRoot '_tools\nuget'
+$env:APPDATA = Join-Path $cliHome 'Roaming'
+$env:LOCALAPPDATA = Join-Path $cliHome 'Local'
+$env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE = '1'
+$env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
+$env:PYTHONDONTWRITEBYTECODE = '1'
+New-Item -ItemType Directory -Force -Path $cliHome,$env:NUGET_PACKAGES,$env:APPDATA,$env:LOCALAPPDATA | Out-Null
+$sdk = Join-Path $toolRoot '_tools\dotnet\dotnet.exe'
+$native = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
+$armSdk = Join-Path $toolRoot '_tools\dotnet-arm64\dotnet.exe'
+if ($native -eq 'ARM64' -and (Test-Path -LiteralPath $armSdk)) { $sdk = $armSdk }
 if (-not (Test-Path -LiteralPath $sdk)) {
-    $sdkCommand = Get-Command dotnet -ErrorAction SilentlyContinue
-    if ($null -eq $sdkCommand) {
-        throw "找不到 .NET 10 SDK。请先运行 tools\setup-dotnet-sdk.ps1。"
-    }
-    $sdk = $sdkCommand.Source
+    $command = Get-Command dotnet -ErrorAction SilentlyContinue
+    if ($null -eq $command) { throw 'Run tools/setup-dotnet-sdk.ps1 to install .NET 10.' }
+    $sdk = $command.Source
 }
 $env:DOTNET_ROOT = Split-Path -Parent $sdk
 $env:PATH = "$env:DOTNET_ROOT;$env:PATH"
-$sdkVersion = (& $sdk --version).Trim()
-if ($LASTEXITCODE -ne 0 -or $sdkVersion -notlike "10.0.*") {
-    throw "Windows 客户端需要 .NET 10 SDK，当前版本为 $sdkVersion。"
+$version = (& $sdk --version).Trim()
+if ($LASTEXITCODE -ne 0 -or $version -notlike '10.0.*') { throw 'The Windows client requires .NET SDK 10.' }
+if (-not $env:JAVA_HOME) {
+    $candidate = Join-Path $toolRoot '_tools\jdk-21'
+    if (Test-Path -LiteralPath (Join-Path $candidate 'bin\javac.exe')) { $env:JAVA_HOME = $candidate }
 }
-
-$localJdk = Join-Path (Split-Path -Parent $repo) "_tools\jdk-21"
-if (-not $env:JAVA_HOME -and (Test-Path -LiteralPath (Join-Path $localJdk "bin\javac.exe"))) {
-    $env:JAVA_HOME = $localJdk
+if (-not $env:JAVA_HOME -or -not (Test-Path -LiteralPath (Join-Path $env:JAVA_HOME 'bin\javac.exe'))) {
+    throw 'Set JAVA_HOME to a JDK 21 that runs on the build host.'
 }
-if (-not $env:JAVA_HOME -or -not (Test-Path -LiteralPath (Join-Path $env:JAVA_HOME "bin\javac.exe"))) {
-    throw "需要 JDK 21。请设置 JAVA_HOME 后重试。"
-}
-
-if (-not $env:HMCL_FX_DIR) {
-    $candidate = Join-Path $env:APPDATA ".hmcl\dependencies\windows-x64\openjfx"
-    if (Test-Path -LiteralPath $candidate) { $env:HMCL_FX_DIR = $candidate }
-}
-if (-not $env:HMCL_FX_DIR -and (Test-Path -LiteralPath (Join-Path $repo "vendor\javafx-windows-x64"))) {
-    $env:HMCL_FX_DIR = Join-Path $repo "vendor\javafx-windows-x64"
-}
-if (-not $env:HMCL_FX_DIR) {
-    $env:HMCL_FX_DIR = Join-Path $repo "build\windows-javafx"
-    & (Join-Path $PSScriptRoot "setup-windows-javafx.ps1") -Destination $env:HMCL_FX_DIR
-}
-
+$python = Get-Command python -ErrorAction SilentlyContinue
+if ($null -eq $python) {
+    $candidate = Join-Path $repo 'build\translation-python\tools\python.exe'
+    if (-not (Test-Path -LiteralPath $candidate)) { throw 'Python 3 is required for backend and payload checks.' }
+    $pythonPath = $candidate
+} else { $pythonPath = $python.Source }
+$fx = if ($env:HMCL_FX_DIR) { $env:HMCL_FX_DIR } else { Join-Path $repo 'build\windows-javafx' }
+if (-not $env:HMCL_FX_DIR) { & (Join-Path $PSScriptRoot 'setup-windows-javafx.ps1') -Destination $fx }
+$env:HMCL_FX_DIR = $fx
+$rid = "win-$Architecture"
+$platform = if ($Architecture -eq 'arm64') { 'ARM64' } else { 'x64' }
+$build = Join-Path $repo 'build'
 Push-Location $repo
 try {
-    python tools/build-backend-windows.py
-    if ($LASTEXITCODE -ne 0) { throw "Java 后端构建失败。" }
-    python tools/make-soundbank.py
-    if ($LASTEXITCODE -ne 0) { throw "界面音效库构建失败。" }
-
-    $buildRoot = [IO.Path]::GetFullPath((Join-Path $repo "build"))
-    $runtime = [IO.Path]::GetFullPath((Join-Path $buildRoot "Runtime"))
-    $requiredPrefix = $buildRoot.TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
-    if (-not $runtime.StartsWith($requiredPrefix, [StringComparison]::OrdinalIgnoreCase)) {
-        throw "运行时输出目录越出了 build 目录。"
-    }
-    if (Test-Path -LiteralPath $runtime) { Remove-Item -LiteralPath $runtime -Recurse -Force }
-    & (Join-Path $env:JAVA_HOME "bin\jlink.exe") `
-        --add-modules ALL-MODULE-PATH `
-        --strip-debug --no-header-files --no-man-pages --compress=2 `
-        --output $runtime
-    if ($LASTEXITCODE -ne 0) { throw "Java 运行时构建失败。" }
-
+    & $pythonPath tools/build-backend-windows.py
+    if ($LASTEXITCODE -ne 0) { throw 'Java backend compilation failed.' }
+    & $pythonPath tools/make-soundbank.py
+    if ($LASTEXITCODE -ne 0) { throw 'Interface soundbank preparation failed.' }
+    $gameRuntime = & (Join-Path $PSScriptRoot 'setup-windows-game-compat.ps1')
+    if ($Architecture -eq 'arm64') {
+        $runtime = & (Join-Path $PSScriptRoot 'setup-windows-arm64.ps1') -CompilerJavaHome $env:JAVA_HOME
+    } else { $runtime = $gameRuntime }
     & (Join-Path $PSScriptRoot 'setup-windows-translation.ps1')
     & (Join-Path $PSScriptRoot 'make-windows-icon.ps1')
-    $project = Join-Path $repo "windows\MCHarbor.Windows.csproj"
-    & $sdk restore $project -r win-x64 --configfile (Join-Path $repo "windows\NuGet.Config") --ignore-failed-sources -p:NuGetAudit=false
-    if ($LASTEXITCODE -ne 0) { throw ".NET 依赖还原失败。" }
-    if ($Mode -in @('Publish', 'Installer')) {
-        $publish = Join-Path $repo "build\MC-Harbor-Windows"
-        & $sdk publish $project -c Release -r win-x64 --self-contained true `
-            --no-restore -p:HMCL_FX_DIR=$env:HMCL_FX_DIR -o $publish
-        if ($LASTEXITCODE -ne 0) { throw ".NET 客户端发布失败。请确认旧版本已退出。" }
-        $packageFormat = if ($Mode -eq 'Installer') { 'Installer' } else { 'Portable' }
-        & (Join-Path $PSScriptRoot 'package-windows.ps1') -PublishDirectory $publish -Format $packageFormat -DotNet $sdk
+    $manifestDirectory = Join-Path $build $rid
+    New-Item -ItemType Directory -Path $manifestDirectory -Force | Out-Null
+    $manifest = [ordered]@{
+        schemaVersion=1;clientArchitecture=$Architecture;javaArchitecture=$Architecture
+        javaFxMode=$(if($Architecture -eq 'arm64'){'modules'}else{'classpath'})
+        gameArchitecture='x64';gameJavaFxMode='classpath';translationPythonArchitecture='x64'
+        minimumWindowsBuild=$(if($Architecture -eq 'arm64'){26100}else{17763})
     }
-    else {
-        & $sdk build $project -c Debug --no-restore -p:HMCL_FX_DIR=$env:HMCL_FX_DIR
+    $manifestPath = Join-Path $manifestDirectory 'runtime.json'
+    [IO.File]::WriteAllText($manifestPath, ($manifest | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
+    $project = Join-Path $repo 'windows\MCHarbor.Windows.csproj'
+    # MSBuild cannot normalize a command-line global property; use an absolute
+    # extensions path so NuGet's generated WinUI imports are found from any cwd.
+    $intermediate = (Join-Path $repo "windows\obj\$rid").TrimEnd('\') + '\'
+    $properties = @("-p:Platform=$platform", "-p:HMCL_FX_DIR=$fx", "-p:HarborRuntimeDirectory=$runtime",
+        "-p:HarborGameRuntimeDirectory=$gameRuntime", "-p:HarborRuntimeManifest=$manifestPath",
+        "-p:BaseIntermediateOutputPath=$intermediate", "-p:MSBuildProjectExtensionsPath=$intermediate")
+    & $sdk restore $project -r $rid --configfile windows/NuGet.Config --ignore-failed-sources -p:NuGetAudit=false @properties
+    if ($LASTEXITCODE -ne 0) { throw '.NET dependency restore failed.' }
+    if ($Mode -eq 'Build') {
+        & $sdk build $project -c Debug -r $rid --no-restore @properties
+        if ($LASTEXITCODE -ne 0) { throw '.NET build failed.' }
+    } else {
+        $name = if ($Architecture -eq 'x64') { 'MC-Harbor-Windows' } else { 'MC-Harbor-Windows-arm64' }
+        $publish = Join-Path $build $name
+        if (Test-Path -LiteralPath $publish) {
+            $resolved = [IO.Path]::GetFullPath($publish)
+            if (-not $resolved.StartsWith([IO.Path]::GetFullPath($build).TrimEnd('\')+'\', [StringComparison]::OrdinalIgnoreCase)) {
+                throw 'Publish output must stay inside build/.'
+            }
+            Remove-Item -LiteralPath $resolved -Recurse -Force
+        }
+        & $sdk publish $project -c Release -r $rid --self-contained true --no-restore @properties -o $publish
+        if ($LASTEXITCODE -ne 0) { throw '.NET publish failed.' }
+        & $pythonPath tools/check-windows-payload.py --directory $publish --architecture $Architecture
+        if ($LASTEXITCODE -ne 0) { throw 'Published payload architecture checks failed.' }
+        $format = if ($Mode -eq 'Installer') { 'Installer' } else { 'Portable' }
+        & (Join-Path $PSScriptRoot 'package-windows.ps1') -PublishDirectory $publish -Architecture $Architecture -Format $format -DotNet $sdk
     }
-    if ($LASTEXITCODE -ne 0) { throw ".NET 客户端构建失败。" }
-}
-finally {
-    Pop-Location
-}
+} finally { Pop-Location }

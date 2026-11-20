@@ -84,7 +84,7 @@ public sealed partial class MainWindow
         CompleteDependencies.IsOn = PreferenceEnabled("completeDependencies");
         DownloadSource.SelectedIndex = AppPaths.GetPreference("downloadSource") == "official" ? 1 : 0;
         DataDirectoryText.Text = AppPaths.DataDirectory;
-        WindowsVersionText.Text = $"MC Harbor for Windows {AppPaths.Version}";
+        WindowsVersionText.Text = $"MC Harbor for Windows {AppPaths.Version} · {WindowsPlatform.ClientArchitecture.ToUpperInvariant()}";
 
         _appearanceReady = true;
         ApplyTheme();

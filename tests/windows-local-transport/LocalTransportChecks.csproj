@@ -8,5 +8,6 @@
   <ItemGroup>
     <Compile Include="../../windows/Services/IndexTranslationWorker.cs" Link="IndexTranslationWorker.cs" />
     <Compile Include="../../windows/Services/LocalTranslationWorker.cs" Link="LocalTranslationWorker.cs" />
+    <Compile Include="../../windows/Services/WindowsPlatform.cs" Link="WindowsPlatform.cs" />
   </ItemGroup>
 </Project>

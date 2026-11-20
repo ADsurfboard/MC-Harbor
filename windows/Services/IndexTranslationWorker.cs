@@ -281,7 +281,7 @@ internal sealed partial class IndexTranslationWorker : IMachineTranslationWorker
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
-        foreach (var argument in new[] { "install", "--id", "ggml.llamacpp", "--exact", "--source", "winget", "--accept-package-agreements", "--accept-source-agreements", "--silent", "--disable-interactivity" })
+        foreach (var argument in new[] { "install", "--id", "ggml.llamacpp", "--exact", "--architecture", WindowsPlatform.NativeArchitecture, "--source", "winget", "--accept-package-agreements", "--accept-source-agreements", "--silent", "--disable-interactivity" })
             settings.ArgumentList.Add(argument);
         using var installer = Process.Start(settings) ?? throw new IOException("无法启动 WinGet 安装程序。");
         var stdout = installer.StandardOutput.ReadToEndAsync(cancellation);
@@ -297,17 +297,30 @@ internal sealed partial class IndexTranslationWorker : IMachineTranslationWorker
             throw new IOException("llama.cpp 安装失败。" + (details.Length > 240 ? details[^240..] : details));
     }
 
-    private static string? ResolveLlamaExecutable() => FindExecutable("llama.exe")
-        ?? FindExecutable("llama-server.exe");
+    private static string? ResolveLlamaExecutable() => FindExecutable("llama.exe", nativeFirst: true)
+        ?? FindExecutable("llama-server.exe", nativeFirst: true);
 
-    private static string? FindExecutable(string name)
+    private static string? FindExecutable(string name, bool nativeFirst = false)
     {
         var candidates = new List<string>();
         var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         candidates.Add(Path.Combine(local, "Microsoft", "WinGet", "Links", name));
         foreach (var directory in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
             candidates.Add(Path.Combine(directory.Trim().Trim('"'), name));
-        return candidates.FirstOrDefault(path => File.Exists(path));
+        var existing = candidates.Where(File.Exists).ToArray();
+        if (nativeFirst)
+        {
+            foreach (var path in existing)
+            {
+                try
+                {
+                    if (WindowsPlatform.MatchesMachine(File.ReadAllBytes(path), WindowsPlatform.MachineFor(WindowsPlatform.NativeArchitecture)))
+                        return path;
+                }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+            }
+        }
+        return existing.FirstOrDefault();
     }
 
     private static IEnumerable<string> SplitLongText(string text, int maximum)

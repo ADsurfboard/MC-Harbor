@@ -1,6 +1,6 @@
 # MC Harbor
 
-Windows x64 移植：参见 [Windows 构建与功能说明](docs/WINDOWS_PORT.md)、[移植参考](docs/WINDOWS_PORT_PLAN.md) 和 [发行说明](docs/WINDOWS_RELEASE.md)。Windows 由 [shiziyueyuan](https://github.com/shiziyueyuan) 维护；下方介绍保留原项目 macOS 版本说明。
+Windows x64 / ARM64 移植：参见 [Windows 构建与功能说明](docs/WINDOWS_PORT.md)、[ARM64 兼容与构建说明](docs/WINDOWS_ARM64.md)、[移植参考](docs/WINDOWS_PORT_PLAN.md) 和 [发行说明](docs/WINDOWS_RELEASE.md)。Windows 由 [shiziyueyuan](https://github.com/shiziyueyuan) 维护；下方介绍保留原项目 macOS 版本说明。
 
 1.7.1 · Apple Silicon / Intel 双版本
 

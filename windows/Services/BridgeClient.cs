@@ -19,9 +19,19 @@ internal sealed class BridgeClient
         CancellationToken cancellationToken = default)
     {
         EnsureRuntimeFiles();
+        var java = _javaExecutable;
+        var moduleFx = WindowsPlatform.UsesJavaFxModules;
+        if (moduleFx && UsesGameCompatibility(command))
+        {
+            java = Path.Combine(AppPaths.ApplicationDirectory, "Compatibility", "JavaX64", "bin", "java.exe");
+            if (!File.Exists(java)) throw new BridgeException("缺少游戏兼容运行时，请解压完整 ARM64 发行包。");
+            moduleFx = false;
+        }
+        var classpath = new List<string> { AppPaths.BackendJar, AppPaths.HmclJar };
+        if (!moduleFx) classpath.Add(Path.Combine(AppPaths.JavaFxDirectory, "*"));
         var startInfo = new ProcessStartInfo
         {
-            FileName = _javaExecutable,
+            FileName = java,
             WorkingDirectory = AppPaths.ApplicationDirectory,
             UseShellExecute = false,
             RedirectStandardInput = true,
@@ -32,16 +42,16 @@ internal sealed class BridgeClient
             StandardOutputEncoding = new UTF8Encoding(false),
             StandardErrorEncoding = new UTF8Encoding(false)
         };
+        if (moduleFx)
+        {
+            startInfo.ArgumentList.Add("--add-modules");
+            startInfo.ArgumentList.Add("javafx.controls");
+        }
         foreach (var argument in new[]
         {
             "-Xms32m", "-Xmx384m", "-Dfile.encoding=UTF-8", "-Djava.awt.headless=true",
             "-Dshenggan.headless=true", $"-Dhmcl.dir={AppPaths.DataDirectory}", "-cp",
-            string.Join(Path.PathSeparator, new[]
-            {
-                AppPaths.BackendJar,
-                AppPaths.HmclJar,
-                Path.Combine(AppPaths.JavaFxDirectory, "*")
-            }),
+            string.Join(Path.PathSeparator, classpath),
             "net.morben.shenggan.NativeBridge"
         }) startInfo.ArgumentList.Add(argument);
 
@@ -119,10 +129,19 @@ internal sealed class BridgeClient
         return result ?? throw new BridgeException("Java 后端未返回结果。");
     }
 
+    internal static bool UsesGameCompatibility(string command) => command is
+        "launch" or "install" or "repair" or "runtime" or "inspectJava" or "import";
+
     private static void EnsureRuntimeFiles()
     {
         if (!File.Exists(AppPaths.BackendJar)) throw new BridgeException("缺少 Backend.jar。请先按 Windows 构建说明编译后端。");
         if (!File.Exists(AppPaths.HmclJar)) throw new BridgeException("缺少 HMCLCore.jar。请保留随 MC Harbor 分发的内核文件。");
+        if (WindowsPlatform.UsesJavaFxModules)
+        {
+            if (!File.Exists(Path.Combine(AppPaths.ApplicationDirectory, "Runtime", "lib", "modules")))
+                throw new BridgeException("缺少 ARM64 JavaFX 模块运行时，请解压完整发行包。");
+            return;
+        }
         if (!Directory.Exists(AppPaths.JavaFxDirectory)
             || !Directory.EnumerateFiles(AppPaths.JavaFxDirectory, "*.jar").Any())
             throw new BridgeException("缺少 Windows JavaFX 依赖。请先准备随应用分发的 JavaFX 文件。");

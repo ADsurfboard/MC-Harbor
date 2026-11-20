@@ -1,11 +1,17 @@
 param(
-    [string]$Version = "10.0.404"
+    [string]$Version = "10.0.404",
+    [ValidateSet('auto','x64','arm64')][string]$Architecture = 'auto'
 )
 
 $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $PSScriptRoot
 $toolRoot = Split-Path -Parent $repo
-$installDir = Join-Path $toolRoot "_tools\dotnet"
+if ($Architecture -eq 'auto') {
+    $native = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
+    $Architecture = if ($native -eq 'ARM64') { 'arm64' } else { 'x64' }
+}
+$folder = if ($Architecture -eq 'arm64') { '_tools\dotnet-arm64' } else { '_tools\dotnet' }
+$installDir = Join-Path $toolRoot $folder
 $installer = Join-Path $toolRoot "_tools\dotnet-install.ps1"
 $toolsDir = Split-Path -Parent $installDir
 $dotnet = Join-Path $installDir "dotnet.exe"
@@ -23,7 +29,7 @@ if (-not (Test-Path -LiteralPath $installer)) {
     Invoke-WebRequest -Uri "https://dot.net/v1/dotnet-install.ps1" -OutFile $installer
 }
 
-& $installer -Version $Version -InstallDir $installDir -Architecture x64
+& $installer -Version $Version -InstallDir $installDir -Architecture $Architecture
 
 $env:DOTNET_ROOT = $installDir
 $env:PATH = "$installDir;$env:PATH"

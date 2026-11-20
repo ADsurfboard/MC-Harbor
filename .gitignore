@@ -44,3 +44,5 @@ chat_history/
 node_modules/
 /tests/windows-local-transport/bin/
 /tests/windows-local-transport/obj/
+/tests/windows-platform-checks/bin/
+/tests/windows-platform-checks/obj/
