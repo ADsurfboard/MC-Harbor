@@ -30,13 +30,13 @@ final class NativeTextAssets {
         for(String rel:List.of("config/ftbquests/quests","config/ftbquests/normal","defaultconfigs/ftbquests/quests"))add(out,seen,run,rel,"ftbquests","FTB Quests · "+rel,data);
         Path saves=run.resolve("saves");if(Files.isDirectory(saves,LinkOption.NOFOLLOW_LINKS))try(var worlds=Files.list(saves)){for(Path world:worlds.sorted().limit(256).toList()){
             if(!Files.isDirectory(world,LinkOption.NOFOLLOW_LINKS)||Files.isSymbolicLink(world))continue;
-            String prefix=run.relativize(world).toString();add(out,seen,run,prefix+"/serverconfig/ftbquests/quests","ftbquests","FTB Quests · "+world.getFileName(),data);
+            String prefix=run.relativize(world).toString().replace(File.separatorChar,'/');add(out,seen,run,prefix+"/serverconfig/ftbquests/quests","ftbquests","FTB Quests · "+world.getFileName(),data);
             packs(out,seen,run,prefix+"/datapacks","存档「"+world.getFileName()+"」",data);
         }}
         packs(out,seen,run,"datapacks","实例",data);return out;
     }
     static void packs(List<Map<String,Object>> out,Set<Path> seen,Path run,String rel,String name,Path data)throws Exception{
-        Path folder=safe(run,rel);if(!Files.isDirectory(folder,LinkOption.NOFOLLOW_LINKS))return;try(var files=Files.list(folder)){for(Path p:files.sorted().limit(512).toList())if(!Files.isSymbolicLink(p)&&(Files.isDirectory(p,LinkOption.NOFOLLOW_LINKS)||p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".zip")))add(out,seen,run,run.relativize(p).toString(),"datapacks",name+" · "+p.getFileName(),data);}
+        Path folder=safe(run,rel);if(!Files.isDirectory(folder,LinkOption.NOFOLLOW_LINKS))return;try(var files=Files.list(folder)){for(Path p:files.sorted().limit(512).toList())if(!Files.isSymbolicLink(p)&&(Files.isDirectory(p,LinkOption.NOFOLLOW_LINKS)||p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".zip")))add(out,seen,run,run.relativize(p).toString().replace(File.separatorChar,'/'),"datapacks",name+" · "+p.getFileName(),data);}
     }
     static void add(List<Map<String,Object>> out,Set<Path> seen,Path run,String rel,String kind,String name,Path data)throws Exception{
         Path p=safe(run,rel);if(!Files.exists(p,LinkOption.NOFOLLOW_LINKS)||!seen.add(p))return;out.add(NativeResourceFiles.item(p,kind,name,null,null,data));
@@ -44,7 +44,7 @@ final class NativeTextAssets {
     static Map<String,byte[]> container(Path source)throws IOException{
         Map<String,byte[]> files=new TreeMap<>();long total=0;int count=0;if(Files.isRegularFile(source)&&Files.size(source)>64_000_000)throw new IOException("数据包超过 64MB，请分包处理");
         if(Files.isDirectory(source,LinkOption.NOFOLLOW_LINKS)){try(var walk=Files.walk(source,16)){for(Path p:walk.filter(f->Files.isRegularFile(f,LinkOption.NOFOLLOW_LINKS)).sorted().limit(20001).toList()){
-            if(++count>20000)throw new IOException("任务 / 数据包文件数量过多");String rel=source.relativize(p).toString();safe(source,rel);if(!candidate(rel))continue;byte[] b=read(p);total+=b.length;if(total>64_000_000)throw new IOException("任务 / 数据包文本超过 64MB，请分包处理");files.put(rel,b);
+            if(++count>20000)throw new IOException("任务 / 数据包文件数量过多");String rel=source.relativize(p).toString().replace(File.separatorChar,'/');safe(source,rel);if(!candidate(rel))continue;byte[] b=read(p);total+=b.length;if(total>64_000_000)throw new IOException("任务 / 数据包文本超过 64MB，请分包处理");files.put(rel,b);
         }}}
         else try(ZipFile zip=new ZipFile(source.toFile())){if(zip.size()>20000)throw new IOException("数据包文件数量过多");for(ZipEntry entry:Collections.list(zip.entries())){
             if(entry.isDirectory())continue;String rel=entry.getName();if(!NativeResourceFiles.safe(rel)||rel.contains(":"))throw new IOException("数据包包含不安全路径");if(!candidate(rel))continue;
@@ -120,7 +120,7 @@ final class NativeTextAssets {
         }
         if(!en.isEmpty()){
             String ns="harbor_text_"+NativeResourceFiles.digest(source.toString().getBytes(StandardCharsets.UTF_8)).substring(0,12);documents.put("assets/"+ns+"/lang/en_us.json",JSON.toJson(en).getBytes(StandardCharsets.UTF_8));documents.put("assets/"+ns+"/lang/zh_cn.json",JSON.toJson(zh).getBytes(StandardCharsets.UTF_8));
-            JsonObject index=new JsonObject();index.addProperty("runDirectory",run.toAbsolutePath().normalize().toString());index.addProperty("installRelative",run.toAbsolutePath().normalize().relativize(source.toAbsolutePath().normalize()).toString());index.addProperty("archive",!Files.isDirectory(source));index.addProperty("archiveSHA256",Files.isDirectory(source)?"":sha(Files.readAllBytes(source)));index.addProperty("namespace",ns);index.add("documents",docs);Files.createDirectories(folder);Files.writeString(folder.resolve(INDEX),JSON.toJson(index));
+            JsonObject index=new JsonObject();index.addProperty("runDirectory",run.toAbsolutePath().normalize().toString());index.addProperty("installRelative",run.toAbsolutePath().normalize().relativize(source.toAbsolutePath().normalize()).toString().replace(File.separatorChar,'/'));index.addProperty("archive",!Files.isDirectory(source));index.addProperty("archiveSHA256",Files.isDirectory(source)?"":sha(Files.readAllBytes(source)));index.addProperty("namespace",ns);index.add("documents",docs);Files.createDirectories(folder);Files.writeString(folder.resolve(INDEX),JSON.toJson(index));
         }
         if(en.isEmpty())Files.deleteIfExists(folder.resolve(INDEX));return documents;
     }
@@ -148,7 +148,7 @@ final class NativeTextAssets {
     }
     static int export(Path folder,JsonArray entries,ZipOutputStream zip,boolean raw,Set<String> written)throws Exception{
         if(!Files.isRegularFile(folder.resolve(INDEX)))return 0;JsonObject index=NativeResourceFiles.object(folder.resolve(INDEX));
-        if(raw){try(var paths=Files.walk(folder.resolve("text-original"))){for(Path p:paths.filter(Files::isRegularFile).sorted().toList()){String name="original-text/"+folder.getFileName()+"/"+folder.resolve("text-original").relativize(p);put(zip,name,Files.readAllBytes(p),written);}}return 0;}
+        if(raw){try(var paths=Files.walk(folder.resolve("text-original"))){for(Path p:paths.filter(Files::isRegularFile).sorted().toList()){String name="original-text/"+folder.getFileName()+"/"+folder.resolve("text-original").relativize(p).toString().replace(File.separatorChar,'/');put(zip,name,Files.readAllBytes(p),written);}}return 0;}
         List<Patch> patches=patches(folder,entries,false);for(Patch p:patches)put(zip,"overrides/"+p.relative,p.bytes,written);return patches.size();
     }
     static void put(ZipOutputStream z,String name,byte[] bytes,Set<String> written)throws IOException{if(!NativeResourceFiles.safe(name)||!written.add(name))throw new IOException("汉化包存在重复目标");z.putNextEntry(new ZipEntry(name));z.write(bytes);z.closeEntry();}
@@ -163,7 +163,7 @@ final class NativeTextAssets {
             Files.createDirectories(backup.getParent());try(ZipOutputStream zip=new ZipOutputStream(Files.newOutputStream(backup,StandardOpenOption.CREATE_NEW))){Set<String> names=new HashSet<>();List<String> created=new ArrayList<>();for(Patch p:all){byte[] original=before.get(p.target);if(original==null)created.add(p.relative);else put(zip,p.relative,original,names);}put(zip,"MC-Harbor-backup.json",JSON.toJson(Map.of("createdFiles",created,"kind","FTB Quests and datapack translations","restore","Restore original entries to the instance and remove only the listed newly-created files.")).getBytes(StandardCharsets.UTF_8),names);}
             try(ZipFile verify=new ZipFile(backup.toFile())){for(ZipEntry e:Collections.list(verify.entries()))try(InputStream in=verify.getInputStream(e)){CRC32 crc=new CRC32();byte[] b=new byte[65536];for(int n;(n=in.read(b))>0;)crc.update(b,0,n);if(crc.getValue()!=e.getCrc())throw new IOException("汉化备份校验失败");}}
             for(Patch p:all){safe(run,p.relative);if(!current(p.target).equals(p.expected))throw new IOException("应用时文件发生变化");Files.move(stages.get(p.target),p.target,StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);committed.add(p.target);}
-            for(Patch p:all){JsonObject applied=NativeResourceFiles.object(p.sourceFolder.resolve("text-applied.json"));JsonObject index=NativeResourceFiles.object(p.sourceFolder.resolve(INDEX));if(!index.get("archive").getAsBoolean())applied.addProperty(Path.of(str(index,"runDirectory")).resolve(str(index,"installRelative")).relativize(p.target).toString(),sha(p.bytes));Files.writeString(p.sourceFolder.resolve("text-applied.json"),JSON.toJson(applied));}
+            for(Patch p:all){JsonObject applied=NativeResourceFiles.object(p.sourceFolder.resolve("text-applied.json"));JsonObject index=NativeResourceFiles.object(p.sourceFolder.resolve(INDEX));if(!index.get("archive").getAsBoolean())applied.addProperty(Path.of(str(index,"runDirectory")).resolve(str(index,"installRelative")).relativize(p.target).toString().replace(File.separatorChar,'/'),sha(p.bytes));Files.writeString(p.sourceFolder.resolve("text-applied.json"),JSON.toJson(applied));}
             return Map.of("files",all.size(),"backup",backup.toString());
         }catch(Exception e){Collections.reverse(committed);for(Path p:committed){byte[] b=before.get(p);if(b==null)Files.deleteIfExists(p);else{Path t=Files.createTempFile(p.getParent(),".harbor-text-rollback-",".tmp");Files.write(t,b);Files.move(t,p,StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);}}throw e;
         }finally{for(Path stage:stages.values())Files.deleteIfExists(stage);for(FileLock lock:locks)try{lock.release();}catch(IOException ignored){}for(FileChannel c:channels)try{c.close();}catch(IOException ignored){}}

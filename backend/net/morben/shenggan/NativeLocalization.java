@@ -43,14 +43,14 @@ final class NativeLocalization {
     }
     private static Map<String,byte[]> documents(Path source)throws IOException{
         Map<String,byte[]> files=new TreeMap<>();long total=0;
-        if(Files.isDirectory(source)){Path assets=source.resolve("assets");if(!Files.isDirectory(assets))return files;try(var paths=Files.walk(assets,8)){for(Path path:paths.filter(p->Files.isRegularFile(p,LinkOption.NOFOLLOW_LINKS)).sorted().toList()){String name=source.relativize(path).toString();if(!NativeResourceFiles.language(name)||!NativeResourceFiles.safe(name))continue;try(InputStream in=Files.newInputStream(path)){byte[] b=NativeResourceFiles.bounded(in,4_000_000);total+=b.length;if(total>128_000_000)throw new IOException("单个实例资源的语言文件过大");files.put(name,b);}}}}
+        if(Files.isDirectory(source)){Path assets=source.resolve("assets");if(!Files.isDirectory(assets))return files;try(var paths=Files.walk(assets,8)){for(Path path:paths.filter(p->Files.isRegularFile(p,LinkOption.NOFOLLOW_LINKS)).sorted().toList()){String name=source.relativize(path).toString().replace(File.separatorChar,'/');if(!NativeResourceFiles.language(name)||!NativeResourceFiles.safe(name))continue;try(InputStream in=Files.newInputStream(path)){byte[] b=NativeResourceFiles.bounded(in,4_000_000);total+=b.length;if(total>128_000_000)throw new IOException("单个实例资源的语言文件过大");files.put(name,b);}}}}
         else try(ZipFile zip=new ZipFile(source.toFile())){for(ZipEntry entry:Collections.list(zip.entries())){if(entry.isDirectory()||!NativeResourceFiles.language(entry.getName())||!NativeResourceFiles.safe(entry.getName()))continue;if(files.size()>20_000)throw new IOException("实例资源语言文件数量过多");try(InputStream in=zip.getInputStream(entry)){byte[] b=NativeResourceFiles.bounded(in,4_000_000);total+=b.length;if(total>128_000_000)throw new IOException("单个实例资源的语言文件过大");files.put(entry.getName(),b);}}}
         return files;
     }
     static double formatFromJar(Path jar){try(ZipFile zip=new ZipFile(jar.toFile())){ZipEntry file=zip.getEntry("version.json");if(file==null)return 0;JsonObject root;try(InputStream in=zip.getInputStream(file)){root=JsonParser.parseString(new String(NativeResourceFiles.bounded(in,200_000),StandardCharsets.UTF_8)).getAsJsonObject();}JsonObject pack=root.getAsJsonObject("pack_version");if(pack==null)return 0;if(pack.has("resource_major")){return pack.get("resource_major").getAsInt()+pack.get("resource_minor").getAsDouble()/1000;}return pack.get("resource").getAsDouble();}catch(Exception e){return 0;}}
     static double fallbackFormat(String version){Map<String,Integer> formats=Map.ofEntries(Map.entry("1.16.5",6),Map.entry("1.17",7),Map.entry("1.17.1",7),Map.entry("1.18",8),Map.entry("1.18.1",8),Map.entry("1.18.2",8),Map.entry("1.19",9),Map.entry("1.19.1",9),Map.entry("1.19.2",9),Map.entry("1.19.3",12),Map.entry("1.19.4",13),Map.entry("1.20",15),Map.entry("1.20.1",15),Map.entry("1.20.2",18),Map.entry("1.20.3",22),Map.entry("1.20.4",22),Map.entry("1.20.5",32),Map.entry("1.20.6",32),Map.entry("1.21",34),Map.entry("1.21.1",34),Map.entry("1.21.2",42),Map.entry("1.21.3",42),Map.entry("1.21.4",46),Map.entry("1.21.5",55),Map.entry("1.21.6",63),Map.entry("1.21.7",64),Map.entry("1.21.8",64));if(formats.containsKey(version))return formats.get(version);if(version.matches("1\\.(6|7|8)(\\..*)?"))return 1;if(version.matches("1\\.(9|10)(\\..*)?"))return 2;if(version.matches("1\\.(11|12)(\\..*)?"))return 3;if(version.matches("1\\.(13|14)(\\..*)?"))return 4;if(version.matches("1\\.15(\\..*)?"))return 5;return 0;}
     Map<String,Object> scan(List<Map<String,Object>> resources)throws Exception{
-        Path run=Path.of(text("runDirectory",""));Path project=data.resolve("localization/"+NativeResourceFiles.digest((run+":"+text("id","")).getBytes(StandardCharsets.UTF_8)));Files.createDirectories(project);
+        Path run=Path.of(text("runDirectory",""));Path project=instanceProject();Files.createDirectories(project);
         List<Map<String,Object>> all=new ArrayList<>(resources);for(String name:List.of("kubejs","resources")){Path folder=run.resolve(name);if(Files.isDirectory(folder.resolve("assets")))all.add(NativeResourceFiles.item(folder,"loose",name,null,null,data));}
         all.addAll(NativeTextAssets.discover(run,data));
         String jar=text("clientJar","");if(!jar.isBlank()&&Files.isRegularFile(Path.of(jar))){var base=NativeResourceFiles.item(Path.of(jar),"minecraft","Minecraft",null,null,data);all.add(0,base);}
@@ -73,23 +73,56 @@ final class NativeLocalization {
         }
         double format=jar.isBlank()?0:formatFromJar(Path.of(jar));if(format==0)format=fallbackFormat(text("version",""));Map<String,Object> result=new LinkedHashMap<>();result.put("project",project.toString());result.put("name",text("name",text("id","Minecraft")));result.put("version",text("version",""));result.put("loader",text("loader",""));result.put("packFormat",format);result.put("sources",sources);result.put("warnings",warnings.stream().limit(60).toList());result.put("countsVersion",2);write(project.resolve("project.json"),result);return result;
     }
-    Map<String,Object> read()throws Exception{return Map.of("entries",entries(project(),text("resource","")));}
+    private Path instanceProject() throws Exception {
+        Path run = Path.of(text("runDirectory", ""));
+        String key = NativeResourceFiles.digest((run + ":" + text("id", "")).getBytes(StandardCharsets.UTF_8));
+        return data.resolve("localization").resolve(key);
+    }
+
+    Map<String,Object> open() throws Exception {
+        return Map.of("project", NativeResourceFiles.object(instanceProject().resolve("project.json")));
+    }
+
+    Map<String,Object> read() throws Exception {
+        JsonArray all = entries(project(), text("resource", ""));
+        if (!input.has("pageSize")) return Map.of("entries", all);
+        int pageSize = Math.max(1, Math.min(500, input.get("pageSize").getAsInt()));
+        int offset = Math.max(0, input.has("offset") ? input.get("offset").getAsInt() : 0);
+        boolean missing = input.has("missing") && input.get("missing").getAsBoolean();
+        String query = text("query", "").strip().toLowerCase(Locale.ROOT);
+        List<JsonObject> matches = new ArrayList<>();
+        for (JsonElement element : all) {
+            JsonObject row = element.getAsJsonObject();
+            if (missing && complete(row)) continue;
+            if (!query.isEmpty() && List.of("key", "source", "translation").stream()
+                    .noneMatch(key -> text(row, key, "").toLowerCase(Locale.ROOT).contains(query))) continue;
+            matches.add(row);
+        }
+        offset = Math.min(offset, matches.isEmpty() ? 0 : (matches.size() - 1) / pageSize * pageSize);
+        return Map.of("entries", matches.subList(offset, Math.min(offset + pageSize, matches.size())),
+                "total", matches.size(), "offset", offset);
+    }
     Map<String,Object> save()throws Exception {
         Path project=project();JsonArray changes=input.has("changes")?input.getAsJsonArray("changes"):new JsonArray();
         if(!input.has("changes")){JsonObject change=new JsonObject();change.addProperty("resource",text("resource",""));change.addProperty("entry",text("entry",""));change.addProperty("translation",text("translation",""));changes.add(change);}
         boolean automatic=input.has("onlyMissing")&&input.get("onlyMissing").getAsBoolean();
-        String origin=text("origin","manual").equals("machine")?"machine":"manual";
-        Map<String,JsonArray> changed=new LinkedHashMap<>();Map<String,Map<String,JsonObject>> indexes=new HashMap<>();int saved=0,skipped=0;
+        String origin = switch (text("origin", "manual")) {
+            case "machine" -> "machine";
+            case "online" -> "online";
+            default -> "manual";
+        };
+        Map<String,JsonArray> changed=new LinkedHashMap<>();Map<String,Map<String,JsonObject>> indexes=new HashMap<>();Set<String> modified=new HashSet<>();int saved=0,skipped=0;
         for(JsonElement value:changes){JsonObject change=value.getAsJsonObject();String resource=validID(text(change,"resource",""));JsonArray rows=changed.get(resource);if(rows==null){rows=entries(project,resource);changed.put(resource,rows);Map<String,JsonObject> index=new HashMap<>();for(JsonElement e:rows){JsonObject row=e.getAsJsonObject();index.put(text(row,"id",""),row);}indexes.put(resource,index);}boolean found=false;
             JsonObject matched=indexes.get(resource).get(text(change,"entry",""));for(JsonObject row:matched==null?List.<JsonObject>of():List.of(matched)){found=true;
                 if(automatic&&(complete(row)||!text(row,"source","").equals(text(change,"source","")))){skipped++;break;}
                 String translated=text(change,"translation","");if(translated.length()>100_000)throw new IOException("条目过长");
                 if(automatic&&(translated.isBlank()||!compatible(text(row,"source",""),translated)||(needsTranslation(text(row,"source",""))&&text(row,"source","").trim().equalsIgnoreCase(translated.trim())))){skipped++;break;}
                 if(!translated.isEmpty()&&!compatible(text(row,"source",""),translated))throw new IOException("译文的格式占位符与原文不一致："+text(row,"key","")+"，请保留 %s、%1$s、{0} 等标记。");
-                row.addProperty("translation",translated);row.addProperty("origin",translated.isEmpty()?"pending":origin);row.addProperty("issue","");saved++;break;
+                row.addProperty("translation",translated);row.addProperty("origin",translated.isEmpty()?"pending":origin);row.addProperty("issue","");modified.add(resource);saved++;break;
             }
             if(!found)throw new IOException("未找到这个语言条目");
         }
+        changed.keySet().retainAll(modified);
         for(var e:changed.entrySet())write(entriesFile(project,e.getKey()),e.getValue());updateCounts(project,changed);
         return Map.of("saved",saved,"skipped",skipped,"project",NativeResourceFiles.object(project.resolve("project.json")));
     }

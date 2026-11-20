@@ -16,7 +16,7 @@ final class NativeResources {
     private static String string(JsonObject object,String name,String fallback){return object.has(name)&&!object.get(name).isJsonNull()?object.get(name).getAsString():fallback;}
     private static long number(JsonObject object,String name,long fallback){return object.has(name)&&!object.get(name).isJsonNull()?object.get(name).getAsLong():fallback;}
     private static JsonArray array(JsonObject object,String key){return object.has(key)&&object.get(key).isJsonArray()?object.getAsJsonArray(key):new JsonArray();}
-    private int loader(){return switch(text("loader","")){case "Forge","Cleanroom"->1;case "Fabric","Legacy Fabric"->4;case "Quilt"->5;case "NeoForge"->6;default->0;};}
+    private int loader(){return switch(text("loader","").toLowerCase(Locale.ROOT)){case "forge","cleanroom"->1;case "fabric","legacy fabric","legacyfabric"->4;case "quilt"->5;case "neoforge"->6;default->0;};}
     private int section(){return switch(text("kind","mod")){case "mod"->6;case "resourcepack"->12;case "shader"->6552;case "world"->17;case "modpack"->4471;default->throw new IllegalArgumentException("未知资源类型");};}
     JsonObject get(String path,Map<String,String> query)throws IOException{
         StringBuilder url=new StringBuilder("https://api.curseforge.com/v1"+path);if(!query.isEmpty()){url.append('?');for(var item:query.entrySet())url.append(URLEncoder.encode(item.getKey(),StandardCharsets.UTF_8)).append('=').append(URLEncoder.encode(item.getValue(),StandardCharsets.UTF_8)).append('&');}
@@ -29,7 +29,9 @@ final class NativeResources {
     }
     private static String numeric(String value)throws IOException{String id=value.replaceFirst("^cf-","").replaceFirst("^file-","");if(!id.matches("[0-9]{1,15}"))throw new IOException("资源编号无效");return id;}
     Map<String,Object> search()throws IOException{
-        int page=Math.max(0,input.has("page")?input.get("page").getAsInt():0);Map<String,String> query=new LinkedHashMap<>(Map.of("gameId","432","classId",Integer.toString(section()),"searchFilter",text("query",""),"sortField",text("query","").isEmpty()?"6":"8","sortOrder","desc","pageSize","30","index",Integer.toString(page*30)));
+        int page=Math.max(0,input.has("page")?input.get("page").getAsInt():0);
+        String sort=input.has("updated")&&input.get("updated").getAsBoolean()?"3":text("query","").isEmpty()?"6":"8";
+        Map<String,String> query=new LinkedHashMap<>(Map.of("gameId","432","classId",Integer.toString(section()),"searchFilter",text("query",""),"sortField",sort,"sortOrder","desc","pageSize","30","index",Integer.toString(page*30)));
         if(!text("version","").isEmpty())query.put("gameVersion",text("version",""));if(section()==6&&loader()>0)query.put("modLoaderType",Integer.toString(loader()));JsonObject response=get("/mods/search",query);List<Map<String,Object>> hits=new ArrayList<>();
         for(JsonElement entry:array(response,"data")){JsonObject project=entry.getAsJsonObject();Map<String,Object> item=new LinkedHashMap<>();item.put("projectId","cf-"+project.get("id").getAsString());item.put("title",string(project,"name",""));item.put("description",string(project,"summary",""));item.put("author",String.join(", ",java.util.stream.StreamSupport.stream(array(project,"authors").spliterator(),false).map(a->string(a.getAsJsonObject(),"name","")).toList()));item.put("iconUrl",project.has("logo")&&!project.get("logo").isJsonNull()?string(project.getAsJsonObject("logo"),"thumbnailUrl",null):null);item.put("downloads",number(project,"downloadCount",0));item.put("pageUrl",project.has("links")?string(project.getAsJsonObject("links"),"websiteUrl",null):null);hits.add(item);}
         JsonObject pagination=response.getAsJsonObject("pagination");int total=pagination==null?hits.size():(int)number(pagination,"totalCount",hits.size());return Map.of("hits",hits,"totalHits",total);

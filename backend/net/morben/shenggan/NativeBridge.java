@@ -55,9 +55,23 @@ public final class NativeBridge {
             org.jackhuang.hmcl.util.CacheRepository.getInstance().changeDirectory(data);
             String command=text("command","");
             if(command.equals("login")){result(login());System.exit(0);}
+            if (command.equals("offlineAccount")) {
+                String name = text("username", "");
+                if (!name.matches("[A-Za-z0-9_]{3,16}")) throw new IOException("离线用户名无效");
+                UUID player = UUID.nameUUIDFromBytes(("OfflinePlayer:" + name).getBytes(StandardCharsets.UTF_8));
+                result(serialize(new OfflineAccountFactory(injector()).create(name, player), "offline"));
+                System.exit(0);
+            }
             if(command.equals("externalLogin")){result(externalLogin());System.exit(0);}
             if(command.equals("migrate")){result(migrate());System.exit(0);}
             if(command.equals("diagnostics")){result(diagnostics());System.exit(0);}
+            if (command.equals("inspectJava")) {
+                Path binary = Path.of(text("gameJava", "")).toAbsolutePath().normalize();
+                if (!Files.isRegularFile(binary)) throw new IOException("找不到所选 Java。");
+                JavaRuntime inspected = readJava(binary);
+                result(Map.of("version", inspected.getVersion(), "compatibleArchitecture", javaArchitectureMatches(inspected)));
+                System.exit(0);
+            }
             if(command.equals("worldRead")||command.equals("worldSave")){NativeWorldEditor editor=new NativeWorldEditor(request,data);result(command.equals("worldRead")?editor.read():editor.save());System.exit(0);}
             if(command.equals("profile")||command.equals("applySkin")){
                 JsonObject stored=request.getAsJsonObject("account");String type=text("accountType","offline");Account account=restore(type,stored.getAsJsonObject("hmclMetadata"),stored.getAsJsonObject("privateData"));
@@ -70,15 +84,15 @@ public final class NativeBridge {
                 DownloadProvider selected=text("source","auto").equals("official")?new AutoDownloadProvider(original,domestic):new AutoDownloadProvider(domestic,original);
                 List<String> candidates=new ArrayList<>(selected.injectURLWithCandidates(address.toString()).stream().map(URI::toString).distinct().toList());if(!text("source","auto").equals("official")&&Set.of("cdn.modrinth.com","edge.forgecdn.net").contains(address.getHost())){String domesticFile=address.toString().replace("https://"+address.getHost(),"https://mod.mcimirror.top");candidates.remove(domesticFile);candidates.add(0,domesticFile);}result(Map.of("urls",candidates));System.exit(0);
             }
-            Path root=Path.of(text("root","/Applications/.minecraft")).toAbsolutePath().normalize();
+            Path root=Path.of(text("root",defaultMinecraftDirectory().toString())).toAbsolutePath().normalize();
             repository=new Repository(root,text("runDirectory",""));repository.refreshVersions();
             DownloadProvider official=new MojangDownloadProvider(),mirror=new BMCLAPIDownloadProvider("https://bmclapi2.bangbang93.com");
             provider=text("source","auto").equals("official")?new AutoDownloadProvider(official,mirror):new AutoDownloadProvider(mirror,official);
             FetchTask.setDownloadExecutorConcurrency(Math.max(4,Math.min(24,integer("threads",8))));
             dependency=new DefaultDependencyManager(repository,provider,new DefaultCacheRepository(root));
             Map<String,Object> output=switch(command){
-                case "mods"->mods();case "resources"->resources();case "loaders"->loaders();case "install"->install();case "repair"->repair();
-                case "langScan"->languageScan();case "langRead"->new NativeLocalization(request,data).read();case "langSave"->new NativeLocalization(request,data).save();
+                case "mods"->mods();case "resources"->resources();case "loaders"->loaders();case "gameVersions"->gameVersions();case "install"->install();case "repair"->repair();
+                case "langScan"->languageScan();case "langOpen"->new NativeLocalization(request,data).open();case "langRead"->new NativeLocalization(request,data).read();case "langSave"->new NativeLocalization(request,data).save();
                 case "langPending"->new NativeLocalization(request,data).pending();case "langTranslate"->new NativeLocalization(request,data).translate();case "langImport"->new NativeLocalization(request,data).importTranslations();case "langExport"->new NativeLocalization(request,data).export();case "langApply"->new NativeLocalization(request,data).applyTextAssets();
                 case "launch"->launch();case "import"->importPack();case "backup"->backup(false);case "export"->exportPack();
                 case "dependencyScan"->new NativeDependencies(request,data,provider,NativeBridge::stage).scan();
@@ -106,7 +120,12 @@ public final class NativeBridge {
         Runtime.getRuntime().addShutdownHook(new Thread(executor::cancel));
         if(!executor.test()){Exception error=executor.getException();if(error!=null)throw error;throw new IOException("任务未完成");}
     }
-    private static String validName(String name)throws IOException{if(name.isBlank()||name.equals(".")||name.equals("..")||name.contains("/")||name.contains("\\"))throw new IOException("无效的实例名称");return name;}
+    private static String validName(String name)throws IOException{
+        if(name.isBlank()||name.length()>100||name.equals(".")||name.equals("..")||!name.equals(name.strip())||name.endsWith(".")||name.endsWith(" ")
+                ||name.chars().anyMatch(c->Character.isISOControl(c)||"<>:\"/\\|?*".indexOf(c)>=0)
+                ||name.matches("(?i)^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\\..*)?$"))throw new IOException("无效的实例名称");
+        return name;
+    }
     private static Map<String,Object> mods()throws Exception{
         String id=validName(text("id",""));var manager=repository.getModManager(id);manager.refresh();List<Map<String,Object>> list=new ArrayList<>();
         for(var mod:manager.getLocalFiles()){Map<String,Object> item=new LinkedHashMap<>();item.put("path",mod.getFile().toString());item.put("name",Objects.toString(mod.getName(),mod.getFileName()));item.put("version",Objects.toString(mod.getVersion(),""));item.put("description",mod.getDescription()==null?"":mod.getDescription().toStringSingleLine());item.put("authors",Objects.toString(mod.getAuthors(),""));item.put("modId",Objects.toString(mod.getId(),""));item.put("enabled",mod.isActive());item.put("size",Files.size(mod.getFile()));item.put("loader",mod.getModLoaderType().name());item.put("iconPath",NativeResourceFiles.icon(mod.getFile(),mod.getLogoPath(),data));item.put("website",mod.getUrl());list.add(item);}
@@ -134,6 +153,15 @@ public final class NativeBridge {
         String game=text("version","");VersionList<?> list=provider.getVersionListById(text("loader","fabric"));perform(list.refreshAsync(game));
         List<String> versions=list.getVersions(game).stream().map(RemoteVersion::getSelfVersion).distinct().sorted((a,b)->VersionNumber.compare(b,a)).toList();return Map.of("versions",versions);
     }
+    private static Map<String,Object> gameVersions()throws Exception{
+        VersionList<?> list=provider.getVersionListById("game");perform(list.refreshAsync(""));
+        List<Map<String,Object>> versions=list.getVersions("").stream().map(version->Map.<String,Object>of(
+                "id",version.getSelfVersion(),"version",version.getGameVersion(),
+                "type",version.getVersionType().name().toLowerCase(Locale.ROOT),
+                "releaseTime",Objects.toString(version.getReleaseDate(),"")))
+                .sorted((a,b)->Objects.toString(b.get("releaseTime"),"").compareTo(Objects.toString(a.get("releaseTime"),""))).toList();
+        return Map.of("versions",versions);
+    }
     private static Map<String,Object> install()throws Exception{
         String name=validName(text("name",""));if(Files.exists(repository.getVersionRoot(name)))throw new IOException("该实例目录已存在，未覆盖");
         GameBuilder builder=dependency.gameBuilder().name(name).gameVersion(text("version",""));String loader=text("loader","vanilla");if(!loader.equals("vanilla"))builder.version(loader,text("loaderVersion",""));
@@ -142,20 +170,59 @@ public final class NativeBridge {
     private static void persistIsolation(String id)throws IOException{Path config=repository.getVersionRoot(id).resolve(".hmcl/config/instance-game-settings.json");Files.createDirectories(config.getParent());if(!Files.exists(config)){Files.writeString(config,"{\"$schema\":\"https://schemas.glavo.site/hmcl/instance-game-settings/1.0.0\",\"overrideProperties\":[\"runningDirectory\"]}");}}
     private static Map<String,Object> repair()throws Exception{String id=validName(text("id",""));stage("校验文件");perform(dependency.checkGameCompletionAsync(repository.getVersion(id),true));return Map.of("id",id);}
     private static JavaRuntime readJava(Path binary)throws IOException{Path release=binary.getParent().getParent().resolve("release");JavaInfo info;try(BufferedReader reader=Files.newBufferedReader(release)){info=JavaInfo.fromReleaseFile(reader);}catch(IOException|RuntimeException e){info=JavaInfoUtils.fromExecutable(binary);}return JavaRuntime.of(binary,info,false);}
+    private static boolean isWindows(){return System.getProperty("os.name","").toLowerCase(Locale.ROOT).startsWith("windows");}
+    private static boolean isMacOS(){return System.getProperty("os.name","").toLowerCase(Locale.ROOT).contains("mac");}
+    private static Path javaBinary(Path home){return home.resolve("bin").resolve(isWindows()?"java.exe":"java");}
+    private static Path defaultMinecraftDirectory(){
+        String appData=System.getenv("APPDATA");
+        return isWindows()&&appData!=null&&!appData.isBlank()?Path.of(appData,".minecraft"):Path.of(System.getProperty("user.home"),".minecraft");
+    }
+    private static Path hmclUserHome(){
+        String configured=System.getProperty("hmcl.home",System.getenv("HMCL_USER_HOME"));
+        if(configured!=null&&!configured.isBlank())return Path.of(configured).toAbsolutePath().normalize();
+        if(isWindows()){
+            String appData=System.getenv("APPDATA");
+            return Path.of(appData==null||appData.isBlank()?System.getProperty("user.home"):appData,".hmcl").toAbsolutePath().normalize();
+        }
+        if(isMacOS())return Path.of(System.getProperty("user.home"),"Library","Application Support","HMCL").toAbsolutePath().normalize();
+        String xdg=System.getenv("XDG_DATA_HOME");
+        return xdg!=null&&!xdg.isBlank()?Path.of(xdg,"hmcl").toAbsolutePath().normalize():Path.of(System.getProperty("user.home"),".local","share","hmcl").toAbsolutePath().normalize();
+    }
     private static JavaRuntime compatibleJava(GameJavaVersion required)throws Exception{
         if(required==null)required=GameJavaVersion.JAVA_8;
-        if(request.has("javaExplicit")&&request.get("javaExplicit").getAsBoolean()){JavaRuntime selected=readJava(Path.of(text("gameJava","")));if(selected.getParsedVersion()<required.majorVersion())throw new IOException("所选 Java 版本过低，此实例需要 Java "+required.majorVersion());return selected;}
-        List<Path> candidates=new ArrayList<>();candidates.add(Path.of(text("gameJava",System.getProperty("java.home")+"/bin/java")));candidates.add(Path.of(System.getProperty("java.home"),"bin/java"));
-        Process finder=new ProcessBuilder("/usr/libexec/java_home","-v",Integer.toString(required.majorVersion())).redirectError(ProcessBuilder.Redirect.DISCARD).start();String home=new String(finder.getInputStream().readAllBytes(),StandardCharsets.UTF_8).strip();if(finder.waitFor()==0&&!home.isBlank())candidates.add(Path.of(home,"bin/java"));
-        HMCLJavaRepository originalRuntimes=new HMCLJavaRepository(Path.of(System.getProperty("user.home"),"Library/Application Support/HMCL/java"));Path originalCached=originalRuntimes.getJavaExecutable(Platform.SYSTEM_PLATFORM,required);if(originalCached!=null)candidates.add(0,originalCached);
+        if(request.has("javaExplicit")&&request.get("javaExplicit").getAsBoolean()){
+            String selectedPath=text("gameJava","");if(selectedPath.isBlank())throw new IOException("请先选择此实例使用的 Java。");
+            JavaRuntime selected=readJava(Path.of(selectedPath));if(selected.getParsedVersion()!=required.majorVersion())throw new IOException("此实例需要 Java "+required.majorVersion());if(!javaArchitectureMatches(selected))throw new IOException("所选 Java 的架构与当前 Windows 客户端不匹配。");return selected;
+        }
+        List<Path> candidates=new ArrayList<>();
+        String selectedPath=text("gameJava","");if(!selectedPath.isBlank())candidates.add(Path.of(selectedPath));
+        candidates.add(javaBinary(Path.of(System.getProperty("java.home"))));
+        String javaHome=System.getenv("JAVA_HOME");if(javaHome!=null&&!javaHome.isBlank())candidates.add(javaBinary(Path.of(javaHome)));
+        if(isMacOS()){
+            Process finder=new ProcessBuilder("/usr/libexec/java_home","-v",Integer.toString(required.majorVersion())).redirectError(ProcessBuilder.Redirect.DISCARD).start();
+            String home=new String(finder.getInputStream().readAllBytes(),StandardCharsets.UTF_8).strip();if(finder.waitFor()==0&&!home.isBlank())candidates.add(javaBinary(Path.of(home)));
+        }else if(isWindows()){
+            String path=System.getenv("PATH");if(path!=null)for(String entry:path.split(java.util.regex.Pattern.quote(File.pathSeparator)))if(!entry.isBlank())candidates.add(Path.of(entry).resolve("java.exe"));
+            for(String variable:List.of("ProgramFiles","ProgramFiles(x86)","LOCALAPPDATA")){
+                String folder=System.getenv(variable);if(folder==null||folder.isBlank())continue;
+                for(String vendor:List.of("Java","Eclipse Adoptium","Microsoft","Zulu")){
+                    Path parent=Path.of(folder).resolve(vendor);if(!Files.isDirectory(parent))continue;
+                    try(var entries=Files.list(parent)){for(Path entry:entries.filter(Files::isDirectory).limit(40).toList())candidates.add(javaBinary(entry));}
+                }
+            }
+        }
+        HMCLJavaRepository originalRuntimes=new HMCLJavaRepository(hmclUserHome().resolve("java"));Path originalCached=originalRuntimes.getJavaExecutable(Platform.SYSTEM_PLATFORM,required);if(originalCached!=null)candidates.add(0,originalCached);
         HMCLJavaRepository runtimes=new HMCLJavaRepository(data.resolve("java"));Path cached=runtimes.getJavaExecutable(Platform.SYSTEM_PLATFORM,required);if(cached!=null)candidates.add(0,cached);
-        for(Path binary:candidates){try{JavaRuntime java=readJava(binary);if(java.getParsedVersion()==required.majorVersion())return java;}catch(IOException ignored){}}
+        Set<Path> checked=new HashSet<>();for(Path binary:candidates){try{Path normalized=binary.toAbsolutePath().normalize();if(!checked.add(normalized)||!Files.isRegularFile(normalized))continue;JavaRuntime java=readJava(normalized);if(java.getParsedVersion()==required.majorVersion() && javaArchitectureMatches(java))return java;}catch(IOException|RuntimeException ignored){}}
         if(Files.getFileStore(data).getUsableSpace()<400*1024*1024L)throw new IOException("下载 Java 运行时需要至少 400 MB 可用空间。");
         stage("准备 Java "+required.majorVersion());Task<JavaRuntime> download=runtimes.getDownloadJavaTask(provider,Platform.SYSTEM_PLATFORM,required);perform(download);return download.getResult();
     }
     private static JavaRuntime gameJava(Version version)throws Exception{
         GameJavaVersion required=version.getJavaVersion()!=null?version.getJavaVersion():GameJavaVersion.getMinimumJavaVersion(org.jackhuang.hmcl.util.versioning.GameVersionNumber.asGameVersion(repository.getGameVersion(version).orElse("1.20.1")));
         return compatibleJava(required);
+    }
+    private static boolean javaArchitectureMatches(JavaRuntime java) {
+        return !isWindows() || java.getPlatform().equals(Platform.CURRENT_PLATFORM);
     }
     private static Map<String,Object> launch()throws Exception{
         if(request.has("completeDependencies")&&request.get("completeDependencies").getAsBoolean()){
@@ -204,7 +271,7 @@ public final class NativeBridge {
         try{
             Set<Path> worlds=new HashSet<>();for(Path file:files.keySet()){Path relative=root.resolve("saves").relativize(file);if(!relative.startsWith("..")&&relative.getNameCount()>1)worlds.add(root.resolve("saves").resolve(relative.getName(0)));}
             for(Path folder:worlds){Path lockFile=folder.resolve("session.lock");if(Files.isRegularFile(lockFile)){var channel=java.nio.channels.FileChannel.open(lockFile,StandardOpenOption.READ,StandardOpenOption.WRITE);channels.add(channel);var lock=channel.tryLock();if(lock==null)throw new IOException("存档正在运行，请退出游戏后备份");locks.add(lock);}}
-            stage("备份存档");try(ZipOutputStream zip=new ZipOutputStream(new BufferedOutputStream(Files.newOutputStream(temporary)))){zip.setLevel(3);for(Path path:files.keySet()){zip.putNextEntry(new ZipEntry(root.relativize(path).toString()));Files.copy(path,zip);zip.closeEntry();}}
+            stage("备份存档");try(ZipOutputStream zip=new ZipOutputStream(new BufferedOutputStream(Files.newOutputStream(temporary)))){zip.setLevel(3);for(Path path:files.keySet()){zip.putNextEntry(new ZipEntry(root.relativize(path).toString().replace(File.separatorChar,'/')));Files.copy(path,zip);zip.closeEntry();}}
             if(!files.equals(backupFiles(root,world)))throw new IOException("存档文件正在变化，请退出游戏后重试");verifyArchive(temporary);
             try{Files.move(temporary,output,StandardCopyOption.ATOMIC_MOVE);}catch(AtomicMoveNotSupportedException e){Files.move(temporary,output);}
             return Map.of("path",output.toString(),"files",files.size());
@@ -243,15 +310,125 @@ public final class NativeBridge {
         try{AuthlibInjectorAccount account=new AuthlibInjectorAccountFactory(injector(),AuthlibInjectorServer::new).create(selector,username,password,null,server);return serialize(account,"authlibInjector");}
         catch(NoSelectedCharacterException e){if(!choices.isEmpty())return Map.of("profiles",choices);throw e;}
     }
-    private static Map<String,Object> migrate()throws Exception{
-        Path home=Path.of(System.getProperty("user.home"));Path shared=home.resolve("Library/Application Support/HMCL");Path local=Path.of(text("root","/Applications/.minecraft")).getParent().resolve(".hmcl");
-        List<Map<String,Object>> results=new ArrayList<>();Set<String> seen=new HashSet<>();List<String> failures=new ArrayList<>();
-        List<Path> bases=List.of(shared,local);List<String> metadataNames=List.of("config/user-accounts.json","config/accounts.json");List<String> secretNames=List.of("private/user-account-private-data.json","private/account-private-data.json");
-        Map<String,JsonObject> privateData=new LinkedHashMap<>();for(int i=0;i<bases.size();i++)privateData.putAll(NativeAccountMigration.readPrivateData(bases.get(i).resolve(secretNames.get(i))));
-        for(int i=0;i<bases.size();i++){Path metadataFile=bases.get(i).resolve(metadataNames.get(i));if(!Files.isRegularFile(metadataFile))continue;JsonObject container=JsonParser.parseString(Files.readString(metadataFile)).getAsJsonObject();JsonArray records=container.getAsJsonArray("accounts");if(records==null)continue;
-            for(JsonElement record:records){JsonObject meta=record.getAsJsonObject();String id=meta.get("accountID").getAsString();if(!seen.add(id))continue;String type=meta.get("type").getAsString();try{JsonObject secret=privateData.getOrDefault(id,new JsonObject());Account account=restore(type,meta,secret);results.add(serialize(account,type));}catch(Exception e){failures.add(type+"："+e.getClass().getSimpleName()+" "+Arrays.stream(e.getStackTrace()).limit(5).map(StackTraceElement::toString).toList());}}
+    private record MigrationFile(Path file, Path secret, boolean userStorage) {}
+
+    private static void addRoot(Set<Path> roots, Path path) {
+        if (path != null) roots.add(path.toAbsolutePath().normalize());
+    }
+
+    private static List<MigrationFile> migrationFiles() {
+        Set<Path> roots = new LinkedHashSet<>();
+        Map<Path, MigrationFile> files = new LinkedHashMap<>();
+        for (Path selected : migrationPaths("migrationFiles")) {
+            addMigrationFile(files, selected);
         }
-        return Map.of("accounts",results,"failures",failures,"metadataFiles",bases.size());
+        for (Path selected : migrationPaths("migrationRoots")) {
+            addRoot(roots, selected);
+            addRoot(roots, selected.resolve(".hmcl"));
+            if (selected.getFileName() != null && selected.getFileName().toString().equalsIgnoreCase("config"))
+                addRoot(roots, selected.getParent());
+        }
+        if (roots.isEmpty() && files.isEmpty() && !request.has("migrationFiles") && !request.has("migrationRoots")) {
+            addRoot(roots, hmclUserHome());
+            String local = System.getenv("HMCL_LOCAL_HOME");
+            if (local != null && !local.isBlank()) addRoot(roots, Path.of(local));
+            Path gameRoot = Path.of(text("root", defaultMinecraftDirectory().toString())).toAbsolutePath().normalize();
+            addRoot(roots, gameRoot.resolve(".hmcl"));
+            addRoot(roots, gameRoot);
+            if (gameRoot.getParent() != null) {
+                addRoot(roots, gameRoot.getParent().resolve(".hmcl"));
+                addRoot(roots, gameRoot.getParent());
+            }
+            addRoot(roots, Path.of(System.getProperty("user.dir", ".")));
+        }
+        for (Path root : roots) {
+            for (String name : List.of("config/user-accounts.json", "config/accounts.json",
+                    "user-accounts.json", "accounts.json", "hmcl.json"))
+                addMigrationFile(files, root.resolve(name));
+        }
+        return files.values().stream().sorted(Comparator.comparing(file -> file.secret() == null)).toList();
+    }
+
+    private static List<Path> migrationPaths(String key) {
+        if (!request.has(key) || !request.get(key).isJsonArray()) return List.of();
+        List<Path> entries = new ArrayList<>();
+        for (JsonElement item : request.getAsJsonArray(key)) {
+            if (item.isJsonPrimitive() && item.getAsJsonPrimitive().isString()) {
+                try { entries.add(Path.of(item.getAsString()).toAbsolutePath().normalize()); }
+                catch (InvalidPathException ignored) {}
+            }
+        }
+        return entries;
+    }
+
+    private static void addMigrationFile(Map<Path, MigrationFile> files, Path file) {
+        if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS) || file.getParent() == null) return;
+        String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
+        Path parent = file.getParent();
+        boolean inConfig = parent.getFileName() != null && parent.getFileName().toString().equalsIgnoreCase("config");
+        Path base = inConfig ? parent.getParent() : parent;
+        if (base == null) return;
+        boolean shared = name.equals("user-accounts.json") || name.equals("accounts.json") && !inConfig;
+        Path secret = name.equals("hmcl.json") ? null : base.resolve(shared
+                ? "private/user-account-private-data.json" : "private/account-private-data.json");
+        files.putIfAbsent(file, new MigrationFile(file, secret, shared));
+    }
+
+    private static Map<String,Object> reauthenticationRecord(JsonObject metadata,String id,String type){
+        String name=NativeResourceFiles.text(metadata,"profileName",NativeResourceFiles.text(metadata,"loginName","需要重新登录"));
+        String uuid=NativeResourceFiles.text(metadata,"profileID","");
+        return Map.of("metadata",Map.of("name",name,"uuid",uuid,"kind",type,"id",id),"hmclMetadata",metadata,"privateData",new JsonObject(),"requiresReauth",true);
+    }
+    private static Map<String,Object> migrate() {
+        Map<String, Map<String,Object>> results = new LinkedHashMap<>();
+        List<String> failures = new ArrayList<>();
+        int metadataFiles = 0;
+        for (MigrationFile source : migrationFiles()) {
+            try {
+                if (Files.size(source.file()) > 16_000_000) throw new IOException("账号文件过大");
+                String content = Files.readString(source.file()).replaceFirst("^\\uFEFF", "");
+                JsonElement document = JsonParser.parseString(content);
+                JsonElement node = document.isJsonObject() ? document.getAsJsonObject().get("accounts") : document;
+                if (node == null || !node.isJsonArray()) continue;
+                metadataFiles++;
+                Map<String, JsonObject> secrets = new HashMap<>();
+                if (source.secret() != null) {
+                    try { secrets.putAll(NativeAccountMigration.readPrivateData(source.secret())); }
+                    catch (IOException | RuntimeException ex) { failures.add("一个 HMCL 私有数据文件无法读取。"); }
+                }
+                List<JsonObject> rows = new ArrayList<>();
+                JsonArray legacy = new JsonArray();
+                for (JsonElement record : node.getAsJsonArray()) {
+                    if (!record.isJsonObject()) continue;
+                    JsonObject row = record.getAsJsonObject();
+                    if (row.has("accountID")) rows.add(row);
+                    else legacy.add(row);
+                }
+                if (!legacy.isEmpty()) {
+                    try {
+                        var converted = NativeAccountMigration.migrateLegacyAccounts(legacy, source.userStorage());
+                        rows.addAll(converted.metadata());
+                        converted.privateData().forEach(secrets::putIfAbsent);
+                        if (converted.metadata().size() < legacy.size()) failures.add("有旧账号记录缺少可迁移的身份信息。");
+                    } catch (RuntimeException ex) { failures.add("一个旧账号列表无法转换。"); }
+                }
+                for (JsonObject row : rows) {
+                    String type = NativeResourceFiles.text(row, "type", "");
+                    String id = NativeResourceFiles.text(row, "accountID", "");
+                    if (id.isBlank()) continue;
+                    if (results.containsKey(id) && !Boolean.TRUE.equals(results.get(id).get("requiresReauth"))) continue;
+                    try {
+                        JsonObject secret = secrets.getOrDefault(id, new JsonObject());
+                        if (!type.equals("offline") && secret.isEmpty()) throw new IOException("缺少在线凭据");
+                        Account account = restore(type, row, secret);
+                        results.put(id, serialize(account, type));
+                    } catch (Exception ex) {
+                        results.putIfAbsent(id, reauthenticationRecord(row, id, type));
+                    }
+                }
+            } catch (Exception ex) { failures.add("一个 HMCL 账号文件无法读取。"); }
+        }
+        return Map.of("accounts", results.values(), "failures", failures, "metadataFiles", metadataFiles);
     }
     private static Map<String,Object> diagnostics(){StringBuilder report=new StringBuilder();for(String address:List.of("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json","https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json")){long start=System.nanoTime();HttpURLConnection connection=null;try{connection=(HttpURLConnection)URI.create(address).toURL().openConnection();connection.setConnectTimeout(6000);connection.setReadTimeout(6000);int status=connection.getResponseCode();if(status!=200)throw new IOException("HTTP "+status);byte[] data=connection.getInputStream().readNBytes(8_000_001);JsonObject manifest=JsonParser.parseString(new String(data,StandardCharsets.UTF_8)).getAsJsonObject();report.append("✓ ").append(URI.create(address).getHost()).append("  ").append(manifest.getAsJsonArray("versions").size()).append(" 个版本  ").append((System.nanoTime()-start)/1_000_000).append(" ms\n");}catch(Exception e){report.append("× ").append(URI.create(address).getHost()).append("  ").append(e.getClass().getSimpleName()).append('\n');}finally{if(connection!=null)connection.disconnect();}}return Map.of("report",report.toString());}
     private static final class Repository extends DefaultGameRepository{

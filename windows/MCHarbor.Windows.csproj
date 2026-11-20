@@ -1,0 +1,79 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <UseWinUI>true</UseWinUI>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <EnableMsixTooling>false</EnableMsixTooling>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\App.ico</ApplicationIcon>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PlatformTarget>x64</PlatformTarget>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <RootNamespace>MCHarbor.Windows</RootNamespace>
+    <AssemblyName>MC Harbor</AssemblyName>
+    <ApplicationTitle>MC Harbor</ApplicationTitle>
+    <Version>1.7.1</Version>
+    <Deterministic>true</Deterministic>
+    <PathMap>$(MSBuildProjectDirectory)=/_/windows</PathMap>
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.6.4" />
+    <PackageReference Include="Microsoft.Graphics.Win2D" Version="1.4.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\Assets\Brand\Icon.png" Link="Assets\Icon.png" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\Assets\Brand\Icon.png')" />
+    <None Update="Assets\App.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\Assets\Brand\Mark.png" Link="Assets\Brand\Mark.png" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\Assets\Brand\Mark.png')" />
+    <Content Include="..\Assets\Skins\wide\steve.png" Link="Assets\Skins\wide\steve.png" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\Assets\Skins\wide\steve.png')" />
+    <Content Include="..\Assets\Services.json" Link="Assets\Services.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\Assets\Voice\*.mp3" Link="Assets\Voice\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\Assets\Fonts\FluentSystemIcons-Regular.ttf" Link="Assets\Fonts\FluentSystemIcons-Regular.ttf" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\build\Interface.soundbank" Link="Assets\Audio\Interface.soundbank" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\build\Interface.soundbank')" />
+    <Content Include="..\Assets\Loaders\*.png" Link="Assets\Loaders\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\vendor\HMCLCore.jar" Link="Backend\HMCLCore.jar" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\vendor\HMCLCore.jar')" />
+    <Content Include="..\build\Backend.jar" Link="Backend\Backend.jar" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\build\Backend.jar')" />
+    <Content Include="..\vendor\javafx-windows-x64\javafx-base-21.0.8-win.jar" Link="Backend\javafx\javafx-base.jar" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\vendor\javafx-windows-x64\javafx-base-21.0.8-win.jar')" />
+    <Content Include="..\vendor\javafx-windows-x64\javafx-graphics-21.0.8-win.jar" Link="Backend\javafx\javafx-graphics.jar" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\vendor\javafx-windows-x64\javafx-graphics-21.0.8-win.jar')" />
+    <Content Include="..\vendor\javafx-windows-x64\javafx-controls-21.0.8-win.jar" Link="Backend\javafx\javafx-controls.jar" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\vendor\javafx-windows-x64\javafx-controls-21.0.8-win.jar')" />
+    <Content Include="$(HMCL_FX_DIR)\javafx-base-21.0.8-win.jar" Link="Backend\javafx\javafx-base.jar" CopyToOutputDirectory="PreserveNewest" Condition="'$(HMCL_FX_DIR)' != '' and Exists('$(HMCL_FX_DIR)\javafx-base-21.0.8-win.jar')" />
+    <Content Include="$(HMCL_FX_DIR)\javafx-graphics-21.0.8-win.jar" Link="Backend\javafx\javafx-graphics.jar" CopyToOutputDirectory="PreserveNewest" Condition="'$(HMCL_FX_DIR)' != '' and Exists('$(HMCL_FX_DIR)\javafx-graphics-21.0.8-win.jar')" />
+    <Content Include="$(HMCL_FX_DIR)\javafx-controls-21.0.8-win.jar" Link="Backend\javafx\javafx-controls.jar" CopyToOutputDirectory="PreserveNewest" Condition="'$(HMCL_FX_DIR)' != '' and Exists('$(HMCL_FX_DIR)\javafx-controls-21.0.8-win.jar')" />
+    <Content Include="..\build\Runtime\**\*" Link="Runtime\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\build\Runtime')" />
+    <None Include="..\build\translation-python\tools\**\*"
+          Exclude="..\build\translation-python\tools\**\__pycache__\**;..\build\translation-python\tools\**\*.pyc;..\build\translation-python\tools\**\*.pyo"
+          Link="Translation\Python\%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Translation\worker.py;Translation\requirements.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- The unpackaged WinUI targets put these files in bin, but omit them from dotnet publish. -->
+  <Target Name="IncludeWinUIResourcesInPublish"
+          AfterTargets="ComputeResolvedFilesToPublishList"
+          DependsOnTargets="Prep_ComputeProcessXamlFiles"
+          Condition="'$(WindowsPackageType)' == 'None'">
+    <Error Condition="!Exists('$(ProjectPriFullPath)')"
+           Text="Missing the application's WinUI resource index: $(ProjectPriFullPath)" />
+    <Error Condition="!Exists('$(TargetDir)App.xbf') Or !Exists('$(TargetDir)MainWindow.xbf')"
+           Text="Missing compiled WinUI startup pages in $(TargetDir)." />
+    <Error Condition="!Exists('$(TargetDir)Controls\WallpaperLibraryDialog.xbf')"
+           Text="Missing the compiled wallpaper library dialog in $(TargetDir)." />
+    <AssignTargetPath Files="@(GeneratedXamlDest->'%(FullPath)')" RootFolder="$(TargetDir)">
+      <Output TaskParameter="AssignedFiles" ItemName="_HarborPublishedXaml" />
+    </AssignTargetPath>
+    <ItemGroup>
+      <ResolvedFileToPublish Include="$(ProjectPriFullPath)" Exclude="@(ResolvedFileToPublish)"
+                             RelativePath="$(ProjectPriFileName)" CopyToPublishDirectory="PreserveNewest" />
+      <ResolvedFileToPublish Include="@(_HarborPublishedXaml)" Exclude="@(ResolvedFileToPublish)"
+                             RelativePath="%(_HarborPublishedXaml.TargetPath)" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
+</Project>

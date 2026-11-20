@@ -21,7 +21,20 @@ final class NativeResourceFiles {
     static JsonObject object(Path path){try{return JsonParser.parseString(Files.readString(path)).getAsJsonObject();}catch(Exception e){return new JsonObject();}}
     static String text(JsonObject object,String key,String fallback){try{return object.get(key).getAsString();}catch(Exception e){return fallback;}}
     static boolean language(String path){return path.matches("assets/[a-z0-9_.-]+/lang/[A-Za-z0-9_.-]+\\.(json|lang)");}
-    static boolean safe(String path){return !path.startsWith("/")&&!path.contains("\\")&&Arrays.stream(path.split("/")).noneMatch(s->s.equals(".."));}
+    static boolean safe(String path) {
+        if (path.isBlank() || path.startsWith("/") || path.contains("\\") || path.indexOf('\0') >= 0)
+            return false;
+        boolean windows = File.separatorChar == '\\';
+        String relative = path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
+        for (String part : relative.split("/", -1)) {
+            if (part.isEmpty() || part.equals(".") || part.equals("..")) return false;
+            if (windows && (part.endsWith(".") || part.endsWith(" ")
+                    || part.chars().anyMatch(c -> c < 32 || "<>:\"|?*".indexOf(c) >= 0)
+                    || part.matches("(?i)^(CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³]) *(\\..*)?$")))
+                return false;
+        }
+        return true;
+    }
     private static String iconValue(JsonElement value){if(value==null)return null;if(value.isJsonPrimitive())return value.getAsString();if(value.isJsonObject())return value.getAsJsonObject().entrySet().stream().sorted(Comparator.comparingInt(e->{try{return -Integer.parseInt(e.getKey());}catch(Exception ignored){return 0;}})).map(e->e.getValue().getAsString()).findFirst().orElse(null);return null;}
     private static String metadataLogo(Path file){
         if(!Files.isRegularFile(file))return null;
@@ -43,7 +56,7 @@ final class NativeResourceFiles {
             }
         }catch(Exception ignored){}return null;
     }
-    static int languageCount(Path file){try{if(Files.isDirectory(file)){try(var paths=Files.walk(file.resolve("assets"),8)){return (int)paths.filter(p->Files.isRegularFile(p,LinkOption.NOFOLLOW_LINKS)&&language(file.relativize(p).toString())).limit(10001).count();}}try(ZipFile zip=new ZipFile(file.toFile())){return (int)zip.stream().filter(e->language(e.getName())&&!e.isDirectory()).limit(10001).count();}}catch(Exception e){return 0;}}
+    static int languageCount(Path file){try{if(Files.isDirectory(file)){try(var paths=Files.walk(file.resolve("assets"),8)){return (int)paths.filter(p->Files.isRegularFile(p,LinkOption.NOFOLLOW_LINKS)&&language(file.relativize(p).toString().replace(File.separatorChar,'/'))).limit(10001).count();}}try(ZipFile zip=new ZipFile(file.toFile())){return (int)zip.stream().filter(e->language(e.getName())&&!e.isDirectory()).limit(10001).count();}}catch(Exception e){return 0;}}
     static Map<String,String> links(String address){Map<String,String> links=new LinkedHashMap<>();try{URI uri=URI.create(address);String host=Objects.toString(uri.getHost(),"").toLowerCase(Locale.ROOT);if(!List.of("http","https").contains(uri.getScheme()))return links;if(host.equals("modrinth.com")||host.equals("www.modrinth.com"))links.put("modrinth",address);if(host.equals("curseforge.com")||host.equals("www.curseforge.com"))links.put("curseforge",address);}catch(Exception ignored){}return links;}
     static Map<String,Object> item(Path file,String kind,String name,String preferred,String address,Path data){Map<String,Object> item=new LinkedHashMap<>();item.put("path",file.toAbsolutePath().toString());item.put("name",name);item.put("kind",kind);item.put("enabled",!file.getFileName().toString().endsWith(".disabled"));item.put("iconPath",icon(file,preferred,data));item.put("links",links(address));item.put("languageFiles",languageCount(file));return item;}
     static JsonObject http(String address,JsonObject body,boolean curse)throws IOException{

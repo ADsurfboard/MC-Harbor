@@ -11,13 +11,13 @@ from reportlab.platypus import Paragraph
 from reportlab.lib.styles import ParagraphStyle
 
 ROOT=Path(__file__).resolve().parent.parent
-OUT=Path(os.environ.get('HARBOR_DOC_OUTPUT',str(ROOT/'outputs/MC-Harbor-Introduction-1.6.1.pdf')));OUT.parent.mkdir(parents=True,exist_ok=True)
+OUT=Path(os.environ.get('HARBOR_DOC_OUTPUT',str(ROOT/'outputs/MC-Harbor-Introduction-1.7.1.pdf')));OUT.parent.mkdir(parents=True,exist_ok=True)
 pdfmetrics.registerFont(TTFont('CJK','/System/Library/Fonts/Supplemental/Arial Unicode.ttf'))
 W,H=595.276,841.89
 INK=HexColor('#10271E');GREEN=HexColor('#29825B');MUTED=HexColor('#5C6E65');PALE=HexColor('#EDF4EE');LINE=HexColor('#D9E5DD')
 DOC=canvas.Canvas(str(OUT),pagesize=(W,H),pageCompression=1)
-DOC.setTitle('MC Harbor | 启动器介绍');DOC.setAuthor('ADsurfboard');DOC.setSubject('1.6.1 双架构版：原生 macOS Minecraft 启动器、功能与汉化')
-README=['# MC Harbor','1.6.1 · Apple Silicon / Intel 双版本','[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/tag/v1.6.1) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.6.1/MC-Harbor-Introduction-1.6.1.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)','以下正文与随包 PDF 同版。']
+DOC.setTitle('MC Harbor | 启动器介绍');DOC.setAuthor('ADsurfboard');DOC.setSubject('1.7.1 双架构版：原生 macOS Minecraft 启动器、功能与汉化')
+README=['# MC Harbor','1.7.1 · Apple Silicon / Intel 双版本','[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/tag/v1.7.1) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.7.1/MC-Harbor-Introduction-1.7.1.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)','以下正文与随包 PDF 同版。']
 STYLE=ParagraphStyle('body',fontName='CJK',fontSize=10.4,leading=17.4,textColor=INK,wordWrap='CJK',spaceAfter=0)
 
 def txt(text,x,y,size=11,color=INK,font='CJK'):
@@ -39,8 +39,8 @@ def page(number,tag,title,description):
     y=para(description,46,H-132,W-92,11,MUTED)
     rule(y-21);return y-52
 def finish(number):
-    rule(52);txt('MC Harbor  ·  1.6.1  ·  2026.11.12',46,33,8,MUTED)
-    txt(f'{number:02d} / 13',W-86,33,8,MUTED);DOC.showPage()
+    rule(52);txt('MC Harbor  ·  1.7.1  ·  2026.11.15',46,33,8,MUTED)
+    txt(f'{number:02d} / 14',W-86,33,8,MUTED);DOC.showPage()
 def section(title,text,y):
     README.append('### '+title)
     txt(title,46,y,15);y=para(text,46,y-17,W-92);return y-27
@@ -67,8 +67,8 @@ para('为 macOS 重新设计的 Minecraft 启动器。\n保留 HMCL 的游戏能
 DOC.setStrokeColor(HexColor('#375448'));DOC.line(48,269,W-48,269)
 for x,big,small in [(48,'SwiftUI','原生界面'),(218,'HMCL','稳定内核'),(388,'Frosted','原生磨砂')]:
     txt(big,x,231,17,HexColor('#F4F8F4'));txt(small,x,207,10,HexColor('#A9C7B4'))
-para('1.6.1 · Apple Silicon / Intel 双版本\nApple Silicon：macOS 26 起；Intel：macOS 12 起',48,132,W-96,10,HexColor('#ADC4B5'),17)
-txt('ADsurfboard / Apple Silicon + Intel / 2026.11.12',48,51,9,HexColor('#A9C7B4'));txt('01 / 13',W-91,51,9,HexColor('#A9C7B4'));DOC.showPage()
+para('1.7.1 · Apple Silicon / Intel 双版本\nApple Silicon：macOS 26 起；Intel：macOS 12 起',48,132,W-96,10,HexColor('#ADC4B5'),17)
+txt('ADsurfboard / Apple Silicon + Intel / 2026.11.15',48,51,9,HexColor('#A9C7B4'));txt('01 / 14',W-91,51,9,HexColor('#A9C7B4'));DOC.showPage()
 
 # 02 - Features
 y=page(2,'DAILY USE','日常操作，一处完成。','以实例为中心。默认加载器图标高清重绘，保留实例资源原图标、可视化资源管理与明确的下载目标。')
@@ -79,7 +79,7 @@ y-=147
 card('下载中心','中英文搜索、简介汉化、模组推荐、备注搜索和优化 / PVP 等分区。下载开始有提示；游戏运行时先下载，退出后再安装。',46,y,col,151)
 card('账号与角色','导入原 HMCL 账号；支持 Microsoft、离线及自定义 authlib-injector API 外置登录。真实皮肤头像与 3D 预览。',58+col,y,col,151)
 y-=165
-card('外观与声音','主题与反色、图片 / 视频背景、三层叠片和毛玻璃。默认保留动画、四种播报与音效；可选“独家优化”冻结动态并取消过渡。已移除彩虹角。',46,y,col,151)
+card('外观与声音','主题与反色、图片 / 视频背景、三层叠片和毛玻璃。默认保留动画、四种播报与音效；可选“独家优化”冻结动态并取消过渡。已移除彩虹角及全局流体背景。',46,y,col,151)
 card('存档与前置补全','原生编辑模式、天数、经验和生命等状态。可选前置补全在启动前检测并补齐必需模组；另有存档备份与便携模式。',58+col,y,col,151)
 y-=183
 para('操作细节：实例更多按钮扩大为 38pt 圆形；按钮命中覆盖完整外形与内边距。下载搜索结果按整个圆角矩形选择，空白部分也可点击。',46,y,W-92,10,MUTED)
@@ -148,7 +148,7 @@ y=page(8,'LIBRARIES & TRANSLATION','更完整的汉化，更顺手的素材库�
 y=section('一键汉化：社区优先，再补齐','先使用资源内中文和 CFPA 社区译文，再用所选在线服务补全；macOS 15 起也可选择本机翻译。国内默认 B站 Index-Translate，阿里云 Qwen-MT 自备密钥；MyMemory 和 Google 公共接口作为手动备选。未变的英文不冒充完成，失败条目保留并可重试。',y)
 y=section('长段落与文本格式保护','长任务说明按词边界拆分，格式占位符、颜色代码、物品 / 任务链接和网址留在翻译引擎之外，写回前继续校验。保留已有中文与手动译文，拒绝写入原文已经改变的旧结果；可停止任务并保留完成部分。对照编辑区支持上下拖动、隐藏 / 再显示，并记住高度与显示状态。',y)
 y=section('LittleSkin 原生皮肤库','在账号页搜索公共皮肤、按收藏或最新排序、翻页、收藏与打开作者原网页。标准皮肤下载后验证 SHA256 与 PNG 尺寸，用现有 skinview3d 渲染真实 Minecraft 三维角色。确认后应用到所选账号；在线上传仍取决于该账号服务能力。高清皮肤会明确提示标准账号尺寸要求。',y)
-y=section('命名、预览、切换壁纸','壁纸库支持批量导入图片 / 视频，逐张命名、预览和切换。视频缩略图右下角显示视频标记，预览默认静音；原有背景登记到库中。新导入内容使用受管理的副本，移除不会删除原始文件。',y)
+y=section('命名、预览、切换壁纸','壁纸库支持批量导入图片 / 视频，逐张命名、预览和切换。视频缩略图右下角显示视频标记，预览默认静音；修复部分系统打开壁纸库时的预览组件崩溃，关闭或切换时停止旧视频。原有背景登记到库中。新导入内容使用受管理的副本，移除不会删除原始文件。',y)
 para('七个默认游戏 / 加载器图标已用 imagegen 重绘成高清透明素材；自定义实例图标与实例资源自带图标继续优先。浅色界面使用黑色折面 h，深色界面保留白色 h。实例设置新增文件大小与磁盘分配空间统计，跳过符号链接并对硬链接去重；APFS 共享块以文件系统分配统计为准。',46,y,W-92,9.5,MUTED)
 finish(8)
 
@@ -188,12 +188,32 @@ finish(12)
 # 13 - Community and validation boundaries
 y=page(13,'CONTRIBUTORS','每条反馈，都有明确署名。','作者设计与社区建议分开记录，贡献名单同时保留在应用、源码说明与此文档中。')
 import json
-for contributor in json.loads((ROOT/'Assets/Contributors/contributors.json').read_text()):
-    y=section(contributor['name'],'\n'.join(contributor['contributions']),y)
+people=json.loads((ROOT/'Assets/Contributors/contributors.json').read_text())
+def person(contributor,y):
+    README.append('### '+contributor['name'])
+    README.append('<img src="Assets/Contributors/'+contributor['avatar']+'" width="64" height="64" alt="'+escape(contributor['name'])+'" style="border-radius:50%">')
+    DOC.saveState();clip=DOC.beginPath();clip.circle(72,y-26,26);DOC.clipPath(clip,stroke=0,fill=0)
+    DOC.drawImage(ImageReader(str(ROOT/'Assets/Contributors'/contributor['avatar'])),46,y-52,52,52,mask='auto');DOC.restoreState()
+    txt(contributor['name'],112,y-8,14)
+    bottom=para('\n'.join(contributor['contributions']),112,y-24,W-158,10.2)
+    return min(y-52,bottom)-26
+for contributor in people:
+    if contributor.get('category')!='developer':y=person(contributor,y)
 y=section('作者的模组夹设计','模组夹、命名与轻染色材质、自动图标预览及展开交互由 ADsurfboard 提出；不混入社区问题反馈的署名。',y)
 y=section('验证范围与服务边界','发布前分别构建两种架构并运行回归；原生系统、窗口行为、事务和网络可用性需要分别验证。第三方镜像、翻译、认证与联机节点均可能变化；阿里翻译需自备有效密钥。自动测试不能代表所有模组组合、所有 macOS 小版本或所有地区网络已穷尽验证。',y)
 para('来源：MCIM / mcimirror.top；B站 / github.com/bilibili/Index-Translate；阿里 / help.aliyun.com/zh/model-studio/qwen-mt-api；MyMemory / mymemory.translated.net/doc/spec.php；Google 公共接口为非官方备选，无稳定性保证。',46,y,W-92,9,MUTED)
 finish(13)
+# 14 - Platform responsibilities
+y=page(14,'DEVELOPMENT','清晰分工，持续维护。','Windows 授权开发职责与现有实现贡献分别记录；平台维护分工不改变项目 GPL 许可。')
+y=section('作者与维护负责人 · ADsurfboard','项目发起、产品方向、主要开发与发布维护。Apple Silicon macOS、Intel macOS、iOS / iPadOS 及其他非 Windows 官方版本继续由 ADsurfboard 独立开发与维护。',y)
+README.insert(len(README)-1,'<img src="https://github.com/ADsurfboard.png?size=128" width="64" height="64" alt="ADsurfboard" style="border-radius:50%">')
+for contributor in people:
+    if contributor.get('category')=='developer':y=person(contributor,y)
+y=section('开发分支与当前阶段','Windows 移植在同一仓库 windows 分支开展，工作由时咨月. 负责；iOS / iPadOS 在 codex/ios-port 分支独立推进。此版本交付的是两种 macOS 安装包，iOS 工程和原生运行验证仍在继续，不以界面演示或构建成功替代 Minecraft 实玩结论。',y)
+y=section('反馈与维护','问题和功能建议统一通过 GitHub Issues 提交。请注明芯片、系统、软件与游戏版本、加载器、复现步骤，并清除日志中的令牌和私人信息。确认的贡献会继续保留明确署名。',y)
+source('平台分工与维护范围','https://github.com/ADsurfboard/MC-Harbor/blob/main/GOVERNANCE.md',y)
+README.append('[iOS / iPadOS 开发分支](https://github.com/ADsurfboard/MC-Harbor/tree/codex/ios-port) · [Windows 开发分支](https://github.com/ADsurfboard/MC-Harbor/tree/windows)')
+finish(14)
 DOC.save()
-README += ['## 构建与许可','构建、开发测试、音效授权与免费服务边界详见 [BUILDING.md](BUILDING.md) 和 [docs/SERVICES.md](docs/SERVICES.md)。本工程为 GPL-3.0-or-later；第三方素材按各自许可分发。','[完整贡献名单](CONTRIBUTORS.md)','如果喜欢，记得 Star 我（']
+README += ['## 构建与许可','构建、开发测试、音效授权与免费服务边界详见 [BUILDING.md](BUILDING.md) 和 [docs/SERVICES.md](docs/SERVICES.md)。本工程为 GPL-3.0-or-later；第三方素材按各自许可分发。','[完整贡献名单](CONTRIBUTORS.md)','[Plus Version 后续设计规范](docs/PLUS-VERSION.md)（普通版与完整 iOS 正式发布后开发）。','如果喜欢，记得 Star 我（']
 (ROOT/'README.md').write_text('\n\n'.join(README)+'\n');print(OUT)

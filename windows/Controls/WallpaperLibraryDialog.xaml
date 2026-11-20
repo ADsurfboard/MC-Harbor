@@ -1,0 +1,86 @@
+<ContentDialog
+    x:Class="MCHarbor.Windows.Controls.WallpaperLibraryDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="壁纸库"
+    CloseButtonText="关闭"
+    DefaultButton="Close">
+    <Grid x:Name="LibraryLayout" ColumnDefinitions="*,300" ColumnSpacing="20" MinWidth="400" Height="410"
+          SizeChanged="LibraryLayout_SizeChanged">
+        <Grid RowDefinitions="Auto,*,Auto" RowSpacing="12">
+            <Button x:Name="ImportButton" Style="{StaticResource HarborPill}" Content="导入图片或 MP4" Click="Import_Click" />
+            <GridView x:Name="Items" Grid.Row="1" SelectionMode="Single" SelectionChanged="Items_SelectionChanged"
+                      ContainerContentChanging="Items_ContainerContentChanging" SizeChanged="Items_SizeChanged"
+                      ScrollViewer.HorizontalScrollMode="Disabled" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                      AutomationProperties.Name="壁纸列表">
+                <GridView.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <ItemsWrapGrid Orientation="Horizontal" ItemWidth="166" ItemHeight="142" />
+                    </ItemsPanelTemplate>
+                </GridView.ItemsPanel>
+                <GridView.ItemContainerStyle>
+                    <Style TargetType="GridViewItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        <Setter Property="VerticalContentAlignment" Value="Stretch" />
+                        <Setter Property="Margin" Value="0,0,10,10" />
+                        <Setter Property="Padding" Value="7" />
+                        <Setter Property="CornerRadius" Value="18" />
+                    </Style>
+                </GridView.ItemContainerStyle>
+                <GridView.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Spacing="7">
+                            <Border Height="86" CornerRadius="12" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                <Grid>
+                                    <FontIcon Glyph="&#xEB9F;" FontSize="26" Opacity="0.46" />
+                                    <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" />
+                                    <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" CornerRadius="7"
+                                            Background="#A0202020" Padding="6,3" Margin="5">
+                                        <TextBlock Text="{Binding Kind}" Foreground="White" FontSize="10" />
+                                    </Border>
+                                </Grid>
+                            </Border>
+                            <TextBlock Text="{Binding Entry.Name}" TextTrimming="CharacterEllipsis" FontSize="12" />
+                        </StackPanel>
+                    </DataTemplate>
+                </GridView.ItemTemplate>
+            </GridView>
+            <TextBlock x:Name="LibrarySummary" Grid.Row="2" FontSize="11" Opacity="0.72" />
+        </Grid>
+        <Grid Grid.Column="1" RowDefinitions="220,Auto,Auto,Auto,*" RowSpacing="12">
+            <Border CornerRadius="18" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                <Grid>
+                    <TextBlock x:Name="PreviewPlaceholder" Text="选择壁纸查看预览" HorizontalAlignment="Center"
+                               VerticalAlignment="Center" TextWrapping="Wrap" Margin="16" Opacity="0.72" />
+                    <Image x:Name="ImagePreview" Stretch="Uniform" Visibility="Collapsed" />
+                    <MediaPlayerElement x:Name="VideoPreview" Visibility="Collapsed" AutoPlay="False"
+                                        AreTransportControlsEnabled="True">
+                        <MediaPlayerElement.TransportControls>
+                            <MediaTransportControls IsVolumeButtonVisible="False"
+                                                    IsPlaybackRateButtonVisible="False" />
+                        </MediaPlayerElement.TransportControls>
+                    </MediaPlayerElement>
+                </Grid>
+            </Border>
+            <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <TextBox x:Name="NameInput" PlaceholderText="壁纸名称" MaxLength="100" AutomationProperties.Name="壁纸名称" />
+                <Button x:Name="RenameButton" Grid.Column="1" Style="{StaticResource HarborPill}" Content="保存" Click="Rename_Click" />
+            </Grid>
+            <TextBlock x:Name="PreviewKind" Grid.Row="2" FontSize="12" Opacity="0.72" />
+            <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8">
+                <Button x:Name="ApplyButton" Style="{StaticResource HarborProminentPill}" Content="使用壁纸" Click="Apply_Click" />
+                <Button x:Name="RemoveButton" Style="{StaticResource HarborPill}" Content="移除" Click="Remove_Click" />
+            </StackPanel>
+            <StackPanel Grid.Row="4" Spacing="8">
+                <StackPanel x:Name="RemoveConfirmation" Spacing="8" Visibility="Collapsed">
+                    <TextBlock Text="从壁纸库移除所选副本？" TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Style="{StaticResource HarborPill}" Content="确认移除" Click="ConfirmRemove_Click" />
+                        <Button Style="{StaticResource HarborPill}" Content="保留" Click="CancelRemove_Click" />
+                    </StackPanel>
+                </StackPanel>
+                <TextBlock x:Name="LibraryStatus" FontSize="12" TextWrapping="Wrap" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</ContentDialog>

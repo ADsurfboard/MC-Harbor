@@ -1,0 +1,19 @@
+{
+  "version": "21.0.8",
+  "classifier": "win",
+  "group": "org.openjfx",
+  "artifacts": [
+    {
+      "module": "javafx-base",
+      "sha1": "c000208028c983b9ccf85b57c74e0e74f85849f0"
+    },
+    {
+      "module": "javafx-graphics",
+      "sha1": "f3aba10d2c9f767e41831aeed6e1cd5418299c03"
+    },
+    {
+      "module": "javafx-controls",
+      "sha1": "ed4a6cb56461d8536e339abf8d7f771e4acf9054"
+    }
+  ]
+}
