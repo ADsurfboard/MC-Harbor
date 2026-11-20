@@ -27,6 +27,8 @@ Windows 实现游戏库、版本和资源安装、账号与皮肤、实例资源
 
 `tools/check-source-privacy.py` 检查 Git 候选文件及 ZIP 的禁用路径、个人路径和常见凭据格式，输出仅含文件名、行号和风险类型。它是发布前的辅助检查，不能证明不存在所有形式的个人信息。上游原有公开 Git 历史不改写；本次提交使用 GitHub 隐私邮箱。
 
+发布前审查修复了进阶本机翻译的代理转发风险：2B 的本地 HTTP 连接显式禁止代理、重定向及 Cookie，避免系统代理将待译文本转发离机。`tests/windows-local-transport` 使用真实客户端工厂与临时回环端口，验证默认客户端的代理转发对照、修复后的直接连接及拒绝重定向；测试不启动模型，也不访问账号或游戏数据。
+
 ## 构建与附件生成
 
 按照 [Windows 构建说明](WINDOWS_PORT.md) 准备 .NET SDK、JDK 21 和 Python 3。若需界面事件音效，先从作者官方渠道取得 JDSherbert 音效包并按条款放入本地 `voice-assets/jds-ui-free`；原始音效与 soundbank 不进入源码归档。未提供音效素材的源码构建会跳过该可选组件。

@@ -42,3 +42,5 @@ chat_history/
 .minecraft/
 .wrangler/
 node_modules/
+/tests/windows-local-transport/bin/
+/tests/windows-local-transport/obj/

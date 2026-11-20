@@ -78,7 +78,7 @@ internal sealed partial class IndexTranslationWorker : IMachineTranslationWorker
         }) settings.ArgumentList.Add(argument);
 
         var process = Process.Start(settings) ?? throw new IOException("无法启动 llama.cpp 本机翻译服务。");
-        var client = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}/"), Timeout = Timeout.InfiniteTimeSpan };
+        var client = CreateLoopbackClient(port);
         var worker = new IndexTranslationWorker(process, client);
         try
         {
@@ -108,6 +108,17 @@ internal sealed partial class IndexTranslationWorker : IMachineTranslationWorker
             throw;
         }
     }
+
+    internal static HttpClient CreateLoopbackClient(int port) => new(new HttpClientHandler
+    {
+        UseProxy = false,
+        AllowAutoRedirect = false,
+        UseCookies = false
+    })
+    {
+        BaseAddress = new Uri($"http://127.0.0.1:{port}/"),
+        Timeout = Timeout.InfiniteTimeSpan
+    };
 
     public async Task<string?[]> TranslateAsync(string[] texts, CancellationToken cancellation)
     {

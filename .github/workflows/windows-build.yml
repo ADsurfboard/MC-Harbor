@@ -40,6 +40,8 @@ jobs:
           & (Join-Path $tool 'wix.exe') extension add -g WixToolset.UI.wixext/5.0.2
           if ($LASTEXITCODE -ne 0) { throw 'WiX extension installation failed.' }
           $tool | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+      - name: Check local translation transport privacy
+        run: dotnet run --project tests/windows-local-transport/LocalTransportChecks.csproj -c Release
       - name: Build unsigned test payload without optional licensed interface sounds
         shell: pwsh
         run: |
