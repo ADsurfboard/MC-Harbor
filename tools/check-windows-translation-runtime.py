@@ -1,9 +1,16 @@
 """Run the production x64 OPUS dependency setup and CPU imports without a model."""
 from importlib.util import module_from_spec, spec_from_file_location
 import json
+import os
 from pathlib import Path
 import struct
 import sys
+
+# Match the worker's main entry point, including on English Windows consoles.
+sys.stdout.reconfigure(encoding="utf-8")
+sys.stderr.reconfigure(encoding="utf-8")
+for variable in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
+    os.environ[variable] = "1"
 
 root = Path(__file__).resolve().parent.parent
 with Path(sys.executable).open("rb") as executable:

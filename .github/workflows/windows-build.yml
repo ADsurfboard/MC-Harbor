@@ -54,6 +54,13 @@ jobs:
         run: dotnet run --project tests/windows-local-transport/LocalTransportChecks.csproj -c Release
       - name: Check platform routing and native execution
         run: dotnet run --project tests/windows-platform-checks/PlatformChecks.csproj -c Release -r win-${{ matrix.architecture }} --self-contained false -- --expect-architecture ${{ matrix.architecture }}
+      - name: Check emulated OPUS runtime on ARM64
+        if: matrix.architecture == 'arm64'
+        shell: pwsh
+        run: |
+          tools/setup-windows-translation.ps1
+          & 'build/translation-python/tools/python.exe' -I tools/check-windows-translation-runtime.py
+          if ($LASTEXITCODE -ne 0) { throw 'The x64 OPUS compatibility runtime failed on ARM64.' }
       - name: Build unsigned test payload without optional licensed interface sounds
         shell: pwsh
         run: |
@@ -63,12 +70,6 @@ jobs:
           tools/package-windows.ps1 -PublishDirectory $folder -Architecture $architecture -Format Installer
           python tools/check-windows-backend.py --directory $folder --architecture $architecture
           python tools/check-source-privacy.py --zip "build/MC-Harbor-Windows-$architecture-portable.zip"
-      - name: Check emulated OPUS runtime on ARM64
-        if: matrix.architecture == 'arm64'
-        shell: pwsh
-        run: |
-          & 'build/translation-python/tools/python.exe' -I tools/check-windows-translation-runtime.py
-          if ($LASTEXITCODE -ne 0) { throw 'The x64 OPUS compatibility runtime failed on ARM64.' }
       - uses: ./.github/actions/upload-artifact-retry
         with:
           name: windows-${{ matrix.architecture }}-ci-unsigned
