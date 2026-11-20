@@ -7,8 +7,9 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: ios-port-${{ github.workflow }}-${{ github.ref }}
-  # Finish native acceptance tests before starting the next source revision.
+  # GitHub permits only one pending run in each group. Group by revision so
+  # new pushes cannot cancel the queued acceptance checks for an older commit.
+  group: ios-port-${{ github.workflow }}-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: false
 jobs:
   device-and-core:
