@@ -199,7 +199,12 @@ import CoreGraphics
         add(screenshot)
         cancel.tap()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
-        XCTAssertTrue(menu.waitForExistence(timeout: 10)); XCTAssertTrue(menu.isHittable); menu.tap()
+        // Files dismisses through a remote view. The underlying button may
+        // reappear in the accessibility tree before it can receive touches.
+        let menuReady = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: menu)
+        XCTAssertEqual(XCTWaiter.wait(for: [menuReady], timeout: 15), .completed,
+                       "The resource menu must be usable after cancelling Files.")
+        menu.tap()
         XCTAssertTrue(importer.waitForExistence(timeout: 10))
     }
 }
