@@ -42,6 +42,9 @@ print(json.dumps({"event":"result","data":{}}),flush=True)
             record=json.loads(receipt.read_text())[-1]
             assert record['id']==game.name and record['accountType']=='offline' and record['root']==str(library),record
             child.wait(timeout=15)
+            assert child.returncode == 0, 'Shortcut helper exited unsuccessfully'
+            assert len(json.loads(receipt.read_text())) == attempt, 'Shortcut launched the instance more than once'
+            assert not list((data/'shortcut-inbox').glob('*.json')), 'Consumed shortcut request was retained'
             if attempt==1:time.sleep(2)  # Allow the recorder's exit callback to release the running-game state.
             print('PASS '+('cold' if attempt==1 else 'warm')+' packaged shortcut dispatches the selected instance',flush=True)
         print('Boundary: real launcher and helper; game JVM replaced by a protocol recorder.',flush=True)

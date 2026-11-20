@@ -1,0 +1,41 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package Name="MC Harbor" Manufacturer="MC Harbor" Version="$(ProductVersion)"
+           UpgradeCode="{43674F15-1C0E-4B55-9D0D-5C9FEE3CD055}"
+           Language="2052" Codepage="936" InstallerVersion="500" Scope="perMachine">
+    <MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="此电脑已安装更新版本的 MC Harbor。" />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+    <Launch Condition="Installed OR (VersionNT64 AND WindowsBuild &gt;= 17763)"
+            Message="MC Harbor 需要 Windows 10 1809 或以上版本的 64 位 Windows。" />
+
+    <Icon Id="HarborIcon.exe" SourceFile="$(PublishDir)\MC Harbor.exe" />
+    <Property Id="ARPPRODUCTICON" Value="HarborIcon.exe" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/ADsurfboard/MC-Harbor" />
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="MC Harbor" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder" />
+
+    <Feature Id="Launcher" Title="MC Harbor" Level="1">
+      <ComponentGroupRef Id="LauncherFiles" />
+    </Feature>
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(LicenseRtf)" />
+  </Package>
+
+  <Fragment>
+    <ComponentGroup Id="LauncherFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(PublishDir)\**">
+        <Exclude Files="$(PublishDir)\MC Harbor.exe" />
+        <Exclude Files="$(PublishDir)\**.pdb" />
+      </Files>
+      <Component Id="HarborLauncher" Bitness="always64">
+        <File Id="HarborExecutable" Source="$(PublishDir)\MC Harbor.exe" KeyPath="yes">
+          <Shortcut Id="HarborStartMenu" Directory="ProgramMenuFolder" Name="MC Harbor"
+                    Description="MC Harbor Minecraft 启动器" Advertise="yes"
+                    Icon="HarborIcon.exe" WorkingDirectory="INSTALLFOLDER" />
+        </File>
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+</Wix>

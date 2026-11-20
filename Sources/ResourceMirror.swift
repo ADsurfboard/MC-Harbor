@@ -16,7 +16,7 @@ actor MCIMSummaryStore {
     private func fetch(_ url:URL,original:String)async->String? {
         guard Date()>=retryAfter else{return nil}
         do{
-            var req=URLRequest(url:url);req.setValue("MC-Harbor/1.6.1",forHTTPHeaderField:"User-Agent")
+            var req=URLRequest(url:url);req.setValue("MC-Harbor/1.6.2",forHTTPHeaderField:"User-Agent")
             let(data,response)=try await session.data(for:req),status=(response as? HTTPURLResponse)?.statusCode ?? 0
             if status==429 || status>=500{retryAfter=Date().addingTimeInterval(60)}
             guard status==200,data.count<100_000,let obj=try JSONSerialization.jsonObject(with:data) as? [String:Any],obj["original"] as? String==original,let translated=obj["translated"] as? String,translated.range(of:"[\\p{Han}]",options:.regularExpression) != nil else{return nil};return translated

@@ -1,0 +1,1236 @@
+<Window
+    x:Class="MCHarbor.Windows.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:MCHarbor.Windows.Controls"
+    Title="MC Harbor">
+    <Grid x:Name="RootShell" Background="#202020" Loaded="MainWindow_Loaded" SizeChanged="RootShell_SizeChanged">
+        <Grid.Resources>
+            <SolidColorBrush x:Key="HarborPanelStroke" Color="#38F0F0F0" />
+            <Style x:Key="HarborNavigationRow" TargetType="Button">
+                <Setter Property="HorizontalAlignment" Value="Stretch" />
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="MinHeight" Value="47" />
+                <Setter Property="Padding" Value="15,5,13,5" />
+                <Setter Property="CornerRadius" Value="16" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="Background" Value="Transparent" />
+            </Style>
+            <AcrylicBrush x:Key="HarborButtonGlass" TintColor="#353535" TintOpacity="0.72"
+                          TintLuminosityOpacity="0.82" FallbackColor="#3F3F3F" />
+            <AcrylicBrush x:Key="HarborProminentGlass" TintColor="#BBDDD8" TintOpacity="0.77"
+                          TintLuminosityOpacity="0.91" FallbackColor="#BBDDD8" />
+            <SolidColorBrush x:Key="HarborProminentText" Color="#142526" />
+            <SolidColorBrush x:Key="HarborButtonShadowCore" Color="#A8000000" Opacity="0.24" />
+            <LinearGradientBrush x:Key="HarborButtonShadowSoft" StartPoint="0,0" EndPoint="0,1" Opacity="0.24">
+                <GradientStop Offset="0.50" Color="#00000000" />
+                <GradientStop Offset="1" Color="#5A000000" />
+            </LinearGradientBrush>
+            <LinearGradientBrush x:Key="HarborButtonShine" StartPoint="0.1,0" EndPoint="0.65,1">
+                <GradientStop Offset="0" Color="#39FFFFFF" />
+                <GradientStop Offset="0.48" Color="#0BFFFFFF" />
+                <GradientStop Offset="1" Color="#20000000" />
+            </LinearGradientBrush>
+            <LinearGradientBrush x:Key="HarborButtonRim" StartPoint="0,0" EndPoint="0.5,1">
+                <GradientStop Offset="0" Color="#62FFFFFF" />
+                <GradientStop Offset="0.62" Color="#25FFFFFF" />
+                <GradientStop Offset="1" Color="#38000000" />
+            </LinearGradientBrush>
+            <Style x:Key="HarborTabPill" TargetType="Button">
+                <Setter Property="CornerRadius" Value="16" />
+                <Setter Property="Padding" Value="14,4" />
+                <Setter Property="MinHeight" Value="30" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+            </Style>
+            <Style x:Key="HarborPill" TargetType="Button" BasedOn="{StaticResource HarborTabPill}">
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="UseSystemFocusVisuals" Value="True" />
+                <Setter Property="Background" Value="{StaticResource HarborButtonGlass}" />
+                <Setter Property="BorderBrush" Value="{StaticResource HarborButtonRim}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Grid x:Name="PillRoot" Background="Transparent">
+                                <VisualStateManager.VisualStateGroups>
+                                    <VisualStateGroup x:Name="CommonStates">
+                                        <VisualState x:Name="Normal" />
+                                        <VisualState x:Name="PointerOver">
+                                            <VisualState.Setters>
+                                                <Setter Target="PillInteraction.Opacity" Value="0.12" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState x:Name="Pressed">
+                                            <VisualState.Setters>
+                                                <Setter Target="PillInteraction.Opacity" Value="0.22" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState x:Name="Disabled">
+                                            <VisualState.Setters>
+                                                <Setter Target="PillRoot.Opacity" Value="0.55" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                    </VisualStateGroup>
+                                </VisualStateManager.VisualStateGroups>
+                                <Border Margin="-2,2,-2,-4" CornerRadius="{TemplateBinding CornerRadius}"
+                                        Background="{StaticResource HarborButtonShadowSoft}" IsHitTestVisible="False" />
+                                <Border Margin="-1,1,-1,-2" CornerRadius="{TemplateBinding CornerRadius}"
+                                        Background="{StaticResource HarborButtonShadowCore}" IsHitTestVisible="False" />
+                                <Border CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False"
+                                        Background="{TemplateBinding Background}" />
+                                <Border CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False"
+                                        Background="{StaticResource HarborButtonShine}" />
+                                <Border x:Name="PillInteraction" CornerRadius="{TemplateBinding CornerRadius}"
+                                        IsHitTestVisible="False" Background="{ThemeResource TextFillColorPrimaryBrush}" Opacity="0" />
+                                <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                  ContentTransitions="{TemplateBinding ContentTransitions}"
+                                                  Padding="{TemplateBinding Padding}" CornerRadius="{TemplateBinding CornerRadius}"
+                                                  Foreground="{TemplateBinding Foreground}"
+                                                  Background="Transparent" BorderBrush="{TemplateBinding BorderBrush}"
+                                                  BorderThickness="{TemplateBinding BorderThickness}"
+                                                  HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+            <Style x:Key="HarborProminentPill" TargetType="Button" BasedOn="{StaticResource HarborPill}">
+                <Setter Property="Background" Value="{StaticResource HarborProminentGlass}" />
+                <Setter Property="Foreground" Value="{StaticResource HarborProminentText}" />
+            </Style>
+            <Style x:Key="HarborSegment" TargetType="Button" BasedOn="{StaticResource HarborTabPill}">
+                <Setter Property="CornerRadius" Value="6" />
+                <Setter Property="Padding" Value="11,2" />
+                <Setter Property="MinHeight" Value="25" />
+                <Setter Property="BorderThickness" Value="0" />
+            </Style>
+            <Style x:Key="HarborPanel" TargetType="local:HarborGlassCard">
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="local:HarborGlassCard">
+                            <Grid Background="Transparent">
+                                <Image x:Name="ShadowImage" Margin="-24" Stretch="Fill" Opacity="0"
+                                       IsHitTestVisible="False" />
+                                <Border x:Name="Surface" CornerRadius="{TemplateBinding CornerRadius}"
+                                        IsHitTestVisible="False" />
+                                <Border x:Name="Film" CornerRadius="{TemplateBinding CornerRadius}"
+                                        IsHitTestVisible="False" Visibility="Collapsed">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0.5,1">
+                                            <GradientStop Offset="0" Color="#16FFFFFF" />
+                                            <GradientStop Offset="0.52" Color="#00FFFFFF" />
+                                            <GradientStop Offset="1" Color="#12000000" />
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                                <Border x:Name="Highlight" CornerRadius="{TemplateBinding CornerRadius}"
+                                        IsHitTestVisible="False" Visibility="Collapsed">
+                                    <Border.Background>
+                                        <RadialGradientBrush RadiusX="0.56" RadiusY="0.55" Opacity="0">
+                                            <GradientStop Offset="0" Color="#26FFFFFF" />
+                                            <GradientStop Offset="0.45" Color="#0CFFFFFF" />
+                                            <GradientStop Offset="1" Color="#00FFFFFF" />
+                                        </RadialGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                                <Border BorderThickness="{TemplateBinding BorderThickness}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        CornerRadius="{TemplateBinding CornerRadius}" Padding="{TemplateBinding Padding}">
+                                    <ContentPresenter Content="{TemplateBinding Content}"
+                                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                      HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+                                </Border>
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+                <Setter Property="CornerRadius" Value="20" />
+                <Setter Property="Padding" Value="18" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="BorderBrush" Value="{StaticResource HarborPanelStroke}" />
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                <Setter Property="VerticalContentAlignment" Value="Stretch" />
+                <Setter Property="IsTabStop" Value="False" />
+            </Style>
+        </Grid.Resources>
+        <Image x:Name="WallpaperImage" Stretch="Fill" IsHitTestVisible="False" />
+        <Border x:Name="WindowGlassLayer" IsHitTestVisible="False" />
+        <Border x:Name="WindowGlassTint" IsHitTestVisible="False" />
+        <Grid ColumnDefinitions="210,*">
+            <Grid x:Name="Sidebar" RowDefinitions="144,*,Auto" Background="Transparent">
+                <Border x:Name="SidebarDivider" Grid.RowSpan="3" HorizontalAlignment="Right"
+                        Width="1" IsHitTestVisible="False" />
+                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Top" Margin="26,70,16,0">
+                    <Image Source="ms-appx:///Assets/Icon.png" Width="36" Height="36" Stretch="Uniform"
+                           IsHitTestVisible="False" AutomationProperties.AccessibilityView="Raw" />
+                        <TextBlock Text="MC Harbor" FontSize="21" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </StackPanel>
+                <ScrollViewer Grid.Row="1" HorizontalScrollMode="Disabled" VerticalScrollBarVisibility="Auto">
+                    <StackPanel x:Name="SidebarItems" Spacing="12" Padding="16,7"
+                                KeyDown="Sidebar_KeyDown" AutomationProperties.Name="主导航" />
+                </ScrollViewer>
+                <Button x:Name="CurrentAccountButton" Grid.Row="2" Click="ShowAccounts_Click"
+                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Margin="16,12,16,16" Padding="12" CornerRadius="18"
+                        Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{StaticResource HarborPanelStroke}" BorderThickness="1"
+                        AutomationProperties.Name="打开当前账号">
+                    <Grid ColumnDefinitions="34,*" ColumnSpacing="8">
+                        <Border Width="32" Height="32" CornerRadius="8" Background="#B77B3B">
+                            <Grid Width="32" Height="32">
+                                <Grid.Clip><RectangleGeometry Rect="0,0,32,32" /></Grid.Clip>
+                                <Image
+                                       Source="ms-appx:///Assets/Skins/wide/steve.png" Width="256" Height="256"
+                                       Margin="-32,-32,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" Stretch="Fill" />
+                                <Image
+                                       Source="ms-appx:///Assets/Skins/wide/steve.png" Width="256" Height="256"
+                                       Margin="-160,-32,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" Stretch="Fill" />
+                                <Image x:Name="CurrentAccountAvatar" Width="32" Height="32" Stretch="Fill" />
+                            </Grid>
+                        </Border>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                            <TextBlock x:Name="CurrentAccountName" Text="离线账号" FontSize="12"
+                                       FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="CurrentAccountKind" Text="未登录" FontSize="10" Opacity="0.72" />
+                        </StackPanel>
+                    </Grid>
+                </Button>
+            </Grid>
+            <Grid Grid.Column="1" Padding="28,28,28,0" RowDefinitions="54,Auto,Auto,Auto,*">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock x:Name="PageEyebrow" Text="游戏" FontSize="12" FontWeight="SemiBold" Opacity="0.83"
+                               VerticalAlignment="Center" />
+                    <Button Grid.Column="1" Style="{StaticResource HarborPill}" Padding="0" Width="32" Height="32"
+                            VerticalAlignment="Center" Click="Refresh_Click"
+                            AutomationProperties.Name="刷新游戏库" ToolTipService.ToolTip="刷新游戏库">
+                        <FontIcon FontSize="14" Glyph="&#xE72C;" />
+                    </Button>
+                </Grid>
+                <Grid x:Name="DownloadTabs" Grid.Row="1" Visibility="Collapsed" ColumnDefinitions="*,Auto"
+                      ColumnSpacing="8" Margin="0,4,0,0">
+                    <ScrollViewer HorizontalScrollMode="Auto" HorizontalScrollBarVisibility="Auto"
+                                  VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled">
+                    <StackPanel x:Name="DownloadCategories" Orientation="Horizontal" Spacing="3" AutomationProperties.Name="下载分类">
+                        <Button Style="{StaticResource HarborTabPill}" Tag="minecraft" Content="游戏" Click="DownloadTab_Click" />
+                        <Button Style="{StaticResource HarborTabPill}" Tag="mod" Content="模组" Click="DownloadTab_Click" />
+                        <Button Style="{StaticResource HarborTabPill}" Tag="resourcepack" Content="资源包" Click="DownloadTab_Click" />
+                        <Button Style="{StaticResource HarborTabPill}" Tag="shader" Content="光影" Click="DownloadTab_Click" />
+                        <Button Style="{StaticResource HarborTabPill}" Tag="world" Content="地图" Click="DownloadTab_Click" />
+                        <Button Style="{StaticResource HarborTabPill}" Tag="modpack" Content="整合包" Click="DownloadTab_Click" />
+                        <Button Style="{StaticResource HarborTabPill}" Tag="tasks" Content="任务" Click="DownloadTab_Click" />
+                    </StackPanel>
+                    </ScrollViewer>
+                    <StackPanel x:Name="CatalogTargetPicker" Grid.Column="1" Orientation="Horizontal" Spacing="8"
+                                VerticalAlignment="Center" Visibility="Collapsed">
+                        <TextBlock Text="安装到" FontSize="12" Opacity="0.75" VerticalAlignment="Center" />
+                        <ComboBox x:Name="CatalogInstance" DisplayMemberPath="Id" Width="166" PlaceholderText="选择实例"
+                                  AutomationProperties.Name="安装到实例" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Grid>
+                <Grid x:Name="PageHeader" Grid.Row="2" ColumnDefinitions="*,Auto" Margin="0,16,0,22">
+                    <Grid ColumnDefinitions="Auto,*" VerticalAlignment="Center">
+                        <Image x:Name="WorkspaceIcon" Width="48" Height="48" Margin="0,0,16,0" Visibility="Collapsed" />
+                        <StackPanel Grid.Column="1" Spacing="5" VerticalAlignment="Center">
+                            <TextBlock x:Name="PageTitle" Text="游戏库" FontSize="34" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="PageSubtitle" Opacity="0.73" FontSize="12" TextTrimming="CharacterEllipsis"
+                                       Visibility="Collapsed" />
+                        </StackPanel>
+                    </Grid>
+                    <StackPanel x:Name="WorkspaceTopActions" Grid.Column="1" Orientation="Horizontal" Spacing="8"
+                                VerticalAlignment="Center" Margin="8,0,0,0" Visibility="Collapsed">
+                        <Button x:Name="WorkspaceLaunchButton" Style="{StaticResource HarborProminentPill}" Content="启动游戏" Click="Launch_Click" />
+                        <Button x:Name="WorkspaceStopButton" Style="{StaticResource HarborPill}" Content="关闭游戏" Click="StopGame_Click" Visibility="Collapsed" />
+                        <DropDownButton Content="···" CornerRadius="16" AutomationProperties.Name="实例操作">
+                            <DropDownButton.Flyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem x:Name="WorkspaceOpenDirectory" Text="打开实例目录" Click="OpenInstanceDirectory_Click" />
+                                    <MenuFlyoutItem x:Name="WorkspaceRepair" Text="修复实例" Click="Repair_Click" />
+                                    <MenuFlyoutItem x:Name="WorkspaceExport" Text="导出整合包" Click="ExportPack_Click" />
+                                </MenuFlyout>
+                            </DropDownButton.Flyout>
+                        </DropDownButton>
+                        <Button Style="{StaticResource HarborPill}" Content="×" Click="CloseWorkspace_Click"
+                                AutomationProperties.Name="关闭实例管理" ToolTipService.ToolTip="关闭实例管理" />
+                    </StackPanel>
+                    <StackPanel x:Name="GameActions" Grid.Column="1" Orientation="Horizontal" Spacing="8"
+                                VerticalAlignment="Center" Margin="8,0,0,0" Visibility="Collapsed">
+                        <Button Style="{StaticResource HarborPill}" Padding="0" Width="34" Height="34" Click="ImportModpack_Click"
+                                AutomationProperties.Name="导入整合包" ToolTipService.ToolTip="导入整合包">
+                            <FontIcon FontSize="15" Glyph="&#xE8B5;" />
+                        </Button>
+                        <Button Style="{StaticResource HarborPill}" Padding="0" Width="34" Height="34" Click="GoToDownloads_Click"
+                                AutomationProperties.Name="安装 Minecraft" ToolTipService.ToolTip="安装 Minecraft">
+                            <FontIcon FontSize="15" Glyph="&#xE710;" />
+                        </Button>
+                        <DropDownButton Content="···" CornerRadius="16" AutomationProperties.Name="游戏库操作">
+                            <DropDownButton.Flyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Text="选择游戏目录" Click="ChooseRoot_Click" />
+                                    <MenuFlyoutItem Text="刷新游戏库" Click="Refresh_Click" />
+                                    <MenuFlyoutItem x:Name="StopGameButton" Text="请求关闭游戏" Click="StopGame_Click" IsEnabled="False" />
+                                </MenuFlyout>
+                            </DropDownButton.Flyout>
+                        </DropDownButton>
+                    </StackPanel>
+                    <StackPanel x:Name="AccountTopActions" Grid.Column="1" Orientation="Horizontal" Spacing="7"
+                                VerticalAlignment="Center" Margin="8,0,0,0" Visibility="Collapsed">
+                        <Button Style="{StaticResource HarborPill}" Content="皮肤库" Click="LittleSkin_Click" />
+                        <Button x:Name="ImportHmclTopButton" Style="{StaticResource HarborPill}"
+                                Content="导入 HMCL 账号" Click="ImportAccounts_Click" />
+                        <DropDownButton Content="···" CornerRadius="16" Padding="10,4" FontSize="12"
+                                        AutomationProperties.Name="更多账号操作">
+                            <DropDownButton.Flyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Text="导入 HMCL 账号" Click="ImportAccounts_Click" />
+                                    <MenuFlyoutItem Text="导入 Mac 迁移包" Click="ImportMacMigration_Click" />
+                                    <MenuFlyoutItem Text="刷新账号列表" Click="RefreshAccountPage_Click" />
+                                </MenuFlyout>
+                            </DropDownButton.Flyout>
+                        </DropDownButton>
+                    </StackPanel>
+                    <Button x:Name="VersionsRefreshButton" Grid.Column="1" Style="{StaticResource HarborPill}"
+                            Padding="0" Width="34" Height="34" VerticalAlignment="Center" Visibility="Collapsed"
+                            Click="RefreshVersions_Click" AutomationProperties.Name="刷新版本列表" ToolTipService.ToolTip="刷新版本列表">
+                        <FontIcon FontSize="15" Glyph="&#xE72C;" />
+                    </Button>
+                    <Button x:Name="NewModFolderButton" Grid.Column="1" Style="{StaticResource HarborPill}"
+                            Content="新建模组夹" VerticalAlignment="Center" Visibility="Collapsed" Click="CreateModFolder_Click" />
+                    <Button x:Name="FriendsRefreshButton" Grid.Column="1" Style="{StaticResource HarborPill}"
+                            Content="刷新" VerticalAlignment="Center" Visibility="Collapsed" Click="RefreshFriends_Click" />
+                    <AutoSuggestBox x:Name="SettingsSearch" Grid.Column="1" Width="280" VerticalAlignment="Center"
+                                    PlaceholderText="搜索设置" QueryIcon="Find" Visibility="Collapsed"
+                                    TextChanged="SettingsSearch_TextChanged" QuerySubmitted="SettingsSearch_QuerySubmitted"
+                                    AutomationProperties.Name="搜索设置" />
+                </Grid>
+                <InfoBar x:Name="StatusBar" Grid.Row="3" IsOpen="False" IsClosable="True" />
+
+                <Grid Grid.Row="4" RowDefinitions="Auto,*" Margin="0,2,0,0">
+                        <ScrollViewer x:Name="AccountWorkspace" Grid.RowSpan="2" Visibility="Collapsed"
+                                      HorizontalScrollMode="Disabled"
+                                      HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                                      SizeChanged="AccountWorkspace_SizeChanged">
+                                <Grid x:Name="AccountCardsLayout" RowDefinitions="Auto,0,Auto" ColumnDefinitions="240,*"
+                                      ColumnSpacing="22" RowSpacing="12" Padding="0,1,0,12">
+                            <local:HarborGlassCard x:Name="AccountListCard" Grid.Row="0" Grid.Column="0" Style="{StaticResource HarborPanel}"
+                                                    CornerRadius="21" Padding="0" BlurGroup="AccountList" VerticalAlignment="Top">
+                                <Grid>
+                                    <TextBlock x:Name="AccountListEmpty" Text="暂无已保存账号" FontSize="12" Opacity="0.73"
+                                               Margin="16,18" TextWrapping="Wrap" />
+                                    <ListView x:Name="AccountsList" SelectionMode="Single" MaxHeight="420"
+                                              SelectionChanged="Accounts_SelectionChanged" Background="Transparent"
+                                              BorderThickness="0" Margin="8,6" Padding="0">
+                                        <ListView.Resources>
+                                            <CornerRadius x:Key="ListViewItemCornerRadius">15</CornerRadius>
+                                            <x:Boolean x:Key="ListViewItemSelectionIndicatorVisualEnabled">False</x:Boolean>
+                                        </ListView.Resources>
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="Padding" Value="0" />
+                                                <Setter Property="Margin" Value="0,3" />
+                                                <Setter Property="MinHeight" Value="0" />
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                <Setter Property="Background" Value="Transparent" />
+                                                <Setter Property="BorderThickness" Value="0" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Padding="12,10" CornerRadius="15" Background="#0FFFFFFF">
+                                                    <Grid ColumnDefinitions="38,*,Auto" ColumnSpacing="8" VerticalAlignment="Center">
+                                                        <Border Width="36" Height="36" CornerRadius="8" Background="#B77B3B">
+                                                            <Grid Width="36" Height="36">
+                                                                <Grid.Clip><RectangleGeometry Rect="0,0,36,36" /></Grid.Clip>
+                                                                <Image Source="ms-appx:///Assets/Skins/wide/steve.png" Width="288" Height="288"
+                                                                       Margin="-36,-36,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" Stretch="Fill" />
+                                                                <Image Source="ms-appx:///Assets/Skins/wide/steve.png" Width="288" Height="288"
+                                                                       Margin="-180,-36,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" Stretch="Fill" />
+                                                                <Image Source="{Binding Avatar}" Width="36" Height="36" Stretch="Fill" />
+                                                            </Grid>
+                                                        </Border>
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                                            <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Text="{Binding KindLabel}" FontSize="10" Opacity="0.7" />
+                                                        </StackPanel>
+                                                        <Grid Grid.Column="2" Width="12" Height="12" VerticalAlignment="Center"
+                                                              Visibility="{Binding SelectedVisibility}">
+                                                            <Ellipse Fill="#C3DFDD" />
+                                                            <TextBlock Text="✓" FontSize="8" FontWeight="Bold" Foreground="#203334"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        </Grid>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </Grid>
+                            </local:HarborGlassCard>
+                            <local:HarborGlassCard x:Name="AccountDetailsCard" Grid.Row="0" Grid.Column="1" Style="{StaticResource HarborPanel}"
+                                                    CornerRadius="26" Padding="0" BlurGroup="AccountDetails" MinHeight="548">
+                                <Grid RowDefinitions="Auto,*,Auto" Padding="24,22,22,22">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <StackPanel Spacing="3">
+                                            <TextBlock x:Name="SelectedAccountName" Text="离线账号" FontSize="23" FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock x:Name="SelectedAccountKind" Text="Minecraft" FontSize="11" Opacity="0.7" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="7" VerticalAlignment="Top">
+                                        <Button Style="{StaticResource HarborPill}" Content="⟳" Width="37" Padding="0"
+                                                Click="RefreshSkin_Click" AutomationProperties.Name="刷新皮肤"
+                                                ToolTipService.ToolTip="刷新皮肤" />
+                                        <DropDownButton Content="···" CornerRadius="16" Padding="9,4"
+                                                        AutomationProperties.Name="账号操作">
+                                            <DropDownButton.Flyout>
+                                                <MenuFlyout>
+                                                    <MenuFlyoutItem Text="预览当前皮肤" Click="OpenSkin_Click" />
+                                                    <MenuFlyoutItem Text="更换 PNG 皮肤" Click="ApplySkin_Click" />
+                                                    <MenuFlyoutItem Text="LittleSkin 皮肤库" Click="LittleSkin_Click" />
+                                                    <MenuFlyoutItem Text="导入 Mac 迁移包" Click="ImportMacMigration_Click" />
+                                                </MenuFlyout>
+                                            </DropDownButton.Flyout>
+                                        </DropDownButton>
+                                        </StackPanel>
+                                    </Grid>
+                                    <Grid Grid.Row="1" Height="326" Margin="0,4,0,2" VerticalAlignment="Center">
+                                        <local:MinecraftSkinViewport x:Name="AccountSkinViewport"
+                                                                     MaxWidth="340" Margin="0,0,3,0" />
+                                        <TextBlock x:Name="AccountSkinPreviewStatus" Text="选择账号以载入皮肤预览。"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="8"
+                                                   IsHitTestVisible="False" TextWrapping="Wrap" Opacity="0.73" />
+                                    </Grid>
+                                    <StackPanel Grid.Row="2" Spacing="9">
+                                        <Border x:Name="SkinMotionTrack" CornerRadius="7" Padding="1" HorizontalAlignment="Left">
+                                            <StackPanel Orientation="Horizontal" Spacing="1">
+                                                <Button x:Name="SkinStillButton" Style="{StaticResource HarborSegment}" Content="静止" Tag="none" Click="SkinMotion_Click" />
+                                                <Button x:Name="SkinRotateButton" Style="{StaticResource HarborSegment}" Content="旋转" Tag="rotate" Click="SkinMotion_Click" />
+                                                <Button x:Name="SkinWalkButton" Style="{StaticResource HarborSegment}" Content="行走" Tag="walk" Click="SkinMotion_Click" />
+                                            </StackPanel>
+                                        </Border>
+                                        <StackPanel Orientation="Horizontal" Spacing="14">
+                                            <TextBlock Text="模型" FontSize="11" Opacity="0.74" VerticalAlignment="Center" MinWidth="49" />
+                                            <Border x:Name="SkinModelTrack" CornerRadius="7" Padding="1">
+                                                <StackPanel Orientation="Horizontal" Spacing="1">
+                                                    <Button x:Name="SkinDefaultModelButton" Style="{StaticResource HarborSegment}" Content="标准" Tag="default" Click="SkinModel_Click" />
+                                                    <Button x:Name="SkinSlimModelButton" Style="{StaticResource HarborSegment}" Content="纤细" Tag="slim" Click="SkinModel_Click" />
+                                                </StackPanel>
+                                            </Border>
+                                        </StackPanel>
+                                        <Button x:Name="ImportSkinButton" Style="{StaticResource HarborPill}"
+                                                Click="ImportSkin_Click" AutomationProperties.Name="导入皮肤">
+                                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                                <FontIcon Glyph="&#xE898;" FontSize="12" />
+                                                <TextBlock Text="导入皮肤" />
+                                            </StackPanel>
+                                        </Button>
+                                        <TextBlock x:Name="SkinDraftStatus" FontSize="11" Opacity="0.72" Visibility="Collapsed" TextWrapping="Wrap" />
+                                        <StackPanel x:Name="SkinDraftActions" Orientation="Horizontal" Spacing="8" Visibility="Collapsed">
+                                            <Button x:Name="CancelSkinDraftButton" Style="{StaticResource HarborPill}"
+                                                    Content="取消预览" Click="CancelSkinDraft_Click" />
+                                            <Button x:Name="ApplyDraftSkinButton" Style="{StaticResource HarborPill}"
+                                                    Content="应用皮肤" Click="ApplySkinDraft_Click" />
+                                        </StackPanel>
+                                        <TextBlock x:Name="AccountSkinUuid" FontFamily="Cascadia Mono" FontSize="10" Opacity="0.52"
+                                                   TextTrimming="CharacterEllipsis" IsTextSelectionEnabled="True" />
+                                    </StackPanel>
+                                </Grid>
+                            </local:HarborGlassCard>
+                            <StackPanel x:Name="AccountLoginActions" Grid.Row="2" Grid.ColumnSpan="2"
+                                        Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <Button x:Name="MicrosoftAccountLoginButton" Style="{StaticResource HarborProminentPill}"
+                                        Content="Microsoft 登录" Click="MicrosoftLogin_Click" />
+                                <Button Style="{StaticResource HarborPill}" Content="添加离线账号" Click="OfflineAccountQuickAdd_Click" />
+                                <Button Style="{StaticResource HarborPill}" Content="外置登录…" Click="ExternalLogin_Click" />
+                            </StackPanel>
+                        </Grid>
+                        </ScrollViewer>
+                        <GridView x:Name="InstanceList" Grid.RowSpan="2" SelectionMode="Single"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto" SelectionChanged="Library_SelectionChanged"
+                                  Loaded="CardGrid_Loaded" SizeChanged="CardGrid_SizeChanged" AutomationProperties.Name="游戏库">
+                            <GridView.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <ItemsWrapGrid Orientation="Horizontal" ItemWidth="318" ItemHeight="92" />
+                                </ItemsPanelTemplate>
+                            </GridView.ItemsPanel>
+                            <GridView.Header>
+                                <StackPanel x:Name="LibraryGridHeader" HorizontalAlignment="Left" Spacing="16" Margin="0,1,0,16">
+                                    <local:HarborGlassCard x:Name="FeaturedGameCard" Style="{StaticResource HarborPanel}" CornerRadius="28"
+                                            Visibility="Collapsed" Padding="28,23">
+                                        <Grid x:Name="FeaturedGameLayout" ColumnDefinitions="*,252" ColumnSpacing="24" MinHeight="225">
+                                            <StackPanel Spacing="10" VerticalAlignment="Center">
+                                                <TextBlock x:Name="FeaturedGameLoader" FontSize="12" Opacity="0.72" />
+                                                <TextBlock x:Name="FeaturedGameName" FontSize="38" FontWeight="SemiBold"
+                                                           TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock x:Name="FeaturedGameVersion" FontFamily="Cascadia Mono" FontSize="12" Opacity="0.72" />
+                                                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+                                                    <Button x:Name="FeaturedGameLaunch" Style="{StaticResource HarborProminentPill}" Content="启动游戏" Click="Launch_Click" />
+                                                    <Button x:Name="FeaturedGameManage" Style="{StaticResource HarborPill}" Content="管理实例" Click="ManageMods_Click" />
+                                                    <Button x:Name="FeaturedGameStop" Style="{StaticResource HarborPill}" Content="请求关闭游戏"
+                                                            Click="StopGame_Click" Visibility="Collapsed" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                            <Grid x:Name="FeaturedGameArt" Grid.Column="1" Width="210" Height="176" IsHitTestVisible="False">
+                                                <Path Fill="#1C70AFB2" Stroke="#44EDF9F8" StrokeThickness="1"
+                                                      Stretch="Fill" Height="128" Margin="0,45,0,0" VerticalAlignment="Top"
+                                                      Data="M 35,6 C 40,0 48,0 55,3.5 L 93,35 C 102,43 102,51 93,58 L 63,93 C 57,100.5 49,100 42,97 L 6.5,72 C -2,66 -1.5,56 6,48 Z" />
+                                                <Path Fill="#256B9DA7" Stroke="#59EDF9F8" StrokeThickness="1"
+                                                      Stretch="Fill" Height="128" Margin="0,24,0,0" VerticalAlignment="Top"
+                                                      Data="M 35,6 C 40,0 48,0 55,3.5 L 93,35 C 102,43 102,51 93,58 L 63,93 C 57,100.5 49,100 42,97 L 6.5,72 C -2,66 -1.5,56 6,48 Z" />
+                                                <Path Fill="#38C3E3DF" Stroke="#73EDF9F8" StrokeThickness="1"
+                                                      Stretch="Fill" Height="128" Margin="0,3,0,0" VerticalAlignment="Top"
+                                                      Data="M 35,6 C 40,0 48,0 55,3.5 L 93,35 C 102,43 102,51 93,58 L 63,93 C 57,100.5 49,100 42,97 L 6.5,72 C -2,66 -1.5,56 6,48 Z" />
+                                                <Border Width="84" Height="84" CornerRadius="16" Background="#160A1918"
+                                                        HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,30">
+                                                    <Image x:Name="FeaturedGameIcon" Width="76" Height="76" Stretch="Uniform" />
+                                                </Border>
+                                            </Grid>
+                                        </Grid>
+                                    </local:HarborGlassCard>
+                                    <TextBox x:Name="GameFilter" CornerRadius="12" HorizontalAlignment="Stretch"
+                                             PlaceholderText="搜索游戏名称、版本或加载器" TextChanged="GameFilter_Changed" />
+                                </StackPanel>
+                            </GridView.Header>
+                            <GridView.ItemContainerStyle>
+                                <Style TargetType="GridViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    <Setter Property="VerticalContentAlignment" Value="Stretch" />
+                                    <Setter Property="CornerRadius" Value="17" />
+                                    <Setter Property="Padding" Value="0" />
+                                    <Setter Property="Margin" Value="0,0,14,14" />
+                                </Style>
+                            </GridView.ItemContainerStyle>
+                            <GridView.ItemTemplate>
+                                <DataTemplate>
+                                    <local:HarborGlassCard Style="{StaticResource HarborPanel}" Padding="13,8" CornerRadius="17">
+                                        <Grid ColumnDefinitions="46,*,Auto,Auto" ColumnSpacing="8">
+                                            <Image Source="{Binding Artwork}" Width="46" Height="46" VerticalAlignment="Center" />
+                                            <StackPanel Grid.Column="1" Spacing="5" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Id}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Opacity="0.72" FontSize="11" TextTrimming="CharacterEllipsis">
+                                                    <Run Text="{Binding Version}" /><Run Text=" · " /><Run Text="{Binding Loader}" />
+                                                </TextBlock>
+                                            </StackPanel>
+                                            <Button Grid.Column="2" Style="{StaticResource HarborTabPill}" Padding="0" Width="28"
+                                                    Background="Transparent" BorderThickness="0" Content="{Binding FavoriteSymbol}"
+                                                    Tag="{Binding Id}" Click="FavoriteGame_Click" VerticalAlignment="Center"
+                                                    AutomationProperties.Name="切换收藏" ToolTipService.ToolTip="切换收藏" />
+                                            <DropDownButton Grid.Column="3" Content="···" Padding="6,2" CornerRadius="14"
+                                                            VerticalAlignment="Center" AutomationProperties.Name="更多实例操作">
+                                                <DropDownButton.Flyout>
+                                                    <MenuFlyout>
+                                                        <MenuFlyoutItem Text="启动游戏" Tag="{Binding Id}" Click="Launch_Click" />
+                                                        <MenuFlyoutItem Text="管理实例" Tag="{Binding Id}" Click="ManageMods_Click" />
+                                                        <MenuFlyoutItem Text="修复实例" Tag="{Binding Id}" Click="Repair_Click" />
+                                                        <MenuFlyoutItem Text="导出整合包" Tag="{Binding Id}" Click="ExportPack_Click" />
+                                                        <MenuFlyoutItem Text="在资源管理器中打开" Tag="{Binding Id}" Click="OpenInstanceDirectory_Click" />
+                                                        <MenuFlyoutItem Text="重新定位运行目录" Tag="{Binding Id}" Click="RelocateInstance_Click" />
+                                                        <MenuFlyoutItem Text="选择游戏 Java" Tag="{Binding Id}" Click="ChooseGameJava_Click" />
+                                                        <MenuFlyoutItem Text="更换实例图标" Tag="{Binding Id}" Click="ChangeInstanceIcon_Click" />
+                                                        <MenuFlyoutItem Text="创建快捷方式" Tag="{Binding Id}" Click="CreateShortcut_Click" />
+                                                        <MenuFlyoutItem Text="管理汉化" Tag="{Binding Id}" Click="OpenInstanceLocalization_Click" />
+                                                        <MenuFlyoutItem Text="移到回收站" Tag="{Binding Id}" Click="RecycleInstance_Click" />
+                                                    </MenuFlyout>
+                                                </DropDownButton.Flyout>
+                                            </DropDownButton>
+                                        </Grid>
+                                    </local:HarborGlassCard>
+                                </DataTemplate>
+                            </GridView.ItemTemplate>
+                        </GridView>
+                        <TextBlock x:Name="FeatureMessage" Grid.RowSpan="2" Visibility="Collapsed"
+                                   TextWrapping="Wrap" Opacity="0.75" />
+                        <Grid x:Name="DownloadActions" Grid.RowSpan="2" Visibility="Collapsed"
+                              RowDefinitions="Auto,*" RowSpacing="18" Margin="0,0,0,12">
+                            <Grid ColumnDefinitions="*,220" ColumnSpacing="12">
+                                <StackPanel x:Name="VersionFilters" Orientation="Horizontal" Spacing="3"
+                                            AutomationProperties.Name="版本类型" VerticalAlignment="Center">
+                                    <Button Style="{StaticResource HarborTabPill}" Content="正式版" Tag="release" Click="VersionFilter_Click" />
+                                    <Button Style="{StaticResource HarborTabPill}" Content="快照" Tag="snapshot" Click="VersionFilter_Click" />
+                                    <Button Style="{StaticResource HarborTabPill}" Content="全部" Tag="all" Click="VersionFilter_Click" />
+                                </StackPanel>
+                                <TextBox x:Name="VersionQuery" Grid.Column="1" PlaceholderText="搜索版本" CornerRadius="12"
+                                         TextChanged="VersionQuery_Changed" />
+                            </Grid>
+                            <local:HarborGlassCard Grid.Row="1" Style="{StaticResource HarborPanel}" CornerRadius="23" Padding="0">
+                                <Grid>
+                                    <ListView x:Name="RemoteVersionsList" SelectionMode="None" Padding="6,4">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                <Setter Property="Padding" Value="0" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Padding="16,10" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}">
+                                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                                        <StackPanel Spacing="4" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Version}" FontWeight="SemiBold" FontSize="17" />
+                                                            <TextBlock Text="{Binding ReleaseDate}" FontFamily="Cascadia Mono" FontSize="11" Opacity="0.65" />
+                                                        </StackPanel>
+                                                        <Button Grid.Column="1" Style="{StaticResource HarborProminentPill}" Content="安装"
+                                                                VerticalAlignment="Center" Click="InstallVersion_Click" />
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                    <TextBlock x:Name="VersionsEmpty" Text="暂无版本" Margin="20" Opacity="0.72" IsHitTestVisible="False" />
+                                </Grid>
+                            </local:HarborGlassCard>
+                        </Grid>
+                        <Grid x:Name="DownloadTasksPage" Grid.RowSpan="2" Visibility="Collapsed" Margin="0,0,0,12">
+                            <TextBlock x:Name="DownloadTasksEmpty" Text="没有下载任务" Opacity="0.72" Margin="2,8" />
+                            <ListView x:Name="DownloadTaskList" SelectionMode="None">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="Padding" Value="0" />
+                                        <Setter Property="Margin" Value="0,0,0,10" />
+                                    </Style>
+                                </ListView.ItemContainerStyle>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <local:HarborGlassCard Style="{StaticResource HarborPanel}" CornerRadius="22" Padding="20">
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
+                                                <StackPanel Spacing="7">
+                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                    <TextBlock Text="{Binding Detail}" FontSize="12" Opacity="0.75" TextWrapping="Wrap" />
+                                                    <ProgressBar IsIndeterminate="True" Visibility="{Binding BusyVisibility}" />
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Style="{StaticResource HarborPill}" Content="取消"
+                                                        Click="CancelDownloadJob_Click" VerticalAlignment="Top"
+                                                        Visibility="{Binding CancelVisibility}" />
+                                            </Grid>
+                                        </local:HarborGlassCard>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </Grid>
+                        <StackPanel x:Name="WorkspaceTabs" Orientation="Horizontal" Spacing="5"
+                                    Visibility="Collapsed" Margin="0,0,0,16" AutomationProperties.Name="实例管理分类">
+                            <Button Style="{StaticResource HarborTabPill}" Content="模组" Tag="mods" Click="WorkspaceTab_Click" />
+                            <Button Style="{StaticResource HarborTabPill}" Content="资源包" Tag="resourcepacks" Click="WorkspaceTab_Click" />
+                            <Button Style="{StaticResource HarborTabPill}" Content="光影" Tag="shaderpacks" Click="WorkspaceTab_Click" />
+                            <Button Style="{StaticResource HarborTabPill}" Content="存档" Tag="saves" Click="WorkspaceTab_Click" />
+                            <Button Style="{StaticResource HarborTabPill}" Content="汉化" Tag="localization" Click="WorkspaceTab_Click" />
+                            <Button Style="{StaticResource HarborTabPill}" Content="设置" Tag="instance-settings" Click="WorkspaceTab_Click" />
+                        </StackPanel>
+                        <local:HarborGlassCard x:Name="InstanceResourcesCard" Grid.Row="1" Visibility="Collapsed"
+                                               Style="{StaticResource HarborPanel}" CornerRadius="24" Padding="14" Margin="0,0,0,12">
+                            <Grid RowDefinitions="Auto,*,Auto" RowSpacing="10">
+                                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                    <TextBox x:Name="ResourceQuery" PlaceholderText="搜索此实例的资源" TextChanged="ResourceQuery_Changed" />
+                                    <Button Grid.Column="1" Style="{StaticResource HarborPill}" Content="下载" Click="BrowseWorkspaceResources_Click" />
+                                    <Button Grid.Column="2" x:Name="ResourceImportButton" Style="{StaticResource HarborPill}" Content="导入文件" Click="ImportResource_Click" />
+                                </Grid>
+                                <ListView x:Name="ResourcesList" Grid.Row="1" Visibility="Collapsed" SelectionMode="Multiple">
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <local:HarborGlassCard Style="{StaticResource HarborPanel}" Padding="12" CornerRadius="14">
+                                                <Grid ColumnDefinitions="*,Auto">
+                                                    <StackPanel Spacing="4">
+                                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                                        <TextBlock Text="{Binding Details}" Opacity="0.72" />
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Status}" VerticalAlignment="Center" />
+                                                        <CheckBox IsChecked="{Binding Enabled, Mode=OneWay}" Visibility="{Binding ToggleVisibility}" Click="ToggleResource_Click" />
+                                                        <Button Content="备份" Visibility="{Binding WorldActions}" Click="BackupWorld_Click" />
+                                                        <Button Content="编辑" Visibility="{Binding WorldActions}" Click="EditWorld_Click" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </local:HarborGlassCard>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                                <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                    <TextBlock x:Name="ResourceCount" FontSize="12" Opacity="0.72" VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                        <Button x:Name="CollectWorkspaceMods" Style="{StaticResource HarborPill}" Content="收藏所选模组" Click="CollectInstanceMods_Click" />
+                                        <Button x:Name="BackupWorkspaceWorlds" Style="{StaticResource HarborPill}" Content="备份存档" Click="BackupWorlds_Click" />
+                                        <Button Style="{StaticResource HarborPill}" Content="刷新" Click="RefreshWorkspaceResources_Click" />
+                                    </StackPanel>
+                                </Grid>
+                            </Grid>
+                        </local:HarborGlassCard>
+                        <local:HarborGlassCard x:Name="InstanceSettingsCard" Grid.Row="1" Visibility="Collapsed"
+                                               Style="{StaticResource HarborPanel}" CornerRadius="24" Padding="24"
+                                               VerticalAlignment="Top" Margin="0,0,0,12">
+                            <StackPanel Spacing="15">
+                                <TextBlock Text="实例设置" FontSize="17" FontWeight="SemiBold" />
+                                <TextBlock x:Name="InstanceSettingsPath" TextWrapping="Wrap" Opacity="0.72" IsTextSelectionEnabled="True" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button x:Name="WorkspaceRelocate" Style="{StaticResource HarborPill}" Content="重新定位运行目录" Click="RelocateInstance_Click" />
+                                    <Button x:Name="WorkspaceJava" Style="{StaticResource HarborPill}" Content="选择游戏 Java" Click="ChooseGameJava_Click" />
+                                    <Button x:Name="WorkspaceChangeIcon" Style="{StaticResource HarborPill}" Content="更换实例图标" Click="ChangeInstanceIcon_Click" />
+                                    <Button x:Name="WorkspaceShortcut" Style="{StaticResource HarborPill}" Content="创建快捷方式" Click="CreateShortcut_Click" />
+                                </StackPanel>
+                            </StackPanel>
+                        </local:HarborGlassCard>
+                        <local:HarborGlassCard x:Name="LocalizationCard" Grid.Row="1" Margin="0,0,0,12"
+                                               Style="{StaticResource HarborPanel}" Padding="15" Visibility="Collapsed">
+                        <Grid x:Name="LocalizationWorkspace" Visibility="Collapsed" RowDefinitions="Auto,Auto,*" RowSpacing="10">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                <StackPanel x:Name="LanguageScanSelectors" Orientation="Horizontal" Spacing="8">
+                                    <ComboBox x:Name="LanguageInstance" MinWidth="180" DisplayMemberPath="Id"
+                                              AutomationProperties.Name="要汉化的游戏实例" SelectionChanged="LanguageInstance_SelectionChanged" />
+                                    <Button Content="扫描实例" Click="ScanLanguage_Click" />
+                                </StackPanel>
+                                <Button x:Name="LanguageCancelButton" Grid.Column="1" Content="停止补译"
+                                        Visibility="Collapsed" Click="CancelLanguageTranslation_Click" />
+                            </Grid>
+                            <Grid Grid.Row="1" RowDefinitions="Auto,Auto" RowSpacing="8">
+                                <ScrollViewer HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Auto"
+                                              VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled">
+                                <StackPanel x:Name="LanguageActions" Orientation="Horizontal" Spacing="6">
+                                    <ComboBox x:Name="LanguageScope" SelectedIndex="0" AutomationProperties.Name="应用范围">
+                                        <ComboBoxItem Content="已启用资源" />
+                                        <ComboBoxItem Content="当前来源" />
+                                    </ComboBox>
+                                    <Button Content="CFPA 补全" Click="CommunityLanguage_Click" />
+                                    <Button Content="本机补译" Click="MachineLanguage_Click" />
+                                    <Button Content="进阶本机补译 2B" Click="IndexLanguage_Click" />
+                                    <Button Content="在线补译" Click="OnlineLanguage_Click" />
+                                    <Button Content="导入译文" Click="ImportLanguage_Click" />
+                                    <Button Content="导出汉化包" Click="ExportLanguage_Click" />
+                                    <Button Content="导出原文" Click="ExportLanguageSource_Click" />
+                                    <Button Content="应用任务" Click="ApplyLanguage_Click" />
+                                </StackPanel>
+                                </ScrollViewer>
+                                <TextBlock x:Name="LanguageSummary" Grid.Row="1" TextWrapping="Wrap" Opacity="0.75" />
+                            </Grid>
+                            <Grid x:Name="LanguageEditor" Grid.Row="2" ColumnDefinitions="210,*" ColumnSpacing="12">
+                                <ListView x:Name="LanguageSources" SelectionChanged="LanguageSources_SelectionChanged" SelectionMode="Single">
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Padding="6" Spacing="4">
+                                                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Progress}" Opacity="0.68" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                                <Grid Grid.Column="1" RowDefinitions="Auto,*,Auto,Auto" RowSpacing="6">
+                                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
+                                        <TextBox x:Name="LanguageQuery" PlaceholderText="搜索原文、译文或语言键" MaxLength="200" />
+                                        <CheckBox x:Name="OnlyMissingLanguage" Grid.Column="1" Content="只看待译" />
+                                        <Button Grid.Column="2" Content="筛选" Click="FilterLanguage_Click" />
+                                    </Grid>
+                                    <ListView x:Name="LanguageEntries" Grid.Row="1" SelectionChanged="LanguageEntries_SelectionChanged" SelectionMode="Single">
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Padding="4" Spacing="3">
+                                                    <TextBlock Text="{Binding Source}" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Key}" TextTrimming="CharacterEllipsis" Opacity="0.65" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                    <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8">
+                                        <Button x:Name="PreviousLanguagePage" Content="上一页" Click="PreviousLanguagePage_Click" IsEnabled="False" />
+                                        <TextBlock x:Name="LanguagePage" VerticalAlignment="Center" />
+                                        <Button x:Name="NextLanguagePage" Content="下一页" Click="NextLanguagePage_Click" IsEnabled="False" />
+                                    </StackPanel>
+                                    <StackPanel x:Name="LanguageEntryEdit" Grid.Row="3" Spacing="5" Visibility="Collapsed">
+                                        <TextBox x:Name="LanguageOriginal" Header="原文" IsReadOnly="True" TextWrapping="Wrap" MaxHeight="86" />
+                                        <TextBox x:Name="LanguageDraft" Header="译文" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="120" MaxLength="100000" />
+                                        <TextBlock x:Name="LanguageEntryStatus" TextWrapping="Wrap" Opacity="0.68" />
+                                        <Button Content="保存译文" Click="SaveLanguage_Click" HorizontalAlignment="Right" />
+                                    </StackPanel>
+                                </Grid>
+                            </Grid>
+                        </Grid>
+                        </local:HarborGlassCard>
+                        <Grid x:Name="SettingsPage" Grid.RowSpan="2" Visibility="Collapsed" ColumnDefinitions="126,*" ColumnSpacing="20">
+                            <StackPanel x:Name="SettingsSections" Spacing="5" AutomationProperties.Name="设置分类">
+                                <Button Style="{StaticResource HarborNavigationRow}" Tag="appearance" Click="SettingsSection_Click">
+                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                        <FontIcon Glyph="&#xE790;" FontSize="13" /><TextBlock Text="外观" FontSize="12" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Style="{StaticResource HarborNavigationRow}" Tag="welcome" Click="SettingsSection_Click">
+                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                        <FontIcon Glyph="&#xE8D6;" FontSize="13" /><TextBlock Text="欢迎动画" FontSize="12" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Style="{StaticResource HarborNavigationRow}" Tag="runtime" Click="SettingsSection_Click">
+                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                        <FontIcon Glyph="&#xE713;" FontSize="13" /><TextBlock Text="运行" FontSize="12" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Style="{StaticResource HarborNavigationRow}" Tag="maintenance" Click="SettingsSection_Click">
+                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                        <FontIcon Glyph="&#xE90F;" FontSize="13" /><TextBlock Text="维护" FontSize="12" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                            <ScrollViewer x:Name="SettingsScroll" Grid.Column="1" HorizontalScrollMode="Disabled">
+                                <StackPanel Padding="1,1,0,24">
+                                    <StackPanel x:Name="AppearanceSettings" Spacing="22">
+                                        <local:HarborGlassCard x:Name="SettingsGlass" CornerRadius="24" Padding="24" Style="{StaticResource HarborPanel}">
+                                        <StackPanel Spacing="12">
+                                        <TextBlock Text="外观" FontSize="17" FontWeight="SemiBold" />
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <ComboBox x:Name="ThemeMode" Header="主题" SelectionChanged="ThemeMode_Changed">
+                                                <ComboBoxItem Content="跟随系统" />
+                                                <ComboBoxItem Content="浅色" />
+                                                <ComboBoxItem Content="深色" />
+                                            </ComboBox>
+                                            <ToggleSwitch x:Name="InvertTheme" Header="主题反色" Toggled="AppearanceToggle_Changed" />
+                                            <ToggleSwitch x:Name="GlassEnabled" Header="窗口内磨砂" Toggled="AppearanceToggle_Changed" />
+                                        </StackPanel>
+                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                                            <Slider x:Name="GlassTransparency" Header="玻璃通透度" Minimum="0" Maximum="100" StepFrequency="1"
+                                                    ValueChanged="GlassMaterial_Changed" />
+                                            <Slider x:Name="GlassShadow" Grid.Column="1" Header="玻璃阴影强度" Minimum="0" Maximum="100"
+                                                    StepFrequency="1" ValueChanged="GlassMaterial_Changed" />
+                                        </Grid>
+                                        <Button Style="{StaticResource HarborPill}" Content="恢复玻璃默认值"
+                                                Click="ResetGlass_Click" HorizontalAlignment="Left" />
+                                        <Slider x:Name="GlassBlur" Header="全局模糊半径" Minimum="0" Maximum="40" StepFrequency="1"
+                                                ValueChanged="GlassMaterial_Changed" Width="300" HorizontalAlignment="Left" />
+                                        <TextBlock Text="分区模糊半径" FontSize="16" FontWeight="SemiBold" Margin="0,6,0,0" />
+                                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+                                            <Slider x:Name="SidebarGlassBlur" Header="侧栏" Minimum="0" Maximum="40" StepFrequency="1"
+                                                    ValueChanged="GlassMaterial_Changed" />
+                                            <Slider x:Name="AccountListGlassBlur" Grid.Column="1" Header="账号列表" Minimum="0" Maximum="40" StepFrequency="1"
+                                                    ValueChanged="GlassMaterial_Changed" />
+                                            <Slider x:Name="AccountDetailsGlassBlur" Grid.Column="2" Header="账号详情" Minimum="0" Maximum="40" StepFrequency="1"
+                                                    ValueChanged="GlassMaterial_Changed" />
+                                        </Grid>
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <ToggleSwitch x:Name="ReduceMotion" Header="减少动态效果" Toggled="AppearanceToggle_Changed" />
+                                            <ToggleSwitch x:Name="PerformanceMode" Header="游玩时暂停动效" Toggled="AppearanceToggle_Changed" />
+                                        </StackPanel>
+                                        </StackPanel>
+                                        </local:HarborGlassCard>
+                                        <local:HarborGlassCard x:Name="SettingsWallpaper" CornerRadius="24" Padding="24" Style="{StaticResource HarborPanel}">
+                                        <StackPanel Spacing="12">
+                                        <TextBlock Text="启动器壁纸" FontSize="17" FontWeight="SemiBold" />
+                                        <Button Style="{StaticResource HarborPill}" Content="壁纸库…" Click="OpenWallpaperLibrary_Click" HorizontalAlignment="Left" />
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <ComboBox x:Name="WallpaperSelector" MinWidth="200" DisplayMemberPath="Name"
+                                                      AutomationProperties.Name="壁纸库" SelectionChanged="Wallpaper_SelectionChanged" />
+                                            <Button Content="导入图片或 MP4" Click="ImportWallpaper_Click" />
+                                            <Button Content="移除所选" Click="RemoveWallpaper_Click" />
+                                        </StackPanel>
+                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                                            <Slider x:Name="WallpaperDimming" Header="壁纸调暗" Minimum="0" Maximum="75"
+                                                    StepFrequency="1" ValueChanged="WallpaperTuning_Changed" />
+                                            <Slider x:Name="WallpaperSoftness" Grid.Column="1" Header="壁纸柔化" Minimum="0" Maximum="24"
+                                                    StepFrequency="1" ValueChanged="WallpaperTuning_Changed" />
+                                        </Grid>
+                                        </StackPanel>
+                                        </local:HarborGlassCard>
+                                        <local:HarborGlassCard x:Name="SettingsSounds" CornerRadius="24" Padding="24" Style="{StaticResource HarborPanel}">
+                                        <StackPanel Spacing="12">
+                                        <TextBlock Text="界面音效" FontSize="17" FontWeight="SemiBold" />
+                                        <ToggleSwitch x:Name="InterfaceSounds" Header="界面音效" IsOn="True" Toggled="AppearanceToggle_Changed" />
+                                        <Slider x:Name="InterfaceVolume" Header="音效音量" Minimum="0" Maximum="100" StepFrequency="1"
+                                                ValueChanged="InterfaceVolume_Changed" Width="300" HorizontalAlignment="Left" />
+                                        <TextBlock Text="界面音效：JDSherbert · Ultimate UI SFX Pack（Free）；Fluent System Icons：Microsoft（MIT）。" TextWrapping="Wrap" Opacity="0.68" />
+                                        </StackPanel>
+                                        </local:HarborGlassCard>
+                                    </StackPanel>
+                                    <StackPanel x:Name="WelcomeSettings" Visibility="Collapsed">
+                                        <local:HarborGlassCard x:Name="SettingsVoice" CornerRadius="24" Padding="24" Style="{StaticResource HarborPanel}">
+                                        <StackPanel Spacing="12">
+                                        <TextBlock Text="启动播报" FontSize="17" FontWeight="SemiBold" />
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <ComboBox x:Name="WelcomeVoice" Header="启动播报" SelectionChanged="WelcomeVoice_Changed">
+                                                <ComboBoxItem Content="静音" />
+                                                <ComboBoxItem Content="女声一" />
+                                                <ComboBoxItem Content="女声二" />
+                                                <ComboBoxItem Content="男声一" />
+                                                <ComboBoxItem Content="男声二" />
+                                            </ComboBox>
+                                            <Button Content="试听" Click="PreviewWelcome_Click" VerticalAlignment="Bottom" />
+                                        </StackPanel>
+                                        <Slider x:Name="WelcomeVolume" Header="音量" Minimum="0" Maximum="100" StepFrequency="1"
+                                                ValueChanged="WelcomeVolume_Changed" Width="300" HorizontalAlignment="Left" />
+                                        </StackPanel>
+                                        </local:HarborGlassCard>
+                                    </StackPanel>
+                                    <StackPanel x:Name="RuntimeSettings" Spacing="22" Visibility="Collapsed">
+                                        <local:HarborGlassCard x:Name="SettingsPaths" Style="{StaticResource HarborPanel}" CornerRadius="24" Padding="24">
+                                            <StackPanel Spacing="10">
+                                                <TextBlock Text="目录" FontSize="17" FontWeight="SemiBold" />
+                                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                                    <TextBlock x:Name="RuntimeGameDirectory" VerticalAlignment="Center" TextWrapping="Wrap"
+                                                               IsTextSelectionEnabled="True" Opacity="0.76" />
+                                                    <Button Grid.Column="1" Style="{StaticResource HarborPill}" Content="选择游戏目录"
+                                                            Click="ChooseRoot_Click" VerticalAlignment="Center" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </local:HarborGlassCard>
+                                        <local:HarborGlassCard x:Name="SettingsGameOptions" CornerRadius="24" Padding="24" Style="{StaticResource HarborPanel}">
+                                        <StackPanel Spacing="12">
+                                        <TextBlock Text="游戏与下载" FontSize="17" FontWeight="SemiBold" />
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <ComboBox x:Name="DownloadSource" Header="下载源" SelectionChanged="DownloadSource_Changed">
+                                                <ComboBoxItem Content="自动（优先国内镜像）" />
+                                                <ComboBoxItem Content="优先官方源" />
+                                            </ComboBox>
+                                            <NumberBox x:Name="GameMemory" Header="游戏最大内存（MB）" Minimum="1024" Maximum="6144"
+                                                       ValueChanged="GameMemory_Changed" SpinButtonPlacementMode="Inline" SmallChange="256" Width="172" />
+                                        </StackPanel>
+                                        <ToggleSwitch x:Name="CompleteDependencies" Header="启动前补齐模组必需依赖" Toggled="AppearanceToggle_Changed" />
+                                        </StackPanel>
+                                        </local:HarborGlassCard>
+                                    </StackPanel>
+                                    <StackPanel x:Name="MaintenanceSettings" Visibility="Collapsed">
+                                        <local:HarborGlassCard x:Name="SettingsData" CornerRadius="24" Padding="24" Style="{StaticResource HarborPanel}">
+                                        <StackPanel Spacing="12">
+                                        <TextBlock Text="维护" FontSize="17" FontWeight="SemiBold" />
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Button Content="打开数据目录" Click="OpenApplicationData_Click" />
+                                            <Button Content="连接诊断" Click="RunDiagnostics_Click" />
+                                            <Button Content="本机游玩记录" Click="LocalHistory_Click" />
+                                        </StackPanel>
+                                        <TextBlock x:Name="DataDirectoryText" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                                        <TextBlock x:Name="WindowsVersionText" FontSize="14" FontWeight="SemiBold" Margin="0,8,0,0" />
+                                        <TextBlock Text="上游功能基线 1.7.1 · HMCL 3.16.4" FontSize="12" Opacity="0.72" />
+                                        <TextBlock Text="作者 ADsurfboard · Windows 移植 时咨月." FontSize="12" Opacity="0.72" />
+                                        </StackPanel>
+                                        </local:HarborGlassCard>
+                                    </StackPanel>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Grid>
+                        <ScrollViewer x:Name="MultiplayerPage" Grid.RowSpan="2" Visibility="Collapsed" HorizontalScrollMode="Disabled">
+                            <StackPanel Spacing="22" Padding="1,1,0,24">
+                                <local:HarborGlassCard Style="{StaticResource HarborPanel}" CornerRadius="24" Padding="24">
+                                    <StackPanel Spacing="12">
+                                        <TextBlock Text="房间联机" FontSize="20" FontWeight="SemiBold" />
+                                        <TextBlock Text="房主在 Minecraft 中开放局域网后创建陶瓦房间。好友可凭房间码加入。"
+                                                   TextWrapping="Wrap" Opacity="0.75" />
+                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
+                                            <Button x:Name="HostRoomButton" Style="{StaticResource HarborPill}" Content="创建房间" Click="HostRoom_Click" />
+                                            <TextBox x:Name="RoomCodeBox" Grid.Column="1" PlaceholderText="输入房间码"
+                                                     AutomationProperties.Name="房间码" MaxLength="256" />
+                                            <Button x:Name="JoinRoomButton" Grid.Column="2" Style="{StaticResource HarborPill}" Content="加入房间" Click="JoinRoom_Click" />
+                                            <Button x:Name="StopRoomButton" Grid.Column="3" Style="{StaticResource HarborPill}" Content="退出房间"
+                                                    Click="StopRoom_Click" IsEnabled="False" />
+                                        </Grid>
+                                        <TextBlock x:Name="RoomStatus" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                                    </StackPanel>
+                                </local:HarborGlassCard>
+                                <local:HarborGlassCard Style="{StaticResource HarborPanel}" CornerRadius="24" Padding="24">
+                                    <StackPanel Spacing="12">
+                                        <TextBlock Text="加入游戏" FontSize="20" FontWeight="SemiBold" />
+                                        <TextBox x:Name="ServerAddressBox" PlaceholderText="服务器地址，例如 play.example.com:25565"
+                                                 AutomationProperties.Name="服务器地址" MaxLength="260" />
+                                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                            <ComboBox x:Name="MultiplayerInstance" DisplayMemberPath="Id" MinWidth="190"
+                                                      PlaceholderText="选择启动实例" AutomationProperties.Name="选择启动实例" />
+                                            <Button Grid.Column="1" Style="{StaticResource HarborPill}" Content="关闭游戏" Click="StopGame_Click" />
+                                            <Button Grid.Column="2" Style="{StaticResource HarborProminentPill}" Content="启动并加入" Click="JoinServer_Click" />
+                                        </Grid>
+                                    </StackPanel>
+                                </local:HarborGlassCard>
+                                <local:HarborGlassCard Style="{StaticResource HarborPanel}" CornerRadius="24" Padding="24">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Text="SakuraFrp 联机" FontSize="20" FontWeight="SemiBold" />
+                                    <PasswordBox x:Name="SakuraToken" Header="Sakura Frp 访问密钥" MaxLength="512" />
+                                    <Button x:Name="LoadSakuraButton" Content="读取节点与隧道" Click="LoadSakura_Click" />
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <ComboBox x:Name="SakuraNodes" Header="节点" DisplayMemberPath="Name" MinWidth="180" />
+                                        <NumberBox x:Name="SakuraPort" Header="局域网端口" Minimum="1" Maximum="65535" MinWidth="116" />
+                                        <Button x:Name="CreateSakuraButton" Content="新建 TCP 隧道" VerticalAlignment="Bottom" Click="CreateSakura_Click" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <ComboBox x:Name="SakuraTunnels" Header="已有隧道" DisplayMemberPath="Label" MinWidth="180" />
+                                        <Button x:Name="StartSakuraButton" Content="开启隧道" VerticalAlignment="Bottom" Click="StartSakura_Click" />
+                                        <Button x:Name="StopSakuraButton" Content="停止" VerticalAlignment="Bottom" Click="StopSakura_Click" IsEnabled="False" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="SakuraStatus" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                                </StackPanel>
+                                </local:HarborGlassCard>
+                            </StackPanel>
+                        </ScrollViewer>
+                        <ScrollViewer x:Name="FriendsPage" Grid.RowSpan="2" Visibility="Collapsed" HorizontalScrollMode="Disabled">
+                            <StackPanel Spacing="20" Padding="1,1,0,24">
+                                <local:HarborGlassCard Style="{StaticResource HarborPanel}" CornerRadius="22" Padding="22">
+                                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                        <TextBlock x:Name="FriendIdentityLabel" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                        <Button Grid.Column="1" Style="{StaticResource HarborPill}" Content="身份与共享设置" Click="FriendIdentity_Click" />
+                                        <Button Grid.Column="2" Style="{StaticResource HarborPill}" Content="复制好友码" Click="CopyFriendCode_Click" />
+                                    </Grid>
+                                </local:HarborGlassCard>
+                                <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                    <TextBox x:Name="AddFriendCode" PlaceholderText="输入好友码" MaxLength="12" />
+                                    <Button Grid.Column="1" Style="{StaticResource HarborPill}" Content="添加好友" Click="AddFriend_Click" />
+                                    <Button Grid.Column="2" x:Name="FriendRequestsButton" Style="{StaticResource HarborPill}"
+                                            Content="好友申请" Click="FriendRequests_Click" />
+                                </Grid>
+                                <Grid ColumnDefinitions="225,*" ColumnSpacing="22">
+                                    <StackPanel Spacing="10">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Text="好友" FontSize="16" FontWeight="SemiBold" />
+                                            <TextBlock x:Name="FriendsCount" Grid.Column="1" FontSize="12" Opacity="0.7" />
+                                        </Grid>
+                                        <TextBox x:Name="FriendSearch" PlaceholderText="搜索昵称或好友码" TextChanged="FriendSearch_Changed" />
+                                        <Button x:Name="MyRecentGamesButton" Style="{StaticResource HarborNavigationRow}"
+                                                Content="我的最近游戏" Click="MyRecentGames_Click" />
+                                        <ListView x:Name="FriendsList" DisplayMemberPath="Label" SelectionChanged="FriendsList_SelectionChanged"
+                                                  MaxHeight="436" MinHeight="84" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Spacing="16">
+                                        <StackPanel x:Name="SelectedFriendPane" Spacing="12" Visibility="Collapsed">
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                                <StackPanel Spacing="5">
+                                                    <TextBlock x:Name="SelectedFriendTitle" FontSize="23" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                    <TextBlock x:Name="SelectedFriendSharing" FontSize="12" Opacity="0.72" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Style="{StaticResource HarborPill}" VerticalAlignment="Top"
+                                                        Content="好友资料" Click="FriendHistory_Click" />
+                                            </Grid>
+                                            <local:HarborGlassCard Style="{StaticResource HarborPanel}" Padding="16">
+                                                <Grid RowDefinitions="Auto,170,Auto" RowSpacing="7">
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <Button Content="邀请联机" Click="InviteFriend_Click" />
+                                                        <Button Content="打开选中的邀请" Click="OpenFriendInvitation_Click" />
+                                                    </StackPanel>
+                                                    <ListView x:Name="FriendMessages" Grid.Row="1" SelectionMode="Single">
+                                                        <ListView.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <StackPanel Padding="6" Spacing="5">
+                                                                    <TextBlock Text="{Binding Header}" Opacity="0.68" />
+                                                                    <TextBlock Text="{Binding Body}" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                                                                </StackPanel>
+                                                            </DataTemplate>
+                                                        </ListView.ItemTemplate>
+                                                    </ListView>
+                                                    <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                                        <TextBox x:Name="FriendDraft" MaxLength="2000" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="100"
+                                                                 PlaceholderText="写消息" TextChanged="FriendDraft_TextChanged" />
+                                                        <Button Grid.Column="1" Content="发送" Click="SendFriendMessage_Click" VerticalAlignment="Bottom" />
+                                                    </Grid>
+                                                </Grid>
+                                            </local:HarborGlassCard>
+                                        </StackPanel>
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                            <TextBlock x:Name="PlayHistoryHeading" Text="本机游玩记录" FontSize="19" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <ComboBox Grid.Column="1" x:Name="PlayHistoryFilter" AutomationProperties.Name="筛选游玩记录"
+                                                      SelectedIndex="0" SelectionChanged="PlayHistoryFilter_Changed">
+                                                <ComboBoxItem Content="全部" />
+                                                <ComboBoxItem Content="与好友游玩" />
+                                            </ComboBox>
+                                        </Grid>
+                                        <TextBlock x:Name="PlayHistoryEmpty" Text="暂无游玩记录" TextWrapping="Wrap" Opacity="0.72" />
+                                        <ItemsControl x:Name="PlayHistoryRows">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border CornerRadius="17" Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                                            Padding="16" Margin="0,0,0,8">
+                                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                                            <StackPanel Spacing="5">
+                                                                <TextBlock Text="{Binding Instance}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                                <TextBlock Text="{Binding Summary}" FontSize="11" TextWrapping="Wrap" Opacity="0.73" />
+                                                            </StackPanel>
+                                                            <TextBlock Grid.Column="1" Text="{Binding Duration}" FontSize="12" Opacity="0.77" />
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Grid>
+                                <TextBlock x:Name="FriendConnectionLabel" FontSize="12" Opacity="0.7" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </ScrollViewer>
+                        <local:HarborGlassCard x:Name="CatalogPage" Grid.RowSpan="2" Visibility="Collapsed"
+                                               Style="{StaticResource HarborPanel}" CornerRadius="24" Padding="0" Margin="0,8,0,16">
+                            <Grid RowDefinitions="Auto,*">
+                                <StackPanel Spacing="9" Padding="16,14">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <ComboBox x:Name="CatalogPlatform" SelectedIndex="0" AutomationProperties.Name="资源平台">
+                                            <ComboBoxItem Content="Modrinth" />
+                                            <ComboBoxItem Content="CurseForge" />
+                                        </ComboBox>
+                                        <ComboBox x:Name="CatalogSort" SelectedIndex="0" AutomationProperties.Name="结果排序">
+                                            <ComboBoxItem Content="默认排序" />
+                                            <ComboBoxItem Content="最近更新" />
+                                        </ComboBox>
+                                        <Button Style="{StaticResource HarborPill}" Content="我的收藏" Click="CatalogFavorites_Click" />
+                                    </StackPanel>
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                        <TextBox x:Name="CatalogQuery" PlaceholderText="搜索资源名称" MaxLength="120"
+                                                 KeyDown="CatalogQuery_KeyDown" />
+                                        <Button Grid.Column="1" Style="{StaticResource HarborPill}" Content="搜索" Click="CatalogSearch_Click" />
+                                    </Grid>
+                                </StackPanel>
+                                <Grid Grid.Row="1" ColumnDefinitions="320,1,*" SizeChanged="CatalogColumns_SizeChanged"
+                                      BorderThickness="0,1,0,0" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}">
+                                    <Grid RowDefinitions="*,Auto" RowSpacing="8" Padding="12">
+                                        <ListView x:Name="CatalogResults" SelectionMode="Single" SelectionChanged="CatalogResults_SelectionChanged">
+                                            <ListView.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Spacing="5" Padding="4,8">
+                                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding Description}" MaxLines="2" TextWrapping="Wrap" Opacity="0.72" FontSize="11" />
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ListView.ItemTemplate>
+                                        </ListView>
+                                        <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4">
+                                            <TextBlock x:Name="CatalogProgress" VerticalAlignment="Center" FontSize="11"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <Button Grid.Column="1" x:Name="CatalogPrevious" Style="{StaticResource HarborPill}"
+                                                    Padding="8,4" Content="‹" Click="CatalogPrevious_Click" IsEnabled="False"
+                                                    AutomationProperties.Name="上一页" ToolTipService.ToolTip="上一页" />
+                                            <Button Grid.Column="2" x:Name="CatalogNext" Style="{StaticResource HarborPill}"
+                                                    Padding="8,4" Content="›" Click="CatalogNext_Click" IsEnabled="False"
+                                                    AutomationProperties.Name="下一页" ToolTipService.ToolTip="下一页" />
+                                        </Grid>
+                                    </Grid>
+                                    <Border Grid.Column="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                                    <Grid Grid.Column="2" RowDefinitions="*,Auto" RowSpacing="10" Padding="20,16">
+                                        <TextBlock x:Name="CatalogDetailEmpty" Text="选择资源查看详情" Opacity="0.72" />
+                                        <ScrollViewer x:Name="CatalogDetail" Visibility="Collapsed">
+                                            <StackPanel Spacing="12">
+                                                <TextBlock Text="{Binding Name}" FontSize="23" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding Source}" FontSize="12" Opacity="0.73" />
+                                                <TextBlock Text="{Binding Description}" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                                            </StackPanel>
+                                        </ScrollViewer>
+                                        <StackPanel Grid.Row="1" Spacing="8">
+                                            <StackPanel x:Name="CatalogDetailActions" Spacing="8" Visibility="Collapsed">
+                                                <Button Style="{StaticResource HarborProminentPill}" Content="下载并安装" Click="CatalogInstall_Click" />
+                                                <StackPanel x:Name="CatalogCollectActions" Orientation="Horizontal" Spacing="8">
+                                                    <Button Style="{StaticResource HarborPill}" Content="收藏 / 备注" Click="CatalogSave_Click" />
+                                                    <Button x:Name="CatalogCollectMod" Style="{StaticResource HarborPill}" Content="加入模组夹" Click="CollectMarketMod_Click" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                            <Button x:Name="CancelCatalogButton" Style="{StaticResource HarborPill}"
+                                                    Content="取消任务" Click="CancelCatalog_Click" IsEnabled="False" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Grid>
+                            </Grid>
+                        </local:HarborGlassCard>
+                        <Grid x:Name="ModFoldersPage" Grid.RowSpan="2" Visibility="Collapsed" Margin="0,0,0,14">
+                            <TextBlock x:Name="ModFoldersEmpty" Text="从下载详情收藏模组，或在实例内批量收藏。" Margin="2,8" Opacity="0.74" />
+                            <GridView x:Name="ModFolderCards" IsItemClickEnabled="True" SelectionMode="None"
+                                      ItemClick="ModFolderCard_Click" Loaded="CardGrid_Loaded" SizeChanged="CardGrid_SizeChanged"
+                                      AutomationProperties.Name="模组夹列表">
+                                <GridView.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <ItemsWrapGrid Orientation="Horizontal" ItemWidth="272" ItemHeight="208" />
+                                    </ItemsPanelTemplate>
+                                </GridView.ItemsPanel>
+                                <GridView.ItemContainerStyle>
+                                    <Style TargetType="GridViewItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="VerticalContentAlignment" Value="Stretch" />
+                                        <Setter Property="CornerRadius" Value="21" />
+                                        <Setter Property="Padding" Value="0" />
+                                        <Setter Property="Margin" Value="0,0,20,24" />
+                                    </Style>
+                                </GridView.ItemContainerStyle>
+                                <GridView.ItemTemplate>
+                                    <DataTemplate>
+                                        <local:HarborGlassCard Style="{StaticResource HarborPanel}" CornerRadius="21" Padding="16">
+                                            <Grid RowDefinitions="*,Auto">
+                                                <Viewbox Width="84" Height="70" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <FontIcon Glyph="&#xE8B7;" FontSize="52" Opacity="0.74" />
+                                                </Viewbox>
+                                                <StackPanel Grid.Row="1" Spacing="5">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding EntryCountLabel}" FontSize="11" Opacity="0.72" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </local:HarborGlassCard>
+                                    </DataTemplate>
+                                </GridView.ItemTemplate>
+                            </GridView>
+                            <local:HarborGlassCard x:Name="ModFolderDetail" Style="{StaticResource HarborPanel}" CornerRadius="24"
+                                                   Padding="22" Visibility="Collapsed">
+                                <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="16">
+                                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                        <TextBlock x:Name="ModFolderTitle" FontSize="25" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <Button Grid.Column="1" Style="{StaticResource HarborPill}" Content="重命名" Click="RenameModFolder_Click" />
+                                        <Button Grid.Column="2" Style="{StaticResource HarborPill}" Content="×" Click="CloseModFolder_Click"
+                                                AutomationProperties.Name="返回模组夹列表" ToolTipService.ToolTip="返回模组夹列表" />
+                                    </Grid>
+                                    <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                        <TextBox x:Name="ModFolderQuery" PlaceholderText="搜索模组夹内的模组" TextChanged="ModFolderQuery_Changed" />
+                                        <Button Grid.Column="1" Style="{StaticResource HarborPill}" Content="收藏本地 JAR" Click="CollectLocalFile_Click" />
+                                    </Grid>
+                                    <local:HarborGlassCard Grid.Row="2" Style="{StaticResource HarborPanel}" Padding="8">
+                                    <ListView x:Name="ModFolderEntries" SelectionMode="Multiple">
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate>
+                                                <local:HarborGlassCard Style="{StaticResource HarborPanel}" Padding="11" CornerRadius="13">
+                                                    <StackPanel Spacing="4">
+                                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding Details}" Opacity="0.74" TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                </local:HarborGlassCard>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                    </local:HarborGlassCard>
+                                    <StackPanel Grid.Row="3" Spacing="9">
+                                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                            <ComboBox x:Name="ModFolderTarget" DisplayMemberPath="Id" MinWidth="190"
+                                                      PlaceholderText="选择目标实例" AutomationProperties.Name="导入到实例" />
+                                            <Button Grid.Column="1" Style="{StaticResource HarborPill}" Content="移除所选" Click="RemoveFolderMods_Click" />
+                                            <Button Grid.Column="2" Style="{StaticResource HarborProminentPill}" Content="导入所选到实例" Click="InstallFolderMods_Click" />
+                                        </Grid>
+                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                                            <Button Style="{StaticResource HarborPill}" Content="删除模组夹" Click="DeleteModFolder_Click" />
+                                            <TextBlock Grid.Column="1" x:Name="ModFolderStatus" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                            <Button Grid.Column="2" x:Name="CancelModFolderButton" Style="{StaticResource HarborPill}"
+                                                    Content="取消任务" Click="CancelCatalog_Click" IsEnabled="False" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Grid>
+                            </local:HarborGlassCard>
+                        </Grid>
+                </Grid>
+            </Grid>
+        </Grid>
+        <Grid x:Name="WindowChromeOverlay" Height="28" VerticalAlignment="Top">
+            <Border Margin="70,0,0,0" Background="Transparent"
+                    PointerPressed="ChromeDrag_PointerPressed" DoubleTapped="ChromeDrag_DoubleTapped" />
+            <StackPanel x:Name="WindowControlGroup" Orientation="Horizontal" Spacing="0"
+                        HorizontalAlignment="Left" VerticalAlignment="Top" Margin="4,2,0,0"
+                        PointerEntered="ChromeButtons_PointerEntered" PointerExited="ChromeButtons_PointerExited">
+                <Button x:Name="ChromeCloseButton" Width="20" Height="24" Padding="0" Background="Transparent"
+                        BorderThickness="0" CornerRadius="10" Click="ChromeClose_Click" GotFocus="ChromeButton_Focused" LostFocus="ChromeButton_LostFocus"
+                        ToolTipService.ToolTip="关闭"
+                        AutomationProperties.Name="关闭 MC Harbor">
+                    <Grid Width="12" Height="12">
+                        <Border x:Name="ChromeCloseDot" CornerRadius="6" Background="#E1695D" />
+                        <TextBlock x:Name="ChromeCloseGlyph" Text="×" FontSize="9" FontWeight="Bold" Foreground="#552D1715"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0" />
+                    </Grid>
+                </Button>
+                <Button x:Name="ChromeMinimizeButton" Width="20" Height="24" Padding="0" Background="Transparent"
+                        BorderThickness="0" CornerRadius="10" Click="ChromeMinimize_Click" GotFocus="ChromeButton_Focused" LostFocus="ChromeButton_LostFocus"
+                        ToolTipService.ToolTip="最小化"
+                        AutomationProperties.Name="最小化 MC Harbor">
+                    <Grid Width="12" Height="12">
+                        <Border x:Name="ChromeMinimizeDot" CornerRadius="6" Background="#F4C536" />
+                        <TextBlock x:Name="ChromeMinimizeGlyph" Text="−" FontSize="9" FontWeight="Bold" Foreground="#55442F00"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0" />
+                    </Grid>
+                </Button>
+                <Button x:Name="ChromeMaximizeButton" Width="20" Height="24" Padding="0" Background="Transparent"
+                        BorderThickness="0" CornerRadius="10" Click="ChromeMaximize_Click" GotFocus="ChromeButton_Focused" LostFocus="ChromeButton_LostFocus"
+                        ToolTipService.ToolTip="最大化"
+                        AutomationProperties.Name="最大化 MC Harbor">
+                    <Grid Width="12" Height="12">
+                        <Border x:Name="ChromeMaximizeDot" CornerRadius="6" Background="#65BE36" />
+                        <TextBlock x:Name="ChromeMaximizeGlyph" Text="□" FontSize="8" FontWeight="Bold" Foreground="#55304A20"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0" />
+                    </Grid>
+                </Button>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>
