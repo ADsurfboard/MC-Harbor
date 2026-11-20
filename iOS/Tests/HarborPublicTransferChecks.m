@@ -103,6 +103,18 @@ int main(void) { @autoreleasepool {
     Check(!error && [[NSData dataWithContentsOfURL:target(@"nested/dir/plain.bin")] isEqual:Payload(name)],@"mirror download is committed");
     Check([attempts isEqual:@[@1]] && [Hosts(name) isEqual:@[Mirror]],@"a healthy mirror needs one attempt");
 
+    // Modrinth supplies SHA-512; reject a bad mirror before renaming it.
+    name=@"mbad-sha512.bin";attempts=[NSMutableArray new];
+    NSData *original=Payload(name);
+    unsigned char digest[CC_SHA512_DIGEST_LENGTH];
+    CC_SHA512(original.bytes,(CC_LONG)original.length,digest);
+    NSMutableString *checksum=[NSMutableString stringWithString:@"sha512:"];
+    for(NSUInteger i=0;i<sizeof(digest);i++) [checksum appendFormat:@"%02x",digest[i]];
+    [old writeToURL:target(name) atomically:YES];
+    error=Run(name,target(name),0,checksum,attempts,YES);
+    Check(!error && attempts.count==2 && [[NSData dataWithContentsOfURL:target(name)] isEqual:original],
+          @"a corrupt mirror cannot replace a SHA-512 verified file");
+
     // Mirror timeout, HTTP error and tampered bytes each fall back to the official source.
     for(name in @[@"mtimeout.bin",@"m503.bin",@"mbad.bin"]){
         attempts=[NSMutableArray new];[old writeToURL:target(name) atomically:YES];

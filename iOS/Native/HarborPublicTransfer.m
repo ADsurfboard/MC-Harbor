@@ -31,7 +31,7 @@ static BOOL HBRTransferTargetIsSafe(NSURL *destination) {
 @property NSArray<NSURL *> *urls;
 @property NSURL *destination;
 @property unsigned long long size;
-@property NSString *sha1;
+@property NSString *checksum;
 @property NSUInteger attempt;
 @property NSURLSessionDownloadTask *first;
 @property BOOL holdsSlot,waiting;
@@ -50,22 +50,30 @@ static BOOL HBRTransferTargetIsSafe(NSURL *destination) {
     NSFileHandle *input=[[NSFileHandle alloc] initWithFileDescriptor:descriptor closeOnDealloc:YES];
     struct stat info;
     // An empty file is only acceptable when its declared hash proves it.
-    if(fstat(descriptor,&info)!=0 || !S_ISREG(info.st_mode) || info.st_size>HBRTransferMaximum || (info.st_size==0 && !self.sha1.length) || (self.size && (unsigned long long)info.st_size!=self.size)){[input closeFile];return HBRTransferError(@"下载大小不匹配或文件无效。");}
-    CC_SHA1_CTX hash;CC_SHA1_Init(&hash);unsigned long long total=0;NSError *error=nil;NSData *first;
+    if(fstat(descriptor,&info)!=0 || !S_ISREG(info.st_mode) || info.st_size>HBRTransferMaximum || (info.st_size==0 && !self.checksum.length) || (self.size && (unsigned long long)info.st_size!=self.size)){[input closeFile];return HBRTransferError(@"下载大小不匹配或文件无效。");}
+    BOOL strong=[self.checksum hasPrefix:@"sha512:"];
+    CC_SHA1_CTX sha1; CC_SHA512_CTX sha512;
+    if(strong) CC_SHA512_Init(&sha512); else if(self.checksum.length) CC_SHA1_Init(&sha1);
+    unsigned long long total=0;NSError *error=nil;NSData *first;
     for(;;){
         if(self.isCancelled){error=[NSError errorWithDomain:NSURLErrorDomain code:NSURLErrorCancelled userInfo:nil];break;}
         NSData *bytes=[input readDataUpToLength:65536 error:&error];if(error || !bytes.length)break;
         if(!first)first=bytes;total+=bytes.length;
         if(total>(unsigned long long)HBRTransferMaximum){error=HBRTransferError(@"下载文件超过 2 GB。");break;}
-        CC_SHA1_Update(&hash,bytes.bytes,(CC_LONG)bytes.length);
+        if(strong) CC_SHA512_Update(&sha512,bytes.bytes,(CC_LONG)bytes.length);
+        else if(self.checksum.length) CC_SHA1_Update(&sha1,bytes.bytes,(CC_LONG)bytes.length);
     }
     [input closeFile];
     if(error)return error;
     if(total!=(unsigned long long)info.st_size)return HBRTransferError(@"校验时下载文件发生变化。");
-    unsigned char digest[CC_SHA1_DIGEST_LENGTH];CC_SHA1_Final(digest,&hash);
-    if(self.sha1.length){
-        NSMutableString *actual=[NSMutableString new];for(int i=0;i<CC_SHA1_DIGEST_LENGTH;i++)[actual appendFormat:@"%02x",digest[i]];
-        if(![actual isEqual:self.sha1.lowercaseString])return HBRTransferError(@"下载 SHA-1 不匹配，尝试备用来源。");
+    if(self.checksum.length){
+        unsigned char digest[CC_SHA512_DIGEST_LENGTH];
+        if(strong) CC_SHA512_Final(digest,&sha512); else CC_SHA1_Final(digest,&sha1);
+        NSMutableString *actual=[NSMutableString new];
+        for(int index=0;index<(strong ? CC_SHA512_DIGEST_LENGTH:CC_SHA1_DIGEST_LENGTH);index++)
+            [actual appendFormat:@"%02x",digest[index]];
+        NSString *expected=strong ? [self.checksum substringFromIndex:7]:self.checksum;
+        if(![actual isEqual:expected.lowercaseString])return HBRTransferError(@"下载校验和不匹配，尝试备用来源。");
     }
     if([self.destination.pathExtension.lowercaseString isEqual:@"jar"]){
         const unsigned char *bytes=first.bytes;
@@ -87,6 +95,7 @@ static BOOL HBRTransferTargetIsSafe(NSURL *destination) {
     if(!handle)return error ?: HBRTransferError(@"无法准备已校验的下载文件。");
     BOOL synced=[handle synchronizeAndReturnError:&error];[handle closeFile];
     if(!synced)return error ?: HBRTransferError(@"无法写入已校验的下载文件。");
+    if(self.isCancelled)return [NSError errorWithDomain:NSURLErrorDomain code:NSURLErrorCancelled userInfo:nil];
     if(rename(stage.path.fileSystemRepresentation,path.fileSystemRepresentation)!=0)return HBRTransferError(@"无法提交已校验的下载文件，原文件保留。");
     return nil;
 }
@@ -145,7 +154,7 @@ static BOOL HBRTransferTargetIsSafe(NSURL *destination) {
 }
 @end
 
-NSURLSessionDownloadTask *HBRCreatePublicTransfer(AFURLSessionManager *manager,NSURL *source,NSURL *destination,unsigned long long size,NSString *sha1,BOOL (^cancelled)(void),void (^started)(NSURLSessionDownloadTask *,NSUInteger),void (^progress)(NSProgress *),void (^completion)(NSURLResponse *,NSURL *,NSError *)) {
+NSURLSessionDownloadTask *HBRCreatePublicTransfer(AFURLSessionManager *manager,NSURL *source,NSURL *destination,unsigned long long size,NSString *checksum,BOOL (^cancelled)(void),void (^started)(NSURLSessionDownloadTask *,NSUInteger),void (^progress)(NSProgress *),void (^completion)(NSURLResponse *,NSURL *,NSError *)) {
     NSArray<NSURL *> *urls=HBRPublicDownloadURLs(source,HBRPublicDownloadRoute());
     BOOL valid=manager && urls.count>0 && destination && HBRTransferTargetIsSafe(destination);
     for(NSURL *url in urls)valid=valid && HBRTransferURLIsSafe(url) && (!url.port || url.port.integerValue==443);
@@ -158,7 +167,7 @@ NSURLSessionDownloadTask *HBRCreatePublicTransfer(AFURLSessionManager *manager,N
         NSMutableURLRequest *safe=[NSMutableURLRequest requestWithURL:request.URL cachePolicy:NSURLRequestReloadIgnoringLocalCacheData timeoutInterval:25];
         safe.HTTPShouldHandleCookies=NO;[safe setValue:@"MC-Harbor-iOS/0.1" forHTTPHeaderField:@"User-Agent"];return safe;
     }];
-    HBRPublicTransfer *transfer=[HBRPublicTransfer new];transfer.manager=manager;transfer.urls=urls;transfer.destination=destination;transfer.size=size;transfer.sha1=sha1;transfer.cancelled=cancelled;transfer.started=started;transfer.progress=progress;transfer.completion=completion;
+    HBRPublicTransfer *transfer=[HBRPublicTransfer new];transfer.manager=manager;transfer.urls=urls;transfer.destination=destination;transfer.size=size;transfer.checksum=checksum;transfer.cancelled=cancelled;transfer.started=started;transfer.progress=progress;transfer.completion=completion;
     NSURLSessionDownloadTask *task=[transfer makeTask];
     if(task){transfer.first=task;objc_setAssociatedObject(task,&HBRTransferKey,transfer,OBJC_ASSOCIATION_RETAIN_NONATOMIC);}
     else dispatch_async(dispatch_get_main_queue(),^{[transfer finish:nil file:nil error:[NSError errorWithDomain:NSURLErrorDomain code:NSURLErrorCancelled userInfo:nil]];});

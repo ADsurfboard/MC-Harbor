@@ -55,30 +55,9 @@ try:
     home = data / 'Library/Application Support/MC-Harbor'
     ready = home / '.native-smoke-ready'
     assert not ready.exists(), 'Cold-launch marker must not preexist'
-    env = os.environ.copy()
-    env.update(SIMCTL_CHILD_LOG_TO_CONSOLE='1', SIMCTL_CHILD_HARBOR_SMOKE_TEST='1')
-    # Do not pass host paths as --stdout/--stderr. The simulator launch service
-    # may block trying to open them in the application sandbox.
-    output = run(['xcrun', 'simctl', 'launch', udid, bundle], env=env, capture_output=True)
-    (OUT / 'launch.log').write_text(output.stdout + output.stderr)
-    match = re.search(r':\s*(\d+)\s*$', output.stdout.strip())
-    assert match, 'No native app PID returned'
-    pid = int(match[1])
-    deadline = time.monotonic() + 60
-    while time.monotonic() < deadline:
-        os.kill(pid, 0)
-        if ready.exists() and ready.read_text() == 'HARBOR_ROOT_READY':
-            break
-        time.sleep(0.5)
-    else:
-        raise AssertionError('The complete native app did not reach its SwiftUI root')
-    time.sleep(3)
-    os.kill(pid, 0)
-    run(['xcrun', 'simctl', 'io', udid, 'screenshot', str(OUT / 'native-app-portrait.png')])
-    assert home.is_dir(), 'Private Application Support storage was not created'
-    assert (home / 'accounts').is_dir(), 'Account storage was not initialized'
-    assert not (data / 'Documents/accounts').exists(), 'Accounts must not be Files-shared'
-    report.update(rootAppeared=True, privateStorage=True, pid=pid)
+    # XCTest launches the already-installed app and asserts its first visible
+    # screen. A separate simctl launch can stall in CoreSimulator before the
+    # XCTest runner starts, even though XCTest can launch the same bundle.
     # Real input files in this freshly-created simulator's private container.
     # No runtime test flag switches archive reading or localization behavior.
     datapack = home / 'instances/default/saves/Harbor Data QA/datapacks/qa.zip'
@@ -95,6 +74,10 @@ try:
          '-destination', 'platform=iOS Simulator,id=' + udid, '-parallel-testing-enabled', 'NO',
          '-maximum-concurrent-test-simulator-destinations', '1', '-derivedDataPath', str(ROOT / 'DerivedData'),
          '-resultBundlePath', str(OUT / 'native-profile.xcresult'), 'CODE_SIGNING_ALLOWED=NO', 'test'], timeout=900)
+    assert ready.is_file() and ready.read_text() == 'HARBOR_ROOT_READY', 'The complete native app did not reach its SwiftUI root'
+    assert (home / 'accounts').is_dir(), 'Private account storage was not initialized'
+    assert not (data / 'Documents/accounts').exists(), 'Accounts must not be Files-shared'
+    report.update(rootAppeared=True, privateStorage=True)
     with zipfile.ZipFile(datapack) as archive:
         assert archive.testzip() is None
         translated = json.loads(archive.read('data/qa/advancements/start.json'))

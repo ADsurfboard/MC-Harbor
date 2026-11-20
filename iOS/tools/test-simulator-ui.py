@@ -54,7 +54,7 @@ for family,device_type,runtime in choices:
   # This UUID has just been created, so it cannot contain an earlier run's
   # marker. Check the actual marker after all UI assertions, including clones.
   phase='xctest-cold-launch'
-  completed=subprocess.run(['xcodebuild','-project','MCHarborIOS.xcodeproj','-scheme','HarborIOSHarness','-destination','platform=iOS Simulator,id='+device,'-parallel-testing-enabled','NO','-maximum-concurrent-test-simulator-destinations','1','-derivedDataPath','DerivedData','-resultBundlePath',str(result),'CODE_SIGNING_ALLOWED=NO','test'],cwd=ROOT,timeout=900)
+  completed=subprocess.run(['xcodebuild','-project','MCHarborIOS.xcodeproj','-scheme','HarborIOSHarness','-destination','platform=iOS Simulator,id='+device,'-parallel-testing-enabled','NO','-maximum-concurrent-test-simulator-destinations','1','-derivedDataPath','DerivedData','-resultBundlePath',str(result),'CODE_SIGNING_ALLOWED=NO','test'],cwd=ROOT,timeout=1200)
   # Xcode may reinstall into a new data container or run on its own clone.
   # Resolve after XCTest, and inspect only this run's uniquely named devices.
   candidates=[d for d in device_inventory()+device_inventory('testing') if d['udid']==device or device_name in d['name']]
@@ -77,13 +77,18 @@ for family,device_type,runtime in choices:
   (EVIDENCE/('ui-'+family+'.json')).write_text(json.dumps(status,indent=2))
   try:
    output=EVIDENCE/'screenshots'/family;output.mkdir(parents=True,exist_ok=True)
-   if result.exists():
+   if (result/'Info.plist').is_file():
     summary=subprocess.run(['xcrun','xcresulttool','get','test-results','summary','--path',str(result)],capture_output=True,text=True,timeout=60)
     (EVIDENCE/('ui-'+family+'-summary.json')).write_text(summary.stdout if summary.returncode==0 else json.dumps({'summaryError':summary.stderr[-4000:]}))
-    run(['xcrun','xcresulttool','export','attachments','--path',str(result),'--output-path',str(output)],timeout=120)
+    attachments=subprocess.run(['xcrun','xcresulttool','export','attachments','--path',str(result),'--output-path',str(output)],capture_output=True,text=True,timeout=120)
+    if attachments.returncode:status['cleanupErrors'].append('Attachment export: '+attachments.stderr[-1000:])
+   elif status['passed']:
+    status.update(passed=False,error='XCTest reported success without a complete result bundle')
    if not status['passed']:
     with (EVIDENCE/('ui-'+family+'-system.log')).open('w') as log:
      subprocess.run(['xcrun','simctl','spawn',device,'log','show','--last','15m','--style','compact','--predicate','process == "HarborIOSHarness" OR process == "SpringBoard"'],stdout=log,stderr=subprocess.STDOUT,timeout=60)
+  except (OSError,subprocess.SubprocessError) as error:
+   status['cleanupErrors'].append('Diagnostics: '+str(error))
   finally:
    # Only delete this script's UUID. Never shut down a local user's simulators.
    commands=[['xcrun','simctl','shutdown',device],['xcrun','simctl','delete',device]]

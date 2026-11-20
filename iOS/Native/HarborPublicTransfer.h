@@ -5,7 +5,7 @@
 /// tasks and call started again, so callers can retain accurate progress.
 /// The destination keeps its previous contents until a source is verified.
 NSURLSessionDownloadTask *HBRCreatePublicTransfer(AFURLSessionManager *manager,NSURL *source,NSURL *destination,
-    unsigned long long expectedSize,NSString *sha1,BOOL (^cancelled)(void),
+    unsigned long long expectedSize,NSString *checksum,BOOL (^cancelled)(void),
     void (^started)(NSURLSessionDownloadTask *,NSUInteger),void (^progress)(NSProgress *),
     void (^completion)(NSURLResponse *,NSURL *,NSError *));
 

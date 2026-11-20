@@ -109,7 +109,7 @@ import XCTest
             XCTAssertTrue(tab.waitForExistence(timeout: 15)); tab.tap()
         }
         openFriends()
-        let search = app.searchFields["搜索昵称、备注或好友码"]
+        let search = app.textFields["friends.search"]
         XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("36")
         let person = app.staticTexts["隔离测试好友 36"]
         for _ in 0..<4 { if person.isHittable { break }; app.swipeUp() }
@@ -121,7 +121,7 @@ import XCTest
         XCTAssertTrue(save.isHittable); XCTAssertGreaterThanOrEqual(save.frame.height, 44); save.tap()
         capture("friends-48-fixture-note")
         app.terminate(); app.launch(); openFriends()
-        let restoredSearch = app.searchFields["搜索昵称、备注或好友码"]
+        let restoredSearch = app.textFields["friends.search"]
         XCTAssertTrue(restoredSearch.waitForExistence(timeout: 10)); restoredSearch.tap(); restoredSearch.typeText("MobileQA36")
         let restored = app.staticTexts["MobileQA36"]
         for _ in 0..<4 { if restored.isHittable { break }; app.swipeUp() }

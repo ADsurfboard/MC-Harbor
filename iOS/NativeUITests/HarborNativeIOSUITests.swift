@@ -3,6 +3,19 @@ import CoreGraphics
 
 /// Targets the installed full JVM/graphics App, never the fixture harness.
 @MainActor final class HarborNativeIOSUITests: XCTestCase {
+    func testColdLaunchOfInstalledNativeBundle() throws {
+        continueAfterFailure = false
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication(bundleIdentifier: "net.morben.harbor.ios")
+        app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"
+        app.launch()
+        XCTAssertTrue(app.buttons["instance.more.(Default)"].waitForExistence(timeout: 30))
+        XCTAssertEqual(app.state, .runningForeground)
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "complete-native-cold-launch"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
     func testNativeWorldEditorSavesRealMetadataAndBackup() throws {
         continueAfterFailure = false; XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication(bundleIdentifier: "net.morben.harbor.ios")

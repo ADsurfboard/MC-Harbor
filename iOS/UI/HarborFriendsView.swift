@@ -90,7 +90,22 @@ struct HarborFriendsView: View {
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }.harborPageBackground().navigationTitle("好友").navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $query, prompt: "搜索昵称、备注或好友码")
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if model.snapshot != nil {
+                    HStack(spacing: 10) {
+                        Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
+                        TextField("搜索昵称、备注或好友码", text: $query)
+                            .textInputAutocapitalization(.never).autocorrectionDisabled()
+                            .frame(minHeight: 44).accessibilityIdentifier("friends.search")
+                        if !query.isEmpty {
+                            Button { query = "" } label: {
+                                Image(systemName: "xmark.circle.fill").frame(width: 44, height: 44).contentShape(Rectangle())
+                            }.buttonStyle(.plain).accessibilityLabel("清空搜索")
+                        }
+                    }.padding(.horizontal, 14).background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                        .padding(.horizontal, 16).padding(.vertical, 6)
+                }
+            }
             .refreshable { do { try await model.reload() } catch { model.error = error.localizedDescription } }
             .alert("好友服务", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) { Button("好") { model.error = nil } } message: { Text(model.error ?? "") }
             .confirmationDialog("移除好友并收回共享访问？", isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }), titleVisibility: .visible) {

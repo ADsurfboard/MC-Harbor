@@ -246,49 +246,38 @@ a=content.index('    NSString *name = altName ?: path.lastPathComponent;\n    NS
 b=content.index('\n- (NSURLSessionDownloadTask *)createDownloadTask:(NSString *)url size:(NSUInteger)size sha:(NSString *)sha altName:(NSString *)altName toPath:(NSString *)path {',a)
 content=content[:a]+'''    NSString *name = altName ?: path.lastPathComponent;
     NSProgress *owner = self.progress;
-    BOOL verify = getPrefBool(@"general.check_sha");
-    NSString *sha1 = (verify && [sha isKindOfClass:NSString.class] && sha.length == 40) ? sha : nil;
+    NSString *checksum = [sha isKindOfClass:NSString.class] &&
+        (sha.length == 40 || ([sha hasPrefix:@"sha512:"] && sha.length == 135)) ? sha : nil;
     NSURL *source = [url isKindOfClass:NSString.class] ? [NSURL URLWithString:url] : nil;
-    __block NSProgress *current = nil;
-    return HBRCreatePublicTransfer(self.manager, source, [NSURL fileURLWithPath:path], verify ? size : 0, sha1, ^BOOL{
+    NSProgress *verified = [NSProgress progressWithTotalUnitCount:100];
+    verified.kind = NSProgressKindFile;
+    NSInteger pending = MAX(1, (NSInteger)MIN(size, 2ULL * 1024 * 1024 * 1024));
+    owner.totalUnitCount += pending;
+    self.textProgress.totalUnitCount = owner.totalUnitCount;
+    [owner addChild:verified withPendingUnitCount:pending];
+    [self.progressList addObject:verified];
+    [self.fileList addObject:name];
+    return HBRCreatePublicTransfer(self.manager, source, [NSURL fileURLWithPath:path], size, checksum, ^BOOL{
         return owner.cancelled;
     }, ^(NSURLSessionDownloadTask *attempt, NSUInteger number) {
         NSLog(@"[MCDL] Downloading %@ from source %lu", name, (unsigned long)number);
-        current = [self harborTrackTransfer:attempt size:size replacing:current];
-        if (number == 1) [self.fileList addObject:name];
-    }, nil, ^(NSURLResponse *response, NSURL *file, NSError *error) {
+    }, ^(NSProgress *raw) {
+        if (raw.totalUnitCount <= 0) return;
+        NSInteger units = MIN(99, (NSInteger)(raw.fractionCompleted * 100));
+        if (units <= verified.completedUnitCount) return;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (!owner.cancelled && units > verified.completedUnitCount) verified.completedUnitCount = units;
+        });
+    }, ^(NSURLResponse *response, NSURL *file, NSError *error) {
         if (owner.cancelled) {
             // Ignore any further errors
         } else if (error != nil) {
             [self finishDownloadWithError:error file:name];
-        } else if (![self checkSHA:sha forFile:path altName:altName]) {
-            [self finishDownloadWithErrorString:[NSString stringWithFormat:@"Failed to verify file %@: checksum mismatch", path.lastPathComponent]];
         } else {
-            if (current.completedUnitCount <= 0) current.completedUnitCount = 1;
-            current.totalUnitCount = current.completedUnitCount;
             if (success) success();
+            verified.completedUnitCount = verified.totalUnitCount;
         }
     });
-}
-
-- (NSProgress *)harborTrackTransfer:(NSURLSessionDownloadTask *)task size:(NSInteger)size replacing:(NSProgress *)previous {
-    NSProgress *progress = [self.manager downloadProgressForTask:task];
-    NSInteger units = size > 0 ? size : 1;
-    progress.kind = NSProgressKindFile;
-    if (size > 0) progress.totalUnitCount = units;
-    NSUInteger row = previous ? [self.progressList indexOfObjectIdenticalTo:previous] : NSNotFound;
-    if (row != NSNotFound) self.progressList[row] = progress;
-    else [self.progressList addObject:progress];
-    [self.progress addChild:progress withPendingUnitCount:units];
-    self.progress.totalUnitCount += units;
-    self.textProgress.totalUnitCount = self.progress.totalUnitCount;
-    if (previous) {
-        // Close the failed source only after its replacement is counted, so
-        // the install cannot report completion between two sources.
-        if (previous.totalUnitCount <= 0) previous.totalUnitCount = 1;
-        previous.completedUnitCount = previous.totalUnitCount;
-    }
-    return progress;
 }
 '''+content[b:]
 def swap(text,old,new,count=1):
@@ -338,6 +327,10 @@ content=content[:close]+'});'+content[close+3:]
 forge.write_text('#import "HarborPublicDownloads.h"\n#import "HarborPublicTransfer.h"\n'+content);patches.append({'file':'Natives/installer/ForgeInstallViewController.m','publicMirrorInstaller':True})
 
 navigation=ENGINE/'Natives/LauncherNavigationController.m';content=navigation.read_text()
+content=swap(content,'    NSProgress *progress = self.task.textProgress;','''    MinecraftResourceDownloadTask *observedTask = self.task;
+    NSProgress *progress = observedTask.textProgress;''')
+content=swap(content,'        if (!progress.finished) return;','''        if (!observedTask || self.task != observedTask ||
+            observedTask.progress.cancelled || !observedTask.progress.finished || !progress.finished) return;''')
 a=content.index('    AFHTTPSessionManager *manager = [AFHTTPSessionManager manager];\n    [manager GET:@"https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"')
 marker='success:^(NSURLSessionTask *task, NSDictionary *responseObject) {'
 b=content.index(marker,a)+len(marker)
