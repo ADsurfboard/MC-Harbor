@@ -21,7 +21,7 @@ static NSLock *lock;
         NSString *version=mirror ? @"../other-instance":@"1.20.1";
         text=[NSString stringWithFormat:@"{\"versions\":[{\"id\":\"%@\",\"type\":\"release\",\"url\":\"https://piston-meta.mojang.com/version.json\"}],\"latest\":{\"release\":\"%@\",\"snapshot\":\"%@\"}}",version,version,version];
     }
-    if ([path hasSuffix:@"maven-metadata.xml"]) text=mirror ? @"<broken>":@"<metadata><versioning><versions><version>1.0</version></versions></versioning></metadata>";
+    if ([path hasSuffix:@"maven-metadata.xml"]) text=mirror ? @"<html><body>Temporary service page</body></html>":@"<metadata><versioning><versions><version>1.0</version></versions></versioning></metadata>";
     if ([path hasSuffix:@"entity.xml"]) text=@"<!DOCTYPE x [<!ENTITY payload 'should not expand'>]><x>&payload;</x>";
     NSData *data=[text dataUsingEncoding:NSUTF8StringEncoding];
     NSString *length=[path hasSuffix:@"oversize"] ? @"8388609":@(data.length).stringValue;

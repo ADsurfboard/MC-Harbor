@@ -72,6 +72,8 @@ static BOOL HBRManifestIsUsable(id object) {
 @property NSURLSessionDataTask *task;
 @property NSMutableData *bytes;
 @property NSError *failure;
+@property NSMutableArray<NSString *> *xmlPath;
+@property BOOL hasMavenVersion;
 @property(copy) void (^completion)(id,NSError *);
 - (void)start;
 @end
@@ -106,8 +108,14 @@ static BOOL HBRManifestIsUsable(id object) {
     error=self.failure ?: error;id object=nil;
     if (!error) {
         if (self.format==HBRMetadataXML) {
-            NSXMLParser *parser=[[NSXMLParser alloc] initWithData:self.bytes];parser.shouldResolveExternalEntities=NO;parser.delegate=self;
-            if ([parser parse]) object=[self.bytes copy];else error=parser.parserError ?: HBRMetadataError(@"加载器 XML 元数据格式无效。");
+            self.xmlPath=[NSMutableArray new];
+            self.hasMavenVersion=NO;
+            NSXMLParser *parser=[[NSXMLParser alloc] initWithData:self.bytes];
+            parser.shouldResolveExternalEntities=NO;
+            parser.delegate=self;
+            if ([parser parse] && self.hasMavenVersion) object=[self.bytes copy];
+            else error=parser.parserError ?: HBRMetadataError(@"加载器 XML 缺少 Maven 版本列表。");
+            self.xmlPath=nil;
         } else {
             object=[NSJSONSerialization JSONObjectWithData:self.bytes options:0 error:&error];
             Class expected=self.format==HBRMetadataArray ? NSArray.class:NSDictionary.class;
@@ -128,6 +136,21 @@ static BOOL HBRManifestIsUsable(id object) {
 }
 - (void)parser:(NSXMLParser *)parser foundExternalEntityDeclarationWithName:(NSString *)name publicID:(NSString *)publicID systemID:(NSString *)systemID { [parser abortParsing]; }
 - (void)parser:(NSXMLParser *)parser foundInternalEntityDeclarationWithName:(NSString *)name value:(NSString *)value { [parser abortParsing]; }
+- (void)parser:(NSXMLParser *)parser didStartElement:(NSString *)name namespaceURI:(NSString *)uri
+ qualifiedName:(NSString *)qualified attributes:(NSDictionary<NSString *,NSString *> *)attributes {
+    if ((!self.xmlPath.count && ![name isEqual:@"metadata"]) || self.xmlPath.count>=32) {
+        [parser abortParsing];
+        return;
+    }
+    [self.xmlPath addObject:name];
+}
+- (void)parser:(NSXMLParser *)parser foundCharacters:(NSString *)text {
+    if (!self.hasMavenVersion && [self.xmlPath isEqual:@[@"metadata",@"versioning",@"versions",@"version"]] &&
+        [text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet].length) self.hasMavenVersion=YES;
+}
+- (void)parser:(NSXMLParser *)parser didEndElement:(NSString *)name namespaceURI:(NSString *)uri qualifiedName:(NSString *)qualified {
+    [self.xmlPath removeLastObject];
+}
 - (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task willPerformHTTPRedirection:(NSHTTPURLResponse *)response newRequest:(NSURLRequest *)request completionHandler:(void (^)(NSURLRequest *))done {
     NSURL *url=request.URL;
     BOOL valid=++self.redirects<=6 && [url.scheme.lowercaseString isEqual:@"https"] && !url.user && !url.password && (!url.port || url.port.integerValue==443);
