@@ -289,6 +289,31 @@ for batch in ('libTasks','assetTasks'):
     content=swap(content,'[%s makeObjectsPerformSelector:@selector(resume)];'%batch,'for (NSURLSessionDownloadTask *queued in %s) HBRStartPublicTransfer(queued);'%batch)
 content=swap(content,'    configuration.timeoutIntervalForRequest = 86400;','    configuration.timeoutIntervalForRequest = 86400;\n    configuration.HTTPMaximumConnectionsPerHost = 16;')
 content='#import "HarborPublicTransfer.h"\n'+content
+content=swap(content, '''        versionStr = getPrefObject(@"internal.latest_version.snapshot");
+    }
+
+    NSString *path''','''        versionStr = getPrefObject(@"internal.latest_version.snapshot");
+    }
+    if (![versionStr isKindOfClass:NSString.class] || !versionStr.length) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self finishDownloadWithErrorString:@"还没有可用的 Minecraft 版本索引。请检查网络，等版本索引载入后再启动。"];
+        });
+        return;
+    }
+
+    NSString *path''')
+content=swap(content, '''            NSArray *libParts = [name componentsSeparatedByString:@":"];
+            artifact[@"path"]''','''            NSArray *libParts = [name componentsSeparatedByString:@":"];
+            if (libParts.count < 3) {
+                [self finishDownloadWithErrorString:@"加载器库坐标缺少版本，已停止下载。"];
+                return nil;
+            }
+            artifact[@"path"]''')
+content=swap(content, '            artifact[@"sha1"] = library[@"checksums"][0];','''            NSArray *checksums = [library[@"checksums"] isKindOfClass:NSArray.class] ? library[@"checksums"] : nil;
+            artifact[@"sha1"] = checksums.firstObject;''')
+content=swap(content, '            NSArray *assetTasks = [self downloadClientAssets];', '''            if (self.progress.cancelled) return;
+            NSArray *assetTasks = [self downloadClientAssets];
+            if (self.progress.cancelled) return;''')
 download.write_text(content);patches.append({'file':'Natives/MinecraftResourceDownloadTask.m','publicMirrorTransfers':True})
 
 # Version lists and loader metadata use the same mirror order and fallback.
@@ -364,7 +389,7 @@ replace('Natives/LauncherNavigationController.m', '        [self.task downloadMo
         else [self.task downloadModpackFromAPI:notification.object detail:userInfo[@"detail"] atIndex:[userInfo[@"index"] unsignedLongValue]];''')
 # Explicit KVO ownership prevents a finished/cancelled task's queued progress
 # callbacks from completing a later import or observing a released object.
-replace('Natives/LauncherNavigationController.m','@property(nonatomic) MinecraftResourceDownloadTask* task;', '@property NSProgress *harborObservedProgress;\n@property(nonatomic) MinecraftResourceDownloadTask* task;')
+replace('Natives/LauncherNavigationController.m','@property(nonatomic) MinecraftResourceDownloadTask* task;', '@property NSProgress *harborObservedProgress;\n@property(nonatomic, strong) dispatch_source_t harborJITWait;\n@property(nonatomic) MinecraftResourceDownloadTask* task;')
 replace('Natives/LauncherNavigationController.m', '''            self.progressViewMain.observedProgress = self.task.progress;
             [self.task.progress addObserver:self
                 forKeyPath:@"fractionCompleted"
@@ -377,6 +402,7 @@ replace('Natives/LauncherNavigationController.m', '- (void)receiveNotification:(
     if (progress) [progress addObserver:self forKeyPath:@"fractionCompleted" options:NSKeyValueObservingOptionInitial context:ProgressObserverContext];
 }
 - (void)dealloc {
+    if (_harborJITWait) dispatch_source_cancel(_harborJITWait);
     if (_harborObservedProgress) [_harborObservedProgress removeObserver:self forKeyPath:@"fractionCompleted" context:ProgressObserverContext];
     [NSNotificationCenter.defaultCenter removeObserver:self];
 }
@@ -392,6 +418,57 @@ replace('Natives/LauncherNavigationController.m', '''    dispatch_async(dispatch
         if (object!=self.harborObservedProgress || !self.task || self.task.progress.cancelled) return;
         self.progressText.text = progress.localizedAdditionalDescription;''')
 replace('Natives/LauncherNavigationController.m', '        self.progressViewMain.observedProgress = nil;', '        [self harborObserveProgress:nil];')
+replace('Natives/LauncherNavigationController.m', '''- (void)invokeAfterJITEnabled:(void(^)(void))handler {
+    localVersionList = remoteVersionList = nil;''', '''- (void)harborStopWaitingForJIT {
+    if (self.harborJITWait) {
+        dispatch_source_cancel(self.harborJITWait);
+        self.harborJITWait = nil;
+    }
+    self.progressText.text = nil;
+    [ALTServerManager.sharedManager stopDiscovering];
+}
+
+- (void)invokeAfterJITEnabled:(void(^)(void))handler {
+    if (!handler || self.harborJITWait) return;
+    void (^launch)(void) = ^{
+        localVersionList = remoteVersionList = nil;
+        handler();
+    };''')
+navigation=ENGINE/'Natives/LauncherNavigationController.m';content=navigation.read_text()
+a=content.index('- (void)invokeAfterJITEnabled:');b=content.index('\n#pragma mark - UIPopoverPresentationControllerDelegate', a)
+section=content[a:b]
+section=swap(section,'    BOOL isLiveContainer = getenv("LC_HOME_PATH") != NULL;\n','')
+section=swap(section,'        handler();\n        return;','        launch();\n        return;',2)
+section=section[:section.index('/* TODO:')]+'''    __weak typeof(self) weakSelf = self;
+    [alert addAction:[UIAlertAction actionWithTitle:@"取消启动" style:UIAlertActionStyleCancel handler:^(UIAlertAction *action) {
+        [weakSelf harborStopWaitingForJIT];
+    }]];
+    [self presentViewController:alert animated:YES completion:nil];
+
+    dispatch_source_t timer=dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
+    self.harborJITWait=timer;
+    NSTimeInterval deadline=NSProcessInfo.processInfo.systemUptime+120;
+    dispatch_source_set_timer(timer, dispatch_time(DISPATCH_TIME_NOW, 500*NSEC_PER_MSEC), 350*NSEC_PER_MSEC, 100*NSEC_PER_MSEC);
+    __weak UIAlertController *weakAlert=alert;
+    dispatch_source_set_event_handler(timer, ^{
+        typeof(self) self=weakSelf;
+        if (!self || !self.harborJITWait) return;
+        if (UIApplication.sharedApplication.applicationState != UIApplicationStateActive) return;
+        BOOL authorized=isJITEnabled(false);
+        if (!authorized && NSProcessInfo.processInfo.systemUptime < deadline) return;
+        [self harborStopWaitingForJIT];
+        void (^finish)(void)=^{
+            if (authorized) launch();
+            else showDialog(@"等待 JIT 超时", @"本次启动已结束。请在设备上完成 JIT 授权后重新点启动。");
+        };
+        UIAlertController *visible=weakAlert;
+        if (visible.presentingViewController) [visible dismissViewControllerAnimated:YES completion:finish];
+        else finish();
+    });
+    dispatch_resume(timer);
+}
+'''
+navigation.write_text(content[:a]+section+content[b:])
 modrinth=ENGINE/'Natives/installer/modpack/ModrinthAPI.m';content=modrinth.read_text()
 a=content.index('- (void)downloader:');b=content.index('\n@end',a)
 content=content[:a]+(IOS/'Native/HarborModrinthInstall.inc').read_text()+content[b:]

@@ -30,6 +30,39 @@ NSArray<NSURL *> *HBRPublicDownloadURLs(NSURL *original, NSString *route) {
 static NSError *HBRMetadataError(NSString *message) {
     return [NSError errorWithDomain:@"net.morben.harbor.publicdownload" code:1 userInfo:@{NSLocalizedDescriptionKey:message}];
 }
+static BOOL HBRVersionIDIsSafe(id value) {
+    if (![value isKindOfClass:NSString.class] || [value length]==0 || [value length]>160 ||
+        [value isEqual:@"."] || [value isEqual:@".."]) return NO;
+    static NSCharacterSet *disallowed;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        // Mojang's historical "1.14 Pre-Release 5" and April Fools versions
+        // include spaces in their actual, single-component directory names.
+        disallowed=[NSCharacterSet characterSetWithCharactersInString:@"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._+- "].invertedSet;
+    });
+    return [value rangeOfCharacterFromSet:disallowed].location==NSNotFound &&
+        ![value hasPrefix:@" "] && ![value hasSuffix:@" "];
+}
+
+static BOOL HBRManifestIsUsable(id object) {
+    if (![object isKindOfClass:NSDictionary.class]) return NO;
+    NSArray *versions=object[@"versions"];
+    NSDictionary *latest=object[@"latest"];
+    if (![versions isKindOfClass:NSArray.class] || versions.count==0 || versions.count>10000 ||
+        ![latest isKindOfClass:NSDictionary.class]) return NO;
+    NSMutableSet *ids=[NSMutableSet setWithCapacity:versions.count];
+    for (id entry in versions) {
+        if (![entry isKindOfClass:NSDictionary.class] || !HBRVersionIDIsSafe(entry[@"id"]) ||
+            [ids containsObject:entry[@"id"]] || ![entry[@"type"] isKindOfClass:NSString.class] ||
+            ![entry[@"url"] isKindOfClass:NSString.class]) return NO;
+        NSURL *url=[NSURL URLWithString:entry[@"url"]];
+        if (![url.scheme isEqual:@"https"] || !url.host.length || url.user || url.password ||
+            (url.port && url.port.integerValue!=443)) return NO;
+        [ids addObject:entry[@"id"]];
+    }
+    return HBRVersionIDIsSafe(latest[@"release"]) && [ids containsObject:latest[@"release"]] &&
+        HBRVersionIDIsSafe(latest[@"snapshot"]) && [ids containsObject:latest[@"snapshot"]];
+}
 @interface HBRPublicMetadata : NSObject<NSURLSessionDataDelegate,NSXMLParserDelegate>
 @property NSArray<NSURL *> *urls;
 @property NSUInteger attempt,redirects;
@@ -83,10 +116,10 @@ static NSError *HBRMetadataError(NSString *message) {
                 if (![row isKindOfClass:NSDictionary.class] || ![row[@"version"] isKindOfClass:NSString.class]) { error=HBRMetadataError(@"加载器版本条目无效。");break; }
             }
             if (!error && [task.originalRequest.URL.path containsString:@"version_manifest"]) {
-                if (![object[@"versions"] isKindOfClass:NSArray.class] || ![object[@"latest"] isKindOfClass:NSDictionary.class]) error=HBRMetadataError(@"Minecraft 版本索引不完整。");
+                if (!HBRManifestIsUsable(object)) error=HBRMetadataError(@"Minecraft 版本索引不完整或包含无效版本路径。");
             }
             if (!error && [task.originalRequest.URL.path hasSuffix:@"/profile/json"]) {
-                if (![object[@"id"] isKindOfClass:NSString.class] || ![object[@"libraries"] isKindOfClass:NSArray.class] || ![object[@"mainClass"] isKindOfClass:NSString.class]) error=HBRMetadataError(@"加载器启动配置不完整。");
+                if (!HBRVersionIDIsSafe(object[@"id"]) || ![object[@"libraries"] isKindOfClass:NSArray.class] || ![object[@"mainClass"] isKindOfClass:NSString.class]) error=HBRMetadataError(@"加载器启动配置不完整。");
             }
         }
     }

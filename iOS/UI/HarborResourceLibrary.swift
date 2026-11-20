@@ -113,7 +113,7 @@ struct HarborResourceSettings: View {
                     Text("国内镜像优先").tag(ResourceRoute.domesticFirst.rawValue)
                     Text("官方优先，镜像备用").tag(ResourceRoute.officialFirst.rawValue)
                 }.accessibilityIdentifier("resources.route")
-                Text("默认优先 MCIM 国内镜像，Modrinth 和资源文件失败后尝试原站。CurseForge 的公开镜像用于读取资料；作者未开放直接下载的文件会提供原项目链接，不会猜测下载地址。")
+                Text("游戏和支持镜像的加载器使用 BMCLAPI，实例资源使用 MCIM。两处都按所选顺序尝试来源。未开放直接下载的 CurseForge 文件可前往项目原页。")
                     .font(.footnote).foregroundStyle(.secondary)
             }
             Section("中文搜索与简介") {
