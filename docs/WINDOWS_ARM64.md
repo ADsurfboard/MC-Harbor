@@ -58,6 +58,8 @@ python tools/check-windows-backend.py --directory build/MC-Harbor-Windows-arm64 
 
 平台测试使用生产环境选择代码和真实子进程管道，验证模块化后台、x64 游戏后台的分流以及缺失兼容环境时的错误。文件检查读取 PE 头，逐项验证主程序、.NET、WinUI、Java、Python 与本地 DLL；只允许两个明确隔离的 x64 目录以及 pip 自带的脚本模板包含兼容架构。
 
+Windows App SDK 的 `Microsoft.Windows.Workloads.Resources_ec.dll` 是 ARM64X 双 ABI 组件，会同时出现在 x64 发行目录中。文件检查读取混合元数据和 ARM64X 动态重定位表识别它；不会仅凭文件名放行普通 ARM64 DLL。[ARM64X 的加载规则见微软说明](https://learn.microsoft.com/en-us/windows/arm/arm64x-pe)。
+
 持续构建同时包含 x64 `windows-2022` 与原生 ARM64 `windows-11-arm`。ARM64 后台检查执行实际打包的原生 Java、兼容 Java 和空资源扫描。自动检查不代表已验证 GUI、真实账号登录、Minecraft 显卡及模组、联网房间、模型推理速度和安装升级流程；这些仍须使用目标设备验收。
 
 ## 官方参考

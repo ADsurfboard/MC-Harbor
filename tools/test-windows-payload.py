@@ -67,6 +67,29 @@ class ArchitectureChecks(unittest.TestCase):
         self.assertEqual(payload.expected_machines(base + "w64-arm.exe", "arm64"), {payload.ARM64})
         self.assertEqual(payload.expected_machines(base + "foreign.exe", "arm64"), {payload.AMD64})
 
+    def test_arm64x_requires_hybrid_metadata_and_arm64x_relocations(self):
+        data = bytearray(image(payload.ARM64)) + bytearray(2560)
+        struct.pack_into("<H", data, 84, 240)
+        struct.pack_into("<H", data, 88, 0x20B)
+        struct.pack_into("<Q", data, 88 + 24, 0x180000000)
+        struct.pack_into("<II", data, 88 + 112 + 10 * 8, 0x2000, 320)
+        struct.pack_into("<IIII", data, 88 + 240 + 8, 3072, 0x2000, 3072, 512)
+        struct.pack_into("<I", data, 512, 320)
+        struct.pack_into("<Q", data, 512 + 200, 0x180002200)
+        struct.pack_into("<IH", data, 512 + 224, 1024, 1)
+        struct.pack_into("<IIQI", data, 1536, 1, 20, 6, 8)
+        with tempfile.TemporaryDirectory(prefix="harbor-hybrid-check-") as folder:
+            path = Path(folder) / "fixture.dll"
+            path.write_bytes(data)
+            self.assertTrue(payload.is_arm64x(path))
+            struct.pack_into("<Q", data, 1536 + 8, 5)
+            path.write_bytes(data)
+            self.assertFalse(payload.is_arm64x(path))
+            struct.pack_into("<Q", data, 1536 + 8, 6)
+            struct.pack_into("<Q", data, 512 + 200, 0)
+            path.write_bytes(data)
+            self.assertFalse(payload.is_arm64x(path))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -57,6 +57,58 @@ def expected_machines(relative: str, architecture: str) -> set[int]:
     return {ARM64, ARM64X} if architecture == "arm64" else {AMD64}
 
 
+def is_arm64x(path: Path) -> bool:
+    """Recognize ARM64X's load config and type-6 dynamic relocation table."""
+    data = path.read_bytes()
+    offset = struct.unpack_from("<I", data, 0x3C)[0]
+    if struct.unpack_from("<H", data, offset + 4)[0] != ARM64:
+        return False  # x64-header ARM64EC alone is not dual-ABI ARM64X.
+    sections = struct.unpack_from("<H", data, offset + 6)[0]
+    optional_size = struct.unpack_from("<H", data, offset + 20)[0]
+    start = offset + 24
+    optional = data[start:start + optional_size]
+    if len(optional) < 200 or struct.unpack_from("<H", optional)[0] != 0x20B:
+        return False
+    table = [struct.unpack_from("<IIII", data, start + optional_size + index * 40 + 8) for index in range(sections)]
+    def rva_offset(rva, length):
+        for virtual_size, virtual_address, raw_size, raw in table:
+            if virtual_address <= rva and rva + length <= virtual_address + min(virtual_size, raw_size):
+                position = raw + rva - virtual_address
+                if position + length <= len(data):
+                    return position
+        return None
+    config_rva, config_size = struct.unpack_from("<II", optional, 112 + 10 * 8)
+    config = rva_offset(config_rva, 232)
+    if config is None or config_size < 232 or struct.unpack_from("<I", data, config)[0] < 232:
+        return False
+    metadata = struct.unpack_from("<Q", data, config + 200)[0]
+    image_base = struct.unpack_from("<Q", optional, 24)[0]
+    if metadata < image_base or rva_offset(metadata - image_base, 4) is None:
+        return False
+    relocation_offset, relocation_section = struct.unpack_from("<IH", data, config + 224)
+    if not 1 <= relocation_section <= sections:
+        return False
+    _, _, raw_size, raw = table[relocation_section - 1]
+    position = raw + relocation_offset
+    limit = min(len(data), raw + raw_size)
+    if position + 8 > limit:
+        return False
+    version, size = struct.unpack_from("<II", data, position)
+    end = position + 8 + size
+    if version != 1 or end > limit:
+        return False
+    position += 8
+    while position + 12 <= end:
+        symbol, block_size = struct.unpack_from("<QI", data, position)
+        position += 12
+        if not block_size or position + block_size > end:
+            return False
+        if symbol == 6:  # IMAGE_DYNAMIC_RELOCATION_ARM64X
+            return True
+        position += block_size
+    return False
+
+
 def check(root: Path, architecture: str) -> dict:
     expected = ARM64 if architecture == "arm64" else AMD64
     critical = ["MC Harbor.exe", "coreclr.dll", "Microsoft.UI.Xaml.dll", "Runtime/bin/java.exe", "Runtime/bin/server/jvm.dll"]
@@ -79,7 +131,7 @@ def check(root: Path, architecture: str) -> dict:
         raise ValueError("Runtime manifest does not match the application architecture.")
     if metadata.get("javaFxMode") != ("modules" if architecture == "arm64" else "classpath"):
         raise ValueError("JavaFX mode does not match its architecture.")
-    native = managed = 0
+    native = managed = hybrid = 0
     errors = []
     for path in root.rglob("*"):
         if not path.is_file() or path.suffix.casefold() not in {".exe", ".dll", ".pyd"}:
@@ -89,6 +141,9 @@ def check(root: Path, architecture: str) -> dict:
             machine, any_cpu = pe_info(path)
             if any_cpu:
                 managed += 1
+            elif relative.casefold() == "microsoft.windows.workloads.resources_ec.dll" and is_arm64x(path):
+                # The official SDK ships a dual-ABI ARM64X component in x64 too.
+                hybrid += 1
             elif machine not in expected_machines(relative, architecture):
                 errors.append(f"{relative}: unexpected machine 0x{machine:04x}")
             else:
@@ -97,7 +152,7 @@ def check(root: Path, architecture: str) -> dict:
             errors.append(f"{relative}: {error}")
     if errors:
         raise ValueError("\n".join(errors))
-    return {"architecture": architecture, "nativeFiles": native, "anyCpuAssemblies": managed,
+    return {"architecture": architecture, "nativeFiles": native, "anyCpuAssemblies": managed, "arm64xFiles": hybrid,
             "gameArchitecture": "x64", "translationPythonArchitecture": "x64"}
 
 
