@@ -62,6 +62,8 @@ Windows App SDK 的 `Microsoft.Windows.Workloads.Resources_ec.dll` 是 ARM64X �
 
 持续构建同时包含 x64 `windows-2022` 与原生 ARM64 `windows-11-arm`。ARM64 后台检查执行实际打包的原生 Java、兼容 Java 和空资源扫描。自动检查不代表已验证 GUI、真实账号登录、Minecraft 显卡及模组、联网房间、模型推理速度和安装升级流程；这些仍须使用目标设备验收。
 
+ARM64 构建机另外使用实际 x64 Python 调用生产环境的依赖安装逻辑，按固定哈希安装并导入 CTranslate2、NumPy、SentencePiece 和 PyYAML，检查 INT8 能力与基础数值运算。该检查不下载翻译模型，不代表已测量真实翻译速度；运行时仍需要支持对应兼容指令的 Windows 更新及硬件。
+
 ## 官方参考
 
 - [BellSoft 支持平台](https://bell-sw.com/pages/supported-configurations/) 与 [Liberica Java 21.0.13.1+5](https://github.com/bell-sw/Liberica/releases/tag/21.0.13.1%2B5)

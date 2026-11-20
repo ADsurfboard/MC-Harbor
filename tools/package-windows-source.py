@@ -4,8 +4,10 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
+import uuid
 
 from importlib.util import module_from_spec, spec_from_file_location
 import sys
@@ -47,7 +49,15 @@ def main() -> None:
         if findings:
             privacy.print_findings(findings)
             raise SystemExit("Exported archive failed privacy checks; no archive was published.")
-        archive.replace(destination)
+        # TemporaryDirectory uses a private Windows ACL. A newly created file in
+        # the output directory inherits its shared ACL before the atomic rename.
+        shared_stage = output / f".source-{uuid.uuid4().hex}.partial"
+        try:
+            with archive.open("rb") as origin, shared_stage.open("xb") as target:
+                shutil.copyfileobj(origin, target)
+            shared_stage.replace(destination)
+        finally:
+            shared_stage.unlink(missing_ok=True)
     print(f"Source archive: {destination.name}, {count} files, commit {revision}")
 
 
