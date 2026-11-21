@@ -59,7 +59,8 @@ $required = @(
     'MC Harbor.pri', 'App.xbf', 'MainWindow.xbf', 'Controls\WallpaperLibraryDialog.xbf',
     'coreclr.dll', 'Microsoft.UI.Xaml.dll',
     'Assets\App.ico', 'Assets\Icon.png', 'Assets\Services.json', 'Assets\Skins\wide\steve.png',
-    'Assets\Fonts\FluentSystemIcons-Regular.ttf', 'Backend\Backend.jar', 'Backend\HMCLCore.jar',
+    'Assets\Fonts\FluentSystemIcons-Regular.ttf', 'Assets\Fonts\SourceHanSerifCN-Regular.otf',
+    'Assets\Fonts\SourceHanSerifCN-Bold.otf', 'Backend\Backend.jar', 'Backend\HMCLCore.jar',
     'Backend\javafx\javafx-base.jar', 'Backend\javafx\javafx-controls.jar', 'Backend\javafx\javafx-graphics.jar',
     'Runtime\bin\java.exe', 'Runtime\bin\server\jvm.dll', 'Translation\worker.py',
     'Translation\requirements.txt', 'Translation\Python\python.exe'

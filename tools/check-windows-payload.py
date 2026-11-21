@@ -122,7 +122,8 @@ def check(root: Path, architecture: str) -> dict:
     if pe_info(root / "Translation/Python/python.exe")[0] != AMD64:
         raise ValueError("The pinned CTranslate2 compatibility worker requires x64 Python.")
     required = ["App.xbf", "MainWindow.xbf", "MC Harbor.pri", "Controls/WallpaperLibraryDialog.xbf",
-                "Backend/Backend.jar", "Backend/HMCLCore.jar", "Backend/runtime.json", "Assets/App.ico"]
+                "Backend/Backend.jar", "Backend/HMCLCore.jar", "Backend/runtime.json", "Assets/App.ico",
+                "Assets/Fonts/SourceHanSerifCN-Regular.otf", "Assets/Fonts/SourceHanSerifCN-Bold.otf"]
     for name in required:
         if not (root / name).is_file():
             raise ValueError(f"Missing publish resource: {name}")

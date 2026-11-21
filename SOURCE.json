@@ -1,7 +1,7 @@
 {
   "version": "1.7.1",
   "windows": {
-    "version": "1.7.1",
+    "version": "1.7.1.1",
     "architectures": ["x64", "arm64"],
     "framework": "WinUI 3 / .NET 10",
     "upstreamBaseline": "2e101df72dd97618f5cdab44bf9145c830867d1f",

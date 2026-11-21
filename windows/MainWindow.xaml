@@ -432,7 +432,7 @@
                                             <Button x:Name="ApplyDraftSkinButton" Style="{StaticResource HarborPill}"
                                                     Content="应用皮肤" Click="ApplySkinDraft_Click" />
                                         </StackPanel>
-                                        <TextBlock x:Name="AccountSkinUuid" FontFamily="Cascadia Mono" FontSize="10" Opacity="0.52"
+                                        <TextBlock x:Name="AccountSkinUuid" FontSize="10" Opacity="0.52"
                                                    TextTrimming="CharacterEllipsis" IsTextSelectionEnabled="True" />
                                     </StackPanel>
                                 </Grid>
@@ -463,7 +463,7 @@
                                                 <TextBlock x:Name="FeaturedGameLoader" FontSize="12" Opacity="0.72" />
                                                 <TextBlock x:Name="FeaturedGameName" FontSize="38" FontWeight="SemiBold"
                                                            TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
-                                                <TextBlock x:Name="FeaturedGameVersion" FontFamily="Cascadia Mono" FontSize="12" Opacity="0.72" />
+                                                <TextBlock x:Name="FeaturedGameVersion" FontSize="12" Opacity="0.72" />
                                                 <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
                                                     <Button x:Name="FeaturedGameLaunch" Style="{StaticResource HarborProminentPill}" Content="启动游戏" Click="Launch_Click" />
                                                     <Button x:Name="FeaturedGameManage" Style="{StaticResource HarborPill}" Content="管理实例" Click="ManageMods_Click" />
@@ -568,7 +568,7 @@
                                                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
                                                         <StackPanel Spacing="4" VerticalAlignment="Center">
                                                             <TextBlock Text="{Binding Version}" FontWeight="SemiBold" FontSize="17" />
-                                                            <TextBlock Text="{Binding ReleaseDate}" FontFamily="Cascadia Mono" FontSize="11" Opacity="0.65" />
+                                                            <TextBlock Text="{Binding ReleaseDate}" FontSize="11" Opacity="0.65" />
                                                         </StackPanel>
                                                         <Button Grid.Column="1" Style="{StaticResource HarborProminentPill}" Content="安装"
                                                                 VerticalAlignment="Center" Click="InstallVersion_Click" />

@@ -24,7 +24,7 @@
     <RootNamespace>MCHarbor.Windows</RootNamespace>
     <AssemblyName>MC Harbor</AssemblyName>
     <ApplicationTitle>MC Harbor</ApplicationTitle>
-    <Version>1.7.1</Version>
+    <Version>1.7.1.1</Version>
     <Deterministic>true</Deterministic>
     <PathMap>$(MSBuildProjectDirectory)=/_/windows</PathMap>
     <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
@@ -43,6 +43,7 @@
     <Content Include="..\Assets\Services.json" Link="Assets\Services.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\Assets\Voice\*.mp3" Link="Assets\Voice\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\Assets\Fonts\FluentSystemIcons-Regular.ttf" Link="Assets\Fonts\FluentSystemIcons-Regular.ttf" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\Assets\Fonts\SourceHanSerifCN-*.otf" Link="Assets\Fonts\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="..\build\Interface.soundbank" Link="Assets\Audio\Interface.soundbank" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\build\Interface.soundbank')" />
     <Content Include="..\Assets\Loaders\*.png" Link="Assets\Loaders\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\vendor\HMCLCore.jar" Link="Backend\HMCLCore.jar" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\vendor\HMCLCore.jar')" />

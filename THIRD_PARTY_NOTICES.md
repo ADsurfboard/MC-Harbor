@@ -7,6 +7,7 @@ Windows ARM64 bundles BellSoft Liberica 21.0.13.1+5 with native JavaFX modules a
 Welcome announcement: user-provided ElevenLabs Clara MP3, retained byte-for-byte and played offline without rate or timbre modification.
 Interface sounds by JDSherbert — https://jdsherbert.itch.io/ultimate-ui-sfx-pack. The macOS and Windows apps embed the free pack's MP3 cues in a finished-app soundbank under the author license. Raw source files are excluded from the app package and source archive; the author's required visible credit is shown in the Windows sound settings. No standalone redistribution. No Steam sound is sampled.
 Fluent System Icons font by Microsoft — https://github.com/microsoft/fluentui-system-icons, MIT License; license text retained in Licenses/Fluent-System-Icons-MIT.txt.
+Source Han Serif CN by Adobe and contributors — https://github.com/adobe-fonts/source-han-serif, SIL Open Font License 1.1; license text retained in Licenses/Source-Han-Serif-OFL.txt.
 Minecraft skin preview: skinview3d 3.4.2 by bs-community (MIT), with Three.js and skinview-utils; license texts retained in SkinViewer.
 Original folded h design developed from the user reference and imagegen; production transparent icon rendered from native vector paths. Design history included in corresponding source.
 Localization metadata: xfl03/I18nUpdateMod3 (AGPL-3.0); license retained in Localization/I18nUpdateMod.LICENSE.

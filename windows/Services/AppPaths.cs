@@ -8,7 +8,7 @@ internal static class AppPaths
     private static Dictionary<string, string>? _preferences;
 
     public static string ApplicationDirectory { get; } = AppContext.BaseDirectory;
-    public static string Version { get; } = typeof(AppPaths).Assembly.GetName().Version?.ToString(3) ?? "1.7.1";
+    public static string Version { get; } = typeof(AppPaths).Assembly.GetName().Version?.ToString(4) ?? "1.7.1.1";
     public static string DataDirectory { get; } = ResolveDataDirectory();
     public static string DefaultGameRoot { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".minecraft");
