@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "id": "ferritecore",
+  "version": "6.0.1",
+  "name": "FerriteCore",
+  "description": "Reduces memory usage",
+  "icon": "logo.png",
+  "authors": [
+    "malte0811"
+  ],
+  "contact": {
+    "issues": "https://github.com/malte0811/FerriteCore/issues",
+    "source": "https://github.com/malte0811/FerriteCore",
+    "homepage": "https://www.curseforge.com/minecraft/mc-mods/ferritecore-fabric"
+  },
+  "license": "MIT",
+  "environment": "*",
+  "depends": {
+    "fabricloader": ">=0.14.21",
+    "minecraft": ">=1.20 <1.21"
+  },
+  "breaks": {
+    "hydrogen": "<=0.3"
+  },
+  "mixins": [
+    "ferritecore.blockstatecache.mixin.json",
+    "ferritecore.dedupmultipart.mixin.json",
+    "ferritecore.fastmap.mixin.json",
+    "ferritecore.mrl.mixin.json",
+    "ferritecore.predicates.mixin.json",
+    "ferritecore.dedupbakedquad.mixin.json",
+    "ferritecore.threaddetec.mixin.json",
+    "ferritecore.modelsides.mixin.json",
+    "ferritecore.fabric.mixin.json"
+  ],
+  "custom": {
+    "lithium:options": {
+      "mixin.alloc.blockstate": false
+    }
+  }
+}

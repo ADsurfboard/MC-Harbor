@@ -178,12 +178,23 @@ import XCTest
         restored.tap(); XCTAssertEqual(restored.value as? String, original)
     }
     func testModFolderForegroundEmptyStateAndPersistence() throws {
-        let app = XCUIApplication(); app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"; app.launch()
+        let app = XCUIApplication()
+        app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"
+        app.launchEnvironment["HARBOR_FOLDER_ART_FIXTURE"] = "1"
+        app.launch()
         func openFolders() {
             let tab = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "模组夹")).firstMatch
             XCTAssertTrue(tab.waitForExistence(timeout: 15)); tab.tap()
         }
         openFolders()
+        let populated = app.buttons["folder.open.真实模组图标"]
+        XCTAssertTrue(populated.waitForExistence(timeout: 15))
+        capture("folder-real-artwork-gallery")
+        populated.tap()
+        XCTAssertTrue(app.staticTexts["FerriteCore"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Fabric API"].waitForExistence(timeout: 10))
+        capture("folder-real-artwork-list")
+        app.buttons["完成"].tap()
         let create = app.buttons["folder.new"]
         XCTAssertTrue(create.waitForExistence(timeout: 15)); XCTAssertGreaterThanOrEqual(create.frame.height, 44); create.tap()
         let title = "Harbor QA " + String(UUID().uuidString.prefix(6))
@@ -245,14 +256,44 @@ import XCTest
         capture("coverflow-horizontal-selection")
         XCUIDevice.shared.orientation = .landscapeLeft
         waitForLandscape(app)
-        capture("coverflow-landscape-before-scroll")
-        if !previous.isHittable { app.swipeUp() }
-        capture("coverflow-landscape-after-scroll")
-        XCTAssertTrue(previous.isHittable)
+        XCTAssertTrue(flow.waitForExistence(timeout: 10))
+        XCTAssertGreaterThanOrEqual(flow.frame.width, app.frame.width * 0.74)
+        XCTAssertFalse(previous.exists)
+        XCTAssertFalse(app.buttons["启动游戏"].exists)
         assertNeighborCovers(flow)
-        previous.tap()
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label == %@", "1 / 2")).firstMatch.waitForExistence(timeout: 10))
+        capture("coverflow-landscape-gallery")
+        flow.coordinate(withNormalizedOffset: CGVector(dx: 0.50, dy: 0.50)).tap()
+        let close = app.buttons["library.coverflow.actions.close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["启动游戏"].exists)
+        XCTAssertTrue(app.buttons["实例管理"].exists)
+        capture("coverflow-landscape-instance-actions")
+        close.tap()
+        XCTAssertTrue(flow.waitForExistence(timeout: 10))
+
+        let focusedCover = try XCTUnwrap(flow.cells.allElementsBoundByIndex.min {
+            abs($0.frame.midX - flow.frame.midX) < abs($1.frame.midX - flow.frame.midX)
+        })
+        let pitch = focusedCover.frame.width * 0.90 / flow.frame.width
+        flow.coordinate(withNormalizedOffset: CGVector(dx: 0.33, dy: 0.50)).press(forDuration: 0.08,
+            thenDragTo: flow.coordinate(withNormalizedOffset: CGVector(dx: 0.33 + pitch, dy: 0.50)), withVelocity: .slow, thenHoldForDuration: 0.3)
+        let position = app.staticTexts["library.coverflow.position"]
+        let firstNew = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "1 / 2"), object: position)
+        XCTAssertEqual(XCTWaiter.wait(for: [firstNew], timeout: 10), .completed)
+        let start = flow.coordinate(withNormalizedOffset: CGVector(dx: 0.50, dy: 0.50))
+        start.press(forDuration: 0.55,
+            thenDragTo: flow.coordinate(withNormalizedOffset: CGVector(dx: min(0.91, 0.50 + pitch), dy: 0.50)),
+            withVelocity: .slow, thenHoldForDuration: 0.15)
+        let moved = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "2 / 2"), object: position)
+        XCTAssertEqual(XCTWaiter.wait(for: [moved], timeout: 10), .completed)
+        capture("coverflow-landscape-reordered")
+        app.terminate()
+        app.launch()
+        waitForLandscape(app)
+        XCTAssertTrue(flow.waitForExistence(timeout: 10))
+        XCTAssertEqual(app.staticTexts["library.coverflow.position"].label, "2 / 2")
         XCUIDevice.shared.orientation = .portrait
+        XCTAssertTrue(menu.waitForExistence(timeout: 10))
         menu.tap(); app.buttons["使用列表选择实例"].tap()
         XCTAssertTrue(app.buttons["instance.launch.fabric-example"].waitForExistence(timeout: 10))
         XCTAssertFalse(flow.exists)

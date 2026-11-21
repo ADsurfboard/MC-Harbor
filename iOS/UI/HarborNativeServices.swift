@@ -130,48 +130,24 @@ struct HarborPhoneRoot: View {
     var body: some View {
         TabView {
             NavigationStack {
-                List {
-                    if !coverFlow || verticalSizeClass != .compact {
-                        Section {
-                            HStack(alignment: .center, spacing: coverFlow ? 12 : 16) {
-                                HarborBrandArtwork().frame(width: coverFlow ? 32 : 46, height: coverFlow ? 32 : 46)
-                                VStack(alignment: .leading, spacing: 5) {
-                                    Text("MC Harbor").font(coverFlow || verticalSizeClass == .compact ? .title2.bold() : .largeTitle.bold())
-                                    if !coverFlow && verticalSizeClass != .compact { Text("Minecraft，随身出发。").font(.subheadline).foregroundStyle(.secondary) }
-                                }
-                            }.padding(.vertical, coverFlow || verticalSizeClass == .compact ? 2 : 18).listRowBackground(Color.clear)
+                GeometryReader { geometry in
+                    let immersive = coverFlow && !library.instances.isEmpty && geometry.size.width > geometry.size.height
+                    Group {
+                        if immersive {
+                            instanceCovers(immersive: true)
+                        } else {
+                            gamesList
                         }
                     }
-                    Section("游戏库") {
-                        if let error = library.error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
-                        if library.instances.isEmpty && library.error == nil {
-                            Menu {
-                                Button("安装 Minecraft") { page = .init(name: "install") }
-                                Button("从文件导入 Modrinth 整合包") { page = .init(name: "importPack") }
-                            } label: {
-                                Label("安装 Minecraft 或导入整合包", systemImage: "plus.circle.fill")
-                                    .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading).contentShape(Rectangle())
-                            }.accessibilityIdentifier("library.install.empty")
-                        }
-                        if coverFlow && !library.instances.isEmpty {
-                            HarborCoverFlowLibrary(instances: library.instances,
-                                launch: { page = .init(name: "launch", profile: $0.id) },
-                                manage: { page = .init(name: "instance", profile: $0.id) },
-                                controls: { page = .init(name: "touch", profile: $0.id) })
-                        } else { ForEach(library.instances) { instance in
-                            HarborInstanceCard(instance: instance, compact: verticalSizeClass == .compact,
-                                launch: { page = .init(name: "launch", profile: instance.id) },
-                                manage: { page = .init(name: "instance", profile: instance.id) },
-                                controls: { page = .init(name: "touch", profile: instance.id) })
-                        } }
-                    }
+                    .toolbar(immersive ? .hidden : .visible, for: .navigationBar)
                 }
                 .harborPageBackground()
                 .navigationTitle("游戏").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Button { page = .init(name: "accounts") } label: { Image(systemName: "person.crop.circle").frame(width: 44, height: 44).contentShape(Rectangle()) }
-                            .accessibilityLabel("账号与皮肤")
+                        Button { page = .init(name: "accounts") } label: {
+                            Image(systemName: "person.crop.circle").frame(width: 44, height: 44).contentShape(Rectangle())
+                        }.accessibilityLabel("账号与皮肤")
                     }
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Menu {
@@ -179,10 +155,11 @@ struct HarborPhoneRoot: View {
                             Button("从文件导入 Modrinth 整合包") { page = .init(name: "importPack") }
                             Button("浏览在线整合包") { page = .init(name: "resources") }
                             Button(coverFlow ? "使用列表选择实例" : "使用封面流选择实例") { coverFlow.toggle() }
-                        } label: { Image(systemName: "plus").frame(width: 44, height: 44).contentShape(Rectangle()) }
-                            .accessibilityLabel("安装或导入")
+                        } label: {
+                            Image(systemName: "plus").frame(width: 44, height: 44).contentShape(Rectangle())
+                        }.accessibilityLabel("安装或导入")
                     }
-                }.refreshable { library.refresh() }
+                }
             }.tabItem { Label("游戏", systemImage: "square.stack.3d.up") }
             NavigationStack {
                 HarborResourcesView(model: resources, instances: library.instances) { page = .init(name: $0) }
@@ -291,6 +268,52 @@ struct HarborPhoneRoot: View {
         }
         .task { await HarborWallpaperState.shared.configure(home: services.harborHomeURL); HarborWelcomeAudio.shared.welcome() }
     }
+    private var gamesList: some View {
+        List {
+            if !coverFlow || verticalSizeClass != .compact {
+                Section {
+                    HStack(alignment: .center, spacing: coverFlow ? 12 : 16) {
+                        HarborBrandArtwork().frame(width: coverFlow ? 32 : 46, height: coverFlow ? 32 : 46)
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("MC Harbor").font(coverFlow || verticalSizeClass == .compact ? .title2.bold() : .largeTitle.bold())
+                            if !coverFlow && verticalSizeClass != .compact { Text("Minecraft，随身出发。").font(.subheadline).foregroundStyle(.secondary) }
+                        }
+                    }.padding(.vertical, coverFlow || verticalSizeClass == .compact ? 2 : 18).listRowBackground(Color.clear)
+                }
+            }
+            Section("游戏库") {
+                if let error = library.error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
+                if library.instances.isEmpty && library.error == nil {
+                    Menu {
+                        Button("安装 Minecraft") { page = .init(name: "install") }
+                        Button("从文件导入 Modrinth 整合包") { page = .init(name: "importPack") }
+                    } label: {
+                        Label("安装 Minecraft 或导入整合包", systemImage: "plus.circle.fill")
+                            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading).contentShape(Rectangle())
+                    }.accessibilityIdentifier("library.install.empty")
+                }
+                if coverFlow && !library.instances.isEmpty {
+                    instanceCovers(immersive: false)
+                } else { ForEach(library.instances) { instance in
+                    HarborInstanceCard(instance: instance, compact: verticalSizeClass == .compact,
+                        launch: { page = .init(name: "launch", profile: instance.id) },
+                        manage: { page = .init(name: "instance", profile: instance.id) },
+                        controls: { page = .init(name: "touch", profile: instance.id) })
+                } }
+            }
+        }
+        .harborPageBackground()
+        .refreshable { library.refresh() }
+    }
+
+    private func instanceCovers(immersive: Bool) -> some View {
+        HarborCoverFlowLibrary(instances: library.instances,
+            launch: { page = .init(name: "launch", profile: $0.id) },
+            manage: { page = .init(name: "instance", profile: $0.id) },
+            controls: { page = .init(name: "touch", profile: $0.id) },
+            immersive: immersive)
+    }
+
     private func matchesSettings(_ keywords: String) -> Bool {
         settingsQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || keywords.localizedCaseInsensitiveContains(settingsQuery.trimmingCharacters(in: .whitespacesAndNewlines))
     }

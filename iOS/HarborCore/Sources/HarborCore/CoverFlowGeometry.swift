@@ -54,3 +54,20 @@ public struct CoverFlowGeometry: Sendable {
                      zIndex: 1000 - Int(abs(distance) * 100))
     }
 }
+
+/// The saved order is a preference over installed IDs, never over virtual
+/// copies. New profiles are appended in their original order.
+public enum CoverFlowOrdering {
+    public static func merge(available: [String], saved: [String]) -> [String] {
+        var remaining = Set(available)
+        return (saved + available).filter { remaining.remove($0) != nil }
+    }
+
+    public static func move(_ id: String, to index: Int, in order: [String]) -> [String] {
+        guard let source = order.firstIndex(of: id), order.indices.contains(index), source != index else { return order }
+        var result = order
+        result.remove(at: source)
+        result.insert(id, at: index)
+        return result
+    }
+}

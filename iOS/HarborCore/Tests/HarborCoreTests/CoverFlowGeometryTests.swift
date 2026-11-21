@@ -2,6 +2,17 @@ import XCTest
 @testable import HarborCore
 
 final class CoverFlowGeometryTests: XCTestCase {
+    func testSavedCoverOrderSurvivesRemovedAndNewInstances() {
+        let original = ["forge", "fabric", "vanilla"]
+        let moved = CoverFlowOrdering.move("forge", to: 1, in: original)
+        XCTAssertEqual(moved, ["fabric", "forge", "vanilla"])
+        XCTAssertEqual(CoverFlowOrdering.merge(available: ["vanilla", "forge", "new"], saved: moved),
+                       ["forge", "vanilla", "new"])
+        XCTAssertEqual(CoverFlowOrdering.merge(available: original, saved: ["forge", "forge", "missing"]), original)
+        XCTAssertEqual(CoverFlowOrdering.move("vanilla", to: 0, in: original), ["vanilla", "forge", "fabric"])
+        XCTAssertEqual(CoverFlowOrdering.move("forge", to: 5, in: original), original)
+    }
+
     func testPortraitLandscapeAndTabletKeepRealNeighborsVisible() {
         for (width, height) in [(320.0, 268.0), (430, 268), (360, 190), (500, 190), (1024, 300)] {
             let layout = CoverFlowGeometry(width: width, height: height, count: 5)

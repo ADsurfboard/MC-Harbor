@@ -1,0 +1,22 @@
+[
+  {
+    "project": "ferrite-core",
+    "releaseID": "unerR5MN",
+    "releaseVersion": "6.0.1",
+    "jar": "https://cdn.modrinth.com/data/uXXizFIs/versions/unerR5MN/ferritecore-6.0.1-fabric.jar",
+    "sha512": "9b7dc686bfa7937815d88c7bbc6908857cd6646b05e7a96ddbdcada328a385bd4ba056532cd1d7df9d2d7f4265fd48bd49ff683f217f6d4e817177b87f6bc457",
+    "iconEntry": "logo.png",
+    "license": "MIT",
+    "extraction": "Only authentic metadata, the declared original icon and root licensing files are retained. The archive contains no gameplay classes."
+  },
+  {
+    "project": "fabric-api",
+    "releaseID": "rvI2dfzR",
+    "releaseVersion": "0.92.12+1.20.1",
+    "jar": "https://cdn.modrinth.com/data/P7dR8mSH/versions/rvI2dfzR/fabric-api-0.92.12%2B1.20.1.jar",
+    "sha512": "de9da2344043b3e9ef9fb7dbfff5f2577b06000c4f73f2a37959a80123141169084cece19133bd299b45feaaa4648bdaca2ea085684888cc8c55cc9134a477ca",
+    "iconEntry": "assets/fabric/icon.png",
+    "license": "Apache-2.0",
+    "extraction": "Only authentic metadata, the declared original icon and root licensing files are retained. The archive contains no gameplay classes."
+  }
+]

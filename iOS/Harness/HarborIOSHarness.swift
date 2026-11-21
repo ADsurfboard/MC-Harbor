@@ -1,3 +1,4 @@
+import CryptoKit
 import SwiftUI
 import UIKit
 import HarborIOSUI
@@ -53,6 +54,9 @@ struct HarnessRoot: UIViewControllerRepresentable {
             }
             try? FileManager.default.createDirectory(at: root.appendingPathComponent("mods"), withIntermediateDirectories: true)
         }
+        if ProcessInfo.processInfo.environment["HARBOR_FOLDER_ART_FIXTURE"] == "1" {
+            seedFolderArtwork()
+        }
         if ProcessInfo.processInfo.environment["HARBOR_WALLPAPER_FIXTURE"] == "1" {
             let folder = harborHomeURL.appendingPathComponent("harbor-wallpapers"), index = folder.appendingPathComponent("library.json")
             if !FileManager.default.fileExists(atPath: index.path) {
@@ -79,6 +83,37 @@ struct HarnessRoot: UIViewControllerRepresentable {
             }
         }
     }
+    private func seedFolderArtwork() {
+        let root = harborHomeURL.appendingPathComponent("harbor-mod-folders")
+        let index = root.appendingPathComponent("folders-v1.json")
+        guard !FileManager.default.fileExists(atPath: index.path) else { return }
+        do {
+            let files = root.appendingPathComponent("files")
+            let icons = root.appendingPathComponent("icons")
+            try FileManager.default.createDirectory(at: files, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: icons, withIntermediateDirectories: true)
+            var mods: [FolderMod] = []
+            for origin in ["ferrite-core", "fabric-api"] {
+                func fixture(_ ext: String) throws -> Data {
+                    guard let root = Bundle.main.resourceURL else {
+                        throw CocoaError(.fileNoSuchFile)
+                    }
+                    return try Data(contentsOf: root.appendingPathComponent("ModFolderFixtures/" + origin + "." + ext))
+                }
+                let bytes = try fixture("jar")
+                let metadata = try ModArchiveMetadata.read(entries: ["fabric.mod.json": try fixture("metadata.json")], filename: origin + ".jar")
+                let id = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+                try bytes.write(to: files.appendingPathComponent(id + ".jar"), options: .atomic)
+                try fixture("png").write(to: icons.appendingPathComponent(id + ".png"), options: .atomic)
+                mods.append(FolderMod(id: id, name: metadata.name, filename: origin + ".jar",
+                    version: metadata.version, loaders: metadata.loaders, gameVersions: metadata.gameVersions,
+                    summary: metadata.summary, authors: metadata.authors, hasIcon: true))
+            }
+            let value = ModFolderSnapshot(folders: [.init(name: "真实模组图标", color: "#a8c9e8", mods: mods)])
+            try JSONEncoder().encode(value).write(to: index, options: .atomic)
+        } catch { NSLog("[Harbor QA] Folder fixture failed: %@", error.localizedDescription) }
+    }
+
     func instanceListJSON() -> Data {
         Data("""
         [{"id":"fabric-example","name":"触控验证 · Fabric","version":"1.20.1","loader":"Fabric"},

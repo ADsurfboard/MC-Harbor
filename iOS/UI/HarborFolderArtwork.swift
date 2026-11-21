@@ -44,13 +44,16 @@ private actor FolderImageCache {
 /// Alpha-aware sampling ignores RGB hidden in transparent PNG pixels.
 struct HarborFolderArtwork: View {
     let url: URL?
+    var animated = true
     @State private var bitmap: FolderBitmap?
     var body: some View {
         GeometryReader { geometry in
             ZStack {
                 Color.white.opacity(0.08)
                 if let bitmap {
-                    if let colors = bitmap.colors { FolderFlowBackdrop(colors: colors) }
+                    if let colors = bitmap.colors {
+                        FolderFlowBackdrop(colors: colors, frozenTime: animated ? nil : 0)
+                    }
                     Image(decorative: bitmap.image, scale: 1).resizable().interpolation(.high)
                         .aspectRatio(contentMode: .fit).padding(4)
                         .mask {
@@ -65,8 +68,13 @@ struct HarborFolderArtwork: View {
                         }
                 }
             }.frame(width: geometry.size.width, height: geometry.size.height).clipped()
-        }.task(id: url) { bitmap = await FolderImageCache.shared.image(url) }
-            .accessibilityHidden(true)
+        }
+        .task(id: url) {
+            let result = await FolderImageCache.shared.image(url)
+            if !Task.isCancelled { bitmap = result }
+        }
+        .onDisappear { bitmap = nil }
+        .accessibilityHidden(true)
     }
 }
 
@@ -107,46 +115,65 @@ struct HarborFolderCard: View {
     private var open: Bool { (pressing || hovering) && !exclusive && !reduceMotion }
     private var tint: Color { folder.color == "none" ? .clear : .folderHex(folder.color) }
     private var dark: Bool { scheme == .dark }
-    private var documents: some View {
+    private var neutral: Color { dark ? Color(white: 0.77) : Color(red: 0.31, green: 0.46, blue: 0.48) }
+
+    private func documents(animated: Bool) -> some View {
         ZStack(alignment: .bottom) {
             ForEach(Array(folder.mods.prefix(3).enumerated()), id: \.element.id) { index, mod in
-                HarborFolderArtwork(url: model.imageURL(mod)).frame(width: 154, height: 110)
-                    .clipShape(RoundedRectangle(cornerRadius: 11))
-                    .rotationEffect(.degrees(open ? Double(index - 1) * 11 : Double(index - 1) * 3))
-                    .offset(x: open ? CGFloat(index - 1) * 35 : CGFloat(index - 1) * 6,
-                            y: open ? -48 - abs(CGFloat(index - 1)) * 6 : -23 - CGFloat(index) * 7)
+                let offset = CGFloat(index) - CGFloat(min(3, folder.mods.count) - 1) / 2
+                let card = RoundedRectangle(cornerRadius: 11)
+                HarborFolderArtwork(url: model.imageURL(mod), animated: animated)
+                    .frame(width: 128, height: 99)
+                    .background(.regularMaterial, in: card)
+                    .clipShape(card)
+                    .rotationEffect(.degrees(Double(offset) * (open ? 11 : 6)))
+                    .rotation3DEffect(.degrees(open ? -5 : -10), axis: (x: 1, y: 0, z: 0), anchor: .bottom)
+                    .offset(x: offset * (open ? 43 : 33),
+                            y: (open ? -65 : -50) - CGFloat(index) * 8)
             }
         }.frame(width: 238, height: 203, alignment: .bottom)
     }
+
     private var pocket: some View {
         let shape = HarborFolderPocket(opening: open ? 1 : 0)
         return ZStack(alignment: .bottom) {
-            shape.fill(.ultraThinMaterial).opacity(dark ? 0.48 : 0.56)
-            documents.compositingGroup().blur(radius: 14).opacity(0.45)
-            shape.fill(tint.opacity(dark ? 0.15 : 0.13))
-            shape.fill(LinearGradient(colors: [.white.opacity(dark ? 0.16 : 0.34), .white.opacity(0.035), .white.opacity(0.12)], startPoint: .topLeading, endPoint: .bottomTrailing))
-        }.frame(width: 210, height: 112).clipShape(shape)
-            // A thin mouth glint; there is no dark bar or perimeter outline.
-            .overlay(shape.trim(from: 0, to: 0.32).stroke(LinearGradient(colors: [.white.opacity(0.58), .white.opacity(0.1), .clear], startPoint: .topLeading, endPoint: .bottomTrailing), style: StrokeStyle(lineWidth: 0.7, lineCap: .round)))
+            shape.fill(.ultraThinMaterial).opacity(dark ? 0.65 : 0.67)
+            if !folder.mods.isEmpty {
+                documents(animated: false).compositingGroup().blur(radius: 11).opacity(0.34)
+            }
+            shape.fill(neutral.opacity(dark ? 0.13 : 0.21))
+            shape.fill(tint.opacity(dark ? 0.20 : 0.17))
+            shape.fill(LinearGradient(colors: [
+                .white.opacity(dark ? 0.25 : 0.45), .white.opacity(0.05), neutral.opacity(0.13)
+            ], startPoint: .topLeading, endPoint: .bottomTrailing))
+        }.frame(width: 210, height: 108).clipShape(shape)
+            .overlay(shape.trim(from: 0, to: 0.33).stroke(LinearGradient(colors: [
+                .white.opacity(0.68), .white.opacity(0.16), .clear
+            ], startPoint: .topLeading, endPoint: .topTrailing), style: StrokeStyle(lineWidth: 0.85, lineCap: .round)))
             .overlay(alignment: .bottomLeading) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(folder.name).font(.system(size: 16, weight: .semibold)).foregroundStyle(.primary).lineLimit(2)
+                    Text(folder.name).font(.system(size: 17, weight: .semibold)).lineLimit(2)
                     Text("\(folder.mods.count) 个模组").font(.caption).foregroundStyle(.secondary)
                 }.padding(16).padding(.trailing, 10).frame(maxWidth: .infinity, alignment: .leading)
-            }.scaleEffect(x: 1, y: open ? 0.955 : 1, anchor: .bottom).offset(y: open ? 3 : 0)
+            }
+            .scaleEffect(x: 1, y: open ? 0.955 : 1, anchor: .bottom)
+            .offset(y: open ? 3 : 0)
     }
+
     var body: some View {
         Button(action: action) {
             GeometryReader { geometry in
                 ZStack(alignment: .bottom) {
-                    HarborFolderBack().fill(.ultraThinMaterial).opacity(0.35)
-                        .overlay(HarborFolderBack().fill(tint.opacity(0.075)))
+                    HarborFolderBack().fill(.ultraThinMaterial).opacity(0.7)
+                        .overlay(HarborFolderBack().fill(neutral.opacity(dark ? 0.18 : 0.24)))
+                        .overlay(HarborFolderBack().fill(tint.opacity(0.15)))
                         .frame(width: 200, height: 141).offset(y: -9)
-                    documents
+                    documents(animated: true)
                     pocket
-                }.frame(width: 238, height: 203).scaleEffect(min(1, geometry.size.width / 238))
-                    .position(x: geometry.size.width / 2, y: 108)
-            }.frame(height: 216).contentShape(Rectangle())
+                }.frame(width: 238, height: 203)
+                    .scaleEffect(min(1, geometry.size.width / 238, geometry.size.height / 203))
+                    .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
+            }.frame(height: 194).contentShape(Rectangle())
         }.buttonStyle(.plain)
             .simultaneousGesture(DragGesture(minimumDistance: 0).updating($pressing) { _, state, _ in state = true })
             .onHover { hovering = $0 }

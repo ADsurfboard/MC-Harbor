@@ -58,7 +58,11 @@ targets:
     type: application
     platform: iOS
     sources:
-      - Harness
+      - path: Harness
+        excludes: [ModFolderFixtures]
+      - path: Harness/ModFolderFixtures
+        type: folder
+        buildPhase: resources
       - path: ../tests/fixtures/wallpaper.mp4
         buildPhase: resources
     dependencies:
