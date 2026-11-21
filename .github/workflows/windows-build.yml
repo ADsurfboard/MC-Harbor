@@ -53,6 +53,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Source privacy regression checks failed.' }
           python tools/test-windows-release.py
           if ($LASTEXITCODE -ne 0) { throw 'Release packaging regression checks failed.' }
+          python tools/test-publish-windows-assets.py
+          if ($LASTEXITCODE -ne 0) { throw 'Shared Release publishing checks failed.' }
           python tools/check-source-privacy.py
           if ($LASTEXITCODE -ne 0) { throw 'Source privacy check failed.' }
       - name: Export corresponding committed source before generating build files
@@ -88,7 +90,7 @@ jobs:
     needs: windows-x64
     if: github.repository == 'ADsurfboard/MC-Harbor' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/windows-v')
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     permissions:
       contents: write
     env:
@@ -97,52 +99,10 @@ jobs:
       RELEASE_TAG: ${{ github.ref_name }}
       RELEASE_VERSION: ${{ needs.windows-x64.outputs.version }}
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: windows-x64-ci-unsigned
           path: release-assets
-      - name: Verify and publish Windows preview assets
-        working-directory: release-assets
-        shell: bash
-        run: |
-          set -euo pipefail
-          sha256sum --check "SHA256SUMS-windows-${RELEASE_VERSION}.txt"
-          assets=(
-            "MC-Harbor-Windows-${RELEASE_VERSION}-x64-portable.zip"
-            "MC-Harbor-Windows-${RELEASE_VERSION}-x64-Setup.zip"
-            "MC-Harbor-Windows-${RELEASE_VERSION}-x64-Setup.msi"
-            "MC-Harbor-Windows-${RELEASE_VERSION}-source.zip"
-            "SHA256SUMS-windows-${RELEASE_VERSION}.txt"
-          )
-          if gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft > ../is-draft.txt; then
-            test "$(cat ../is-draft.txt)" = true || { echo 'A published release is never overwritten.'; exit 1; }
-          else
-            gh release create "$RELEASE_TAG" --verify-tag --draft --prerelease --latest=false \
-              --title "MC Harbor Windows ${RELEASE_VERSION} x64 预览版" --notes-file RELEASE_NOTES.md
-          fi
-          gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber
-          gh api "repos/${GH_REPO}/releases/tags/${RELEASE_TAG}" > ../release.json
-          python3 - <<'PY'
-          import hashlib
-          import json
-          import os
-          from pathlib import Path
-          import zipfile
-          data = json.loads(Path('../release.json').read_text())
-          if not data['draft']:
-              raise SystemExit('Release must remain a draft until all assets are verified.')
-          version = os.environ['RELEASE_VERSION']
-          files = sorted(path for path in Path('.').iterdir() if path.suffix in {'.zip', '.msi', '.txt'})
-          assets = {asset['name']: asset for asset in data['assets']}
-          if set(assets) != {path.name for path in files}:
-              raise SystemExit('Unexpected or missing Release attachments.')
-          for path in files:
-              with path.open('rb') as stream:
-                  digest = 'sha256:' + hashlib.file_digest(stream, 'sha256').hexdigest()
-              if assets[path.name]['digest'] != digest or assets[path.name]['size'] != path.stat().st_size:
-                  raise SystemExit('Server-side Release attachment digest or size differs.')
-          with zipfile.ZipFile(f'MC-Harbor-Windows-{version}-source.zip') as archive:
-              if archive.comment.decode('ascii') != os.environ['GITHUB_SHA']:
-                  raise SystemExit('The source attachment does not match the release tag.')
-          PY
-          gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
+      - name: Verify and attach Windows assets to the shared Latest release
+        run: python3 tools/publish-windows-assets.py --directory release-assets

@@ -71,7 +71,7 @@ def assemble(portable: Path, installer: Path, source: Path, output: Path,
         bundle = stage / f"{stem}-x64-Setup.zip"
         prefix = f"{stem}-x64-Setup/"
         instruction = (
-            f"MC Harbor Windows {version} x64 预览版\n\n"
+            f"MC Harbor Windows {version} x64 安装版\n\n"
             "完整解压后，运行同目录的 MSI 安装器；请勿直接在压缩软件中运行。\n"
             "安装到 Program Files，并创建开始菜单入口。\n"
             "安装版数据位置：%LOCALAPPDATA%\\MCHarbor。\n"
