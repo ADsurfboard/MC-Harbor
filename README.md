@@ -1,8 +1,8 @@
 # MC Harbor
 
-1.7.1 · Apple Silicon / Intel 双版本
+1.7.2 · Apple Silicon / Intel 双版本
 
-[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/tag/v1.7.1) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.7.1/MC-Harbor-Introduction-1.7.1.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)
+[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/tag/v1.7.2) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.7.2/MC-Harbor-Introduction-1.7.2.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)
 
 以下正文与随包 PDF 同版。
 
@@ -10,7 +10,7 @@
 保留 HMCL 的游戏能力，采用真实 WinHarbor 原生界面，
 把账号、下载、实例资源与汉化工作集中在一个窗口。
 
-1.7.1 · Apple Silicon / Intel 双版本
+1.7.2 · Apple Silicon / Intel 双版本
 Apple Silicon：macOS 26 起；Intel：macOS 12 起
 
 ## 日常操作，一处完成。
@@ -292,11 +292,17 @@ Intel 版已在 Rosetta 下校验并启动官方陶瓦、退出房间，并验�
 <img src="Assets/Contributors/jiekee.png" width="64" height="64" alt="jiekee❄" style="border-radius:50%">
 
 问题反馈与复现：提供 Intel 与不同 macOS 版本下的加载器下载超时、实例删除、程序坞窗口恢复、模组列表遮挡、游戏运行时资源下载受阻、翻页汉化失效及快捷方式误开浏览器和未启动游戏的线索。
+
+功能与交互建议：提出外置认证、模组推荐、中英文搜索、简介及语言文件汉化、实例快捷方式、关闭游戏、拖入整合包、按内容导出及实例资源批量管理；补充国内来源、搜索和授权体验方面的反馈。
+
+问题反馈与复现：提供 Intel 与不同 macOS 版本下的加载器下载超时、实例删除、程序坞窗口恢复、模组列表遮挡、游戏运行时资源下载受阻、翻页汉化失效及快捷方式误开浏览器和未启动游戏的线索。
 功能与交互建议：提出外置认证、模组推荐、中英文搜索、简介及语言文件汉化、实例快捷方式、关闭游戏、拖入整合包、按内容导出及实例资源批量管理；补充国内来源、搜索和授权体验方面的反馈。
 
 ### 花圆银行
 
 <img src="Assets/Contributors/flowerbank.png" width="64" height="64" alt="花圆银行" style="border-radius:50%">
+
+导入进度展示建议：提出整合包导入时展示当前处理阶段与下载进度，替代仅显示加载转圈，让玩家了解任务状态并判断是否停滞。
 
 导入进度展示建议：提出整合包导入时展示当前处理阶段与下载进度，替代仅显示加载转圈，让玩家了解任务状态并判断是否停滞。
 
@@ -312,24 +318,37 @@ Intel 版已在 Rosetta 下校验并启动官方陶瓦、退出房间，并验�
 
 ## 清晰分工，持续维护。
 
-Windows 授权开发职责与现有实现贡献分别记录；平台维护分工不改变项目 GPL 许可。
+Windows、Android 与 Linux 的移植职责与现有实现贡献分别记录；平台维护分工不改变项目 GPL 许可。
 
-### 作者与维护负责人 · ADsurfboard
+### ADsurfboard
 
-<img src="https://github.com/ADsurfboard.png?size=128" width="64" height="64" alt="ADsurfboard" style="border-radius:50%">
+<img src="Assets/Contributors/adsurfboard.jpg" width="64" height="64" alt="ADsurfboard" style="border-radius:50%">
 
-项目发起、产品方向、主要开发与发布维护。Apple Silicon macOS、Intel macOS、iOS / iPadOS 及其他非 Windows 官方版本继续由 ADsurfboard 独立开发与维护。
+项目发起人 · 主要作者与维护负责人
+
+独立负责 macOS、iOS 和 iPadOS 的开发与维护。
+
+[GitHub 主页](https://github.com/ADsurfboard)
+
+项目发起人 · 主要作者与维护负责人
+独立负责 macOS、iOS 和 iPadOS 的开发与维护。
 
 ### 时咨月.
 
 <img src="Assets/Contributors/shiziyueyuan.png" width="64" height="64" alt="时咨月." style="border-radius:50%">
 
-经项目作者 ADsurfboard 正式授权，负责 MC Harbor 后续 Windows 版本的移植开发、兼容性适配、测试与维护，工作在本仓库 windows 分支进行。
-授权范围为 Windows 版本；macOS、iOS 及其他版本继续由 ADsurfboard 独立开发与维护。当前署名记录其开发职责，不代表 Windows 移植已完成。
+Windows、Android 与 Linux 移植负责人
+
+经项目作者授权，负责这三个平台的移植开发、兼容性适配、测试与维护。
+
+[GitHub 主页](https://github.com/shiziyueyuan)
+
+Windows、Android 与 Linux 移植负责人
+经项目作者授权，负责这三个平台的移植开发、兼容性适配、测试与维护。
 
 ### 开发分支与当前阶段
 
-Windows 移植在同一仓库 windows 分支开展，工作由时咨月. 负责；iOS / iPadOS 在 codex/ios-port 分支独立推进。此版本交付的是两种 macOS 安装包，iOS 工程和原生运行验证仍在继续，不以界面演示或构建成功替代 Minecraft 实玩结论。
+时咨月. 负责 Windows、Android 与 Linux 移植。ADsurfboard 继续维护 macOS 与 iOS / iPadOS。此版本同时发布 Apple 芯片、Intel 和 iOS 工程包。iOS 已通过云端构建和模拟器测试，设备安装需要开发者签名与受支持的 JIT 授权。
 
 ### 反馈与维护
 
@@ -345,6 +364,6 @@ Windows 移植在同一仓库 windows 分支开展，工作由时咨月. 负责�
 
 [完整贡献名单](CONTRIBUTORS.md)
 
-如果喜欢，记得 Star 我（
-
 [Plus Version 后续设计规范](docs/PLUS-VERSION.md)（普通版与完整 iOS 正式发布后开发）。
+
+如果喜欢，记得 Star 我（

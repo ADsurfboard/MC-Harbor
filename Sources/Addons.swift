@@ -211,17 +211,17 @@ struct AddonBrowser:View {
                 VStack(spacing:8){
                     if canRecommend && showingRecommendations && remarkListFilter.isEmpty{
                         if recommending{HarborActivityIndicator().controlSize(.small)}
-                        ScrollView{LazyVStack(spacing:7){ForEach(recommendations){item in projectButton(item.project,suggestion:item.suggestion)};if !recommending && recommendations.isEmpty{Text("此版本暂未找到适配推荐，可搜索全部模组。").font(.system(size:12)).harborSecondaryText().padding()}}}.harborHideScrollIndicators()
+                        ScrollView{LazyVStack(spacing:7){ForEach(recommendations){item in projectButton(item.project,suggestion:item.suggestion)};if !recommending && recommendations.isEmpty{Text("此版本暂未找到适配推荐，可搜索全部模组。").font(.system(size:12)).harborSecondaryText().padding()}}}.harborHideScrollIndicators().clipped()
                     }else{
                         if loading{HarborActivityIndicator().controlSize(.small)}
                         ScrollView{LazyVStack(spacing:5){
                             if kind == .mods && !localRemarks.isEmpty{Text("我的备注").font(.system(size:11,weight:.semibold)).frame(maxWidth:.infinity,alignment:.leading);ForEach(localRemarks){remark in remarkButton(remark)};Divider()}
                             if remarkListFilter.isEmpty{ForEach(result?.hits ?? []){project in projectButton(project)}}else if localRemarks.isEmpty{Text("此列表暂无匹配备注。选择模组后可保存到这里。").font(.system(size:11)).harborSecondaryText().padding()}
-                        }}.harborHideScrollIndicators()
+                        }}.harborHideScrollIndicators().clipped()
                         if let result,remarkListFilter.isEmpty{HStack{Text("平台 \(result.totalHits) 个结果");Spacer();Button{page=max(0,page-1);search()}label:{HarborSymbol(systemName:"chevron.left").frame(width:28,height:28)}.disabled(page==0);Text("\(page+1)");Button{page+=1;search()}label:{HarborSymbol(systemName:"chevron.right").frame(width:28,height:28)}.disabled((page+1)*30>=result.totalHits)}.buttonStyle(HarborBareButtonStyle()).font(.system(size:10)).foregroundStyle(.secondary)}
                     }
                 }.padding(12).frame(minWidth:310,maxWidth:400)
-                Divider().opacity(0.35)
+                Rectangle().fill(Color.primary.opacity(0.10)).frame(width: 1)
                 detail.frame(maxWidth:.infinity,maxHeight:.infinity)
             }.frame(maxHeight:.infinity)
         }
@@ -264,9 +264,12 @@ struct AddonBrowser:View {
         Button{selected=project;HarborAudio.shared.play(.navigate)}label:{
             HStack(alignment:.top,spacing:12){AddonIcon(url:project.iconUrl).frame(width:43,height:43);VStack(alignment:.leading,spacing:5){
                 HStack{ModProjectName(project:project,enabled:kind == .mods,preferred:suggestion?.chinese).font(.system(size:13,weight:.medium)).lineLimit(1);if let suggestion,ModDiscovery.installed(suggestion,mods:installedMods){Text("已安装").font(.system(size:9)).foregroundStyle(model.accentTextColor)}}
-                Text(suggestion == nil ? project.author:project.title).font(.system(size:10)).harborSecondaryText()
+                Text(suggestion == nil ? project.author:project.title).font(.system(size:10)).harborSecondaryText().lineLimit(1)
                 if let suggestion{Text(suggestion.reason).font(.system(size:11)).harborSecondaryText().lineLimit(2)}else{ModSummaryText(text:project.description,enabled:model.preferences.translateModDescriptions,compact:true,projectID:project.id,source:source)}
-            };Spacer(minLength:0)}.padding(12).frame(maxWidth:.infinity,alignment:.leading).background(model.controlTint.opacity(selected?.id==project.id ? 0.11:0.025),in:RoundedRectangle(cornerRadius:16)).contentShape(RoundedRectangle(cornerRadius:16))
+            }.frame(maxWidth: .infinity, alignment: .leading)}
+                .padding(12).frame(maxWidth:.infinity,alignment:.leading)
+                .background(model.controlTint.opacity(selected?.id==project.id ? 0.11:0.025),in:RoundedRectangle(cornerRadius:16))
+                .clipShape(RoundedRectangle(cornerRadius:16)).contentShape(RoundedRectangle(cornerRadius:16))
         }.buttonStyle(HarborBareButtonStyle())
     }
     @ViewBuilder private var detail:some View{

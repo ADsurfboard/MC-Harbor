@@ -6,17 +6,18 @@ struct HarborContributor: Decodable, Identifiable {
     let name: String
     let avatar: String
     let contributions: [String]
+    let description: String?
     let role: String?
     let category: String?
     let url: URL?
 }
 
 enum HarborContributions {
-    static var entries: [HarborContributor] {
+    static let entries: [HarborContributor] = {
         guard let data = try? Data(contentsOf: NativePaths.resources.appendingPathComponent("Contributors/contributors.json")),
               let items = try? JSONDecoder().decode([HarborContributor].self, from: data) else { return [] }
         return items
-    }
+    }()
 }
 
 private struct ContributorAvatar: View {
@@ -33,7 +34,7 @@ private struct ContributorAvatar: View {
 struct ContributorsPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 23) {
-            ForEach(HarborContributions.entries) { entry in
+            ForEach(HarborContributions.entries.filter { $0.category == nil }) { entry in
                 HStack(alignment: .top, spacing: 16) {
                     ContributorAvatar(entry: entry)
                     VStack(alignment: .leading, spacing: 9) {
@@ -53,21 +54,21 @@ struct ContributorsPanel: View {
 struct DevelopersPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("ADsurfboard").font(.system(size: 16, weight: .semibold))
-                Text("项目发起人、主要作者与维护负责人。macOS、iOS 及其他非 Windows 版本由作者独立开发与维护。")
-                    .font(.system(size: 12)).harborSecondaryText().fixedSize(horizontal: false, vertical: true)
-                Link("作者 GitHub", destination: HarborBrand.authorURL).buttonStyle(HarborButtonStyle())
-            }
-            ForEach(HarborContributions.entries.filter { $0.category == "developer" }) { entry in
+            let developers = HarborContributions.entries.filter { $0.category == "author" || $0.category == "developer" }
+            ForEach(developers) { entry in
                 HStack(alignment: .top, spacing: 16) {
                     ContributorAvatar(entry: entry)
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(entry.name).font(.system(size: 14, weight: .semibold))
-                        Text(entry.role ?? "授权开发者").font(.system(size: 12, weight: .medium))
-                        Text("负责本项目 windows 分支的后续移植、适配、测试与维护。")
-                            .font(.system(size: 12)).harborSecondaryText().fixedSize(horizontal: false, vertical: true)
-                        if let url = entry.url { Link("GitHub 主页", destination: url).buttonStyle(HarborButtonStyle()) }
+                        Text(entry.name).font(.system(size: 16, weight: .semibold))
+                        if let role = entry.role { Text(role).font(.system(size: 12, weight: .medium)) }
+                        if let description = entry.description {
+                            Text(description).font(.system(size: 12)).harborSecondaryText()
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        if let url = entry.url {
+                            Link("GitHub 主页", destination: url).buttonStyle(HarborButtonStyle())
+                                .accessibilityHint("打开 \(entry.name) 的 GitHub 个人主页")
+                        }
                     }
                 }
             }

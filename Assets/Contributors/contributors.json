@@ -1,5 +1,15 @@
 [
   {
+    "id": "adsurfboard",
+    "name": "ADsurfboard",
+    "avatar": "adsurfboard.jpg",
+    "role": "项目发起人 · 主要作者与维护负责人",
+    "category": "author",
+    "url": "https://github.com/ADsurfboard",
+    "description": "独立负责 macOS、iOS 和 iPadOS 的开发与维护。",
+    "contributions": []
+  },
+  {
     "id": "jiekee",
     "name": "jiekee❄",
     "avatar": "jiekee.png",
@@ -20,12 +30,10 @@
     "id": "shiziyueyuan",
     "name": "时咨月.",
     "avatar": "shiziyueyuan.png",
-    "role": "Windows 版本授权开发者 · 移植负责人",
+    "role": "Windows、Android 与 Linux 移植负责人",
     "category": "developer",
     "url": "https://github.com/shiziyueyuan",
-    "contributions": [
-      "经项目作者 ADsurfboard 正式授权，负责 MC Harbor 后续 Windows 版本的移植开发、兼容性适配、测试与维护，工作在本仓库 windows 分支进行。",
-      "授权范围为 Windows 版本；macOS、iOS 及其他版本继续由 ADsurfboard 独立开发与维护。当前署名记录其开发职责，不代表 Windows 移植已完成。"
-    ]
+    "contributions": [],
+    "description": "经项目作者授权，负责这三个平台的移植开发、兼容性适配、测试与维护。"
   }
 ]

@@ -50,6 +50,9 @@ import UniformTypeIdentifiers
     @Published var logLines: [String] = []
     private var processes: [UUID:Process] = [:]
     var gameControls:[String:URL]=[:]
+    private var reconnectedControls: [String: URL] = [:]
+    private var reconnectTask: Task<Void, Never>?
+    private var launchJobs: [UUID: String] = [:]
     var shortcutWatcher:InstanceShortcutWatcher?
     private var preferenceWork:DispatchWorkItem?
     private let preferenceQueue=DispatchQueue(label:"net.morben.mcharbor.preferences")
@@ -92,7 +95,7 @@ import UniformTypeIdentifiers
     }
     func flushPreferences(){preferenceWork?.cancel();guard let data=try? JSONEncoder().encode(preferences) else{return};preferenceQueue.sync{try? data.write(to:NativePaths.root.appendingPathComponent("preferences.json"),options:.atomic)}}
 
-    func scan() { let root=preferences.gameRoot;Task { let scanned=await Task.detached(priority:.userInitiated){NativeScanner.scan(root)}.value;games=scanned } }
+    func scan() { let root=preferences.gameRoot;Task { let scanned=await Task.detached(priority:.userInitiated){NativeScanner.scan(root)}.value;games=scanned;refreshRunningGames() } }
     func toast(_ text:String) { toastTask?.cancel();toastMessage=text;toastTask=Task{try? await HarborDelay.sleep(seconds:HarborNoticePolicy.lifetime);if !Task.isCancelled{toastMessage=nil}} }
     func open(_ path:String) { guard FileManager.default.fileExists(atPath:path) else{errorMessage="目录尚不存在。";return};NSWorkspace.shared.open(URL(fileURLWithPath:path)) }
     func selectRoot() { let panel=NSOpenPanel();panel.canChooseDirectories=true;panel.canChooseFiles=false;panel.prompt="选择游戏库";if panel.runModal() == .OK,let url=panel.url{preferences.gameRoot=url.path;scan()} }
@@ -116,7 +119,27 @@ import UniformTypeIdentifiers
         if games.contains(where:{$0.id==name}){errorMessage="该版本名称已存在。";return}
         backend("install",title:"安装 "+name,arguments:["version":version.id,"name":name,"loader":loader,"loaderVersion":loaderVersion]){_ in self.scan();self.preferences.selectedGame=name;self.toast("安装完成")}
     }
+    private func refreshRunningGames() {
+        let active = HarborGameReceipts.controls(for: games, in: NativePaths.root)
+            .filter { gameControls[$0.key] == nil }
+        for id in reconnectedControls.keys where active[id] == nil { running.remove(id) }
+        for id in active.keys where !running.contains(id) { running.insert(id) }
+        reconnectedControls = active
+        guard !active.isEmpty, reconnectTask == nil else { return }
+        reconnectTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await HarborDelay.sleep(seconds: 2)
+                guard !Task.isCancelled, let self else { return }
+                self.refreshRunningGames()
+                if self.reconnectedControls.isEmpty {
+                    self.reconnectTask = nil
+                    return
+                }
+            }
+        }
+    }
     func launch(_ game:GameInstance,server:String?=nil) {
+        refreshRunningGames()
         guard !running.contains(game.id) else{return}
         guard resourceInstalling[resourceDirectoryKey(game),default:[]].isEmpty else{toast("正在完成此实例的资源安装，请稍后启动");return}
         guard let account=selectedAccount else{inspectedGame=nil;section = .accounts;return}
@@ -141,10 +164,17 @@ import UniformTypeIdentifiers
         backend("import",title:"导入 "+url.lastPathComponent,arguments:["file":url.path,"name":ResourceInstall.uniqueName(url.deletingPathExtension().lastPathComponent,root:preferences.gameRoot)]){result in self.scan();if let id=result["id"] as? String{self.preferences.selectedGame=id};self.toast("整合包已导入")}
     }
     func stopGame(_ game:GameInstance){
-        guard running.contains(game.id),let control=gameControls[game.id] else{errorMessage="此游戏进程不由当前启动器管理，请在游戏内退出。";return}
+        guard running.contains(game.id),let control=gameControls[game.id] ?? reconnectedControls[game.id] else{errorMessage="此游戏进程不由当前启动器管理，请在游戏内退出。";return}
         let alert=NSAlert();alert.messageText="关闭 "+displayName(game)+"？";alert.informativeText="将请求游戏退出。建议先在游戏内保存并退出存档，避免丢失未保存的进度。";alert.addButton(withTitle:"关闭游戏");alert.addButton(withTitle:"取消")
         guard alert.runModal() == .alertFirstButtonReturn else{return}
-        do{try FileManager.default.createDirectory(at:control.deletingLastPathComponent(),withIntermediateDirectories:true);try Data().write(to:control,options:.atomic);toast("已请求游戏退出，正在等待进程结束")}catch{errorMessage=error.localizedDescription}
+        requestGameStop(control)
+    }
+    private func requestGameStop(_ control: URL) {
+        do {
+            try FileManager.default.createDirectory(at: control.deletingLastPathComponent(), withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            try Data().write(to: control, options: .atomic)
+            toast("已请求停止游戏")
+        } catch { errorMessage = error.localizedDescription }
     }
     func backup(_ game:GameInstance) { backend("backup",title:"备份 "+game.id,arguments:["runDirectory":game.runDirectory]){result in self.toast("存档备份完成");if let path=result["path"] as? String{NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath:path)])}} }
     func diagnostics() { backend("diagnostics",title:"检查下载连接",arguments:[:]){result in self.toast("诊断完成");if let report=result["report"] as? String{self.logLines.append(report)}} }
@@ -177,17 +207,27 @@ import UniformTypeIdentifiers
     func backend(_ command:String,title:String,arguments:[String:Any],silent:Bool=false,done:@escaping([String:Any])->Void) {
         let job=WorkItem(title:title);if !silent { works.insert(job,at:0) }
         var input=arguments;input["command"]=command;input["root"]=preferences.gameRoot;input["source"]=preferences.downloadSource;input["threads"]=preferences.downloadThreads;input["clientID"]=preferences.microsoftClientID
+        if works.count > 150 { works = works.enumerated().filter { $0.offset < 150 || $0.element.active }.map(\.element) }
         do {
             let process=try JavaBridge.start(input:input,event:{[weak self] event in Task{@MainActor in guard let self else{return};if let updated=event["data"],event["event"] as? String=="accountUpdated",let id=arguments["accountID"] as? String,let bytes=try? JSONSerialization.data(withJSONObject:updated){try? KeychainStore.write(bytes,id:id)}
                 if !silent,let message=event["message"] as? String{if self.logLines.count>400{self.logLines.removeFirst(100)};self.logLines.append(message);if let i=self.works.firstIndex(where:{$0.id==job.id}){self.works[i].detail=message}}
                 if let value=event["progress"] as? Double,let i=self.works.firstIndex(where:{$0.id==job.id}){self.works[i].progress=value}
                 if let code=event["deviceCode"] as? String{self.deviceCode=code;self.verificationURL=event["url"] as? String}
-                if event["event"] as? String == "launched",let id=arguments["id"] as? String{self.running.insert(id);if let game=self.games.first(where:{$0.id==id}){self.social.begin(game,name:self.displayName(game),id:arguments["historySessionID"] as? String ?? UUID().uuidString)};if let i=self.works.firstIndex(where:{$0.id==job.id}){self.works[i].active=false};self.toast("游戏已启动")}
-            }},completion:{[weak self] result in Task{@MainActor in guard let self else{return};self.processes.removeValue(forKey:job.id);if command=="import"{self.packImporting=false};if command=="launch",let id=arguments["id"] as? String{self.social.finish(id);if let control=self.gameControls.removeValue(forKey:id){try? FileManager.default.removeItem(at:control)}};if command=="migrate"{self.migrating=false};if let i=self.works.firstIndex(where:{$0.id==job.id}){self.works[i].active=false;switch result{case .success:self.works[i].progress=1;case .failure:self.works[i].error=true}}
+                if event["event"] as? String == "launched",let id=arguments["id"] as? String{self.running.insert(id);if let game=self.games.first(where:{$0.id==id}){self.social.begin(game,name:self.displayName(game),id:arguments["historySessionID"] as? String ?? UUID().uuidString)};if let i=self.works.firstIndex(where:{$0.id==job.id}){self.works[i].active=false};self.toast("游戏已启动")
+                    switch self.preferences.postLaunch {
+                    case .keep: break
+                    case .hide: NSApp.hide(nil)
+                    case .quit:
+                        self.flushPreferences()
+                        NSApp.terminate(nil)
+                    }
+                }
+            }},completion:{[weak self] result in Task{@MainActor in guard let self else{return};self.processes.removeValue(forKey:job.id);self.launchJobs.removeValue(forKey:job.id);if command=="import"{self.packImporting=false};if command=="launch",let id=arguments["id"] as? String{self.social.finish(id);if let control=self.gameControls.removeValue(forKey:id){try? FileManager.default.removeItem(at:control)}};if command=="migrate"{self.migrating=false};if let i=self.works.firstIndex(where:{$0.id==job.id}){self.works[i].active=false;switch result{case .success:self.works[i].progress=1;case .failure:self.works[i].error=true}}
                 switch result{case .success(let object):done(object);case .failure(let error):self.errorMessage=error.localizedDescription;if command=="launch",let id=arguments["id"] as? String{self.running.remove(id)}}
             }})
             processes[job.id]=process
-        }catch{if command=="import"{packImporting=false};if command=="migrate"{migrating=false};if let id=arguments["id"] as? String,command=="launch"{running.remove(id)};if let index=works.firstIndex(where:{$0.id==job.id}){works[index].active=false;works[index].error=true};errorMessage=error.localizedDescription}
+            if command=="launch",let id=arguments["id"] as? String{launchJobs[job.id]=id}
+        }catch{if command=="import"{packImporting=false};if command=="migrate"{migrating=false};if let id=arguments["id"] as? String,command=="launch"{running.remove(id);gameControls.removeValue(forKey:id)};if let index=works.firstIndex(where:{$0.id==job.id}){works[index].active=false;works[index].error=true};errorMessage=error.localizedDescription}
     }
     func loadMods(_ game:GameInstance,force:Bool=false) {
         if modMetadata[game.id] != nil && !force{return}
@@ -195,7 +235,14 @@ import UniformTypeIdentifiers
             self.modMetadata[game.id]=(result["mods"] as? [[String:Any]] ?? []).compactMap{m in guard let path=m["path"] as? String else{return nil};return ModFile(id:path.replacingOccurrences(of:".disabled",with:""),name:m["name"] as? String ?? URL(fileURLWithPath:path).lastPathComponent,path:URL(fileURLWithPath:path),enabled:m["enabled"] as? Bool ?? true,size:(m["size"] as? NSNumber)?.int64Value ?? 0,version:m["version"] as? String ?? "",authors:m["authors"] as? String ?? "",modID:m["modId"] as? String ?? "",iconPath:m["iconPath"] as? String,summary:m["description"] as? String ?? "")}
         }
     }
-    func cancel(_ work:WorkItem) { processes[work.id]?.terminate();nativeTasks[work.id]?.cancel() }
+    func cancel(_ work:WorkItem) {
+        if let id = launchJobs[work.id], let control = gameControls[id] {
+            requestGameStop(control)
+        } else {
+            processes[work.id]?.terminate()
+            nativeTasks[work.id]?.cancel()
+        }
+    }
 }
 
 enum KeychainStore {
@@ -230,13 +277,27 @@ enum JavaBridge {
         let process=Process();process.executableURL=URL(fileURLWithPath:java)
         let fx=resources.appendingPathComponent("javafx").path+"/*"
         process.arguments=["-Xms32m","-Xmx384m","-Dfile.encoding=UTF-8","-Djava.awt.headless=true","-Dshenggan.headless=true","-Dhmcl.dir="+NativePaths.root.path,"-cp",resources.appendingPathComponent("Backend.jar").path+":"+resources.appendingPathComponent("HMCLCore.jar").path+":"+fx,"net.morben.shenggan.NativeBridge"]
+        if input["command"] as? String == "launch" {
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/nohup")
+            process.arguments = [java] + (process.arguments ?? [])
+        }
+        let data=try JSONSerialization.data(withJSONObject:input)
         let stdin=Pipe(),stdout=Pipe(),stderr=Pipe();process.standardInput=stdin;process.standardOutput=stdout;process.standardError=stderr
         let reader=BridgeReader(event:event,completion:completion)
         try process.run()
         DispatchQueue.global(qos:.userInitiated).async { while true {let data=stdout.fileHandleForReading.availableData;if data.isEmpty{break};reader.receive(data)};process.waitUntilExit();reader.finish(process.terminationStatus) }
-        stderr.fileHandleForReading.readabilityHandler={handle in _=handle.availableData}
-        process.terminationHandler={_ in stderr.fileHandleForReading.readabilityHandler=nil}
-        let data=try JSONSerialization.data(withJSONObject:input);try stdin.fileHandleForWriting.write(contentsOf:data+Data([10]));try? stdin.fileHandleForWriting.close();return process
+        DispatchQueue.global(qos:.utility).async {
+            while !stderr.fileHandleForReading.availableData.isEmpty {}
+        }
+        do {
+            try stdin.fileHandleForWriting.write(contentsOf:data+Data([10]))
+            try stdin.fileHandleForWriting.close()
+        } catch {
+            try? stdin.fileHandleForWriting.close()
+            if process.isRunning { process.terminate() }
+            throw error
+        }
+        return process
     }
 }
 final class BridgeReader: @unchecked Sendable {
