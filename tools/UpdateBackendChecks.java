@@ -30,7 +30,29 @@ public final class UpdateBackendChecks {
         Path archive=data.resolve("export.zip");try(ZipOutputStream out=new ZipOutputStream(Files.newOutputStream(archive))){for(String entry:List.of("mmc-pack.json",".minecraft/mods/a.jar",".minecraft/config/a.toml",".minecraft/servers.dat",".minecraft/options.txt",".minecraft/saves/World/level.dat",".minecraft/.harbor/private.json")){out.putNextEntry(new ZipEntry(entry));out.write(entry.getBytes(java.nio.charset.StandardCharsets.UTF_8));out.closeEntry();}}NativeExport.filter(archive,exportOptions);try(ZipFile zip=new ZipFile(archive.toFile())){check("export-exact-whitelist",zip.size()==3&&zip.getEntry(".minecraft/servers.dat")==null&&zip.getEntry("mmc-pack.json")!=null);}
         exportOptions.add("contents",G.toJsonTree(List.of("../private")));try{NativeExport.selected(exportOptions);check("export-rejects-unknown-category",false);}catch(IOException e){check("export-rejects-unknown-category",true);}
         Path stop=data.resolve("launch-control/"+UUID.randomUUID()+".stop");Files.createDirectories(stop.getParent());check("game-control-valid-owned-path",NativeGameControl.stopPath(data,stop.toString()).equals(stop));try{NativeGameControl.stopPath(data,data.resolve("outside.stop").toString());check("game-control-rejects-outside",false);}catch(IOException e){check("game-control-rejects-outside",true);}
-        Process owned=new ProcessBuilder("/bin/sleep","30").start(),unrelated=new ProcessBuilder("/bin/sleep","30").start();try{Thread requestStop=new Thread(()->{try{Thread.sleep(150);Files.writeString(stop,"");}catch(Exception e){throw new RuntimeException(e);}});requestStop.start();NativeGameControl.waitFor(owned,stop);requestStop.join();check("game-control-owned-process-stopped",!owned.isAlive());check("game-control-unrelated-process-kept",unrelated.isAlive());check("game-control-request-cleaned",!Files.exists(stop));}finally{owned.destroy();unrelated.destroy();}
+        Process owned = new ProcessBuilder("/bin/sleep", "30").start();
+        Process unrelated = new ProcessBuilder("/bin/sleep", "30").start();
+        try {
+            try (NativeGameControl control = new NativeGameControl(data, run, stop.toString())) {
+                Thread requestStop = new Thread(() -> {
+                    try {
+                        Thread.sleep(150);
+                        Files.writeString(stop, "");
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+                requestStop.start();
+                control.waitFor(owned);
+                requestStop.join();
+            }
+            check("game-control-owned-process-stopped", !owned.isAlive());
+            check("game-control-unrelated-process-kept", unrelated.isAlive());
+            check("game-control-request-cleaned", !Files.exists(stop));
+        } finally {
+            owned.destroy();
+            unrelated.destroy();
+        }
         LocalizationBackendChecks.run(data.resolve("language-regression"),UpdateBackendChecks::check);
         long passed=checks.values().stream().filter(Boolean::booleanValue).count();Map<String,Object> report=Map.of("passed",passed,"failed",checks.size()-passed,"checks",checks);Files.writeString(data.getParent().resolve("update-backend-report.json"),G.toJson(report));if(passed!=checks.size())System.exit(1);
     }
