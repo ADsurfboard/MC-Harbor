@@ -62,6 +62,21 @@ import XCTest
         XCTAssertTrue(restored.waitForExistence(timeout: 10)); waitForValue("使用中", in: restored)
         let defaults = app.buttons["wallpapers.default"]; defaults.tap(); waitForValue("已选中", in: defaults)
         capture("wallpaper-default-restored")
+        let video = app.buttons["wallpapers.item.22345678-1234-4321-8765-123456789ABC"]
+        if !video.isHittable { app.swipeUp() }
+        XCTAssertTrue(video.waitForExistence(timeout: 10))
+        video.tap()
+        let play = app.buttons["播放视频预览"]
+        let pause = app.buttons["暂停视频预览"]
+        for _ in 0..<3 {
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true AND hittable == true"), object: play)
+            XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed)
+            play.tap()
+            XCTAssertTrue(pause.waitForExistence(timeout: 10))
+            pause.tap()
+            XCTAssertTrue(play.waitForExistence(timeout: 10))
+        }
+        capture("wallpaper-video-preview-reopened")
     }
     func testWelcomeAudioListsFourOriginalVoicesAndPersistsChoice() throws {
         let app = XCUIApplication(); app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"; app.launch()

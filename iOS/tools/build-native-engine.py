@@ -35,6 +35,10 @@ def replace(relative,old,new,count=1):
     p=ENGINE/relative;s=p.read_text();assert s.count(old)==count,(relative,s.count(old),old[:80])
     p.write_text(s.replace(old,new));patches.append({'file':relative,'replacements':count})
 
+def swap(text,old,new,count=1):
+    assert text.count(old)==count,(text.count(old),old[:80])
+    return text.replace(old,new)
+
 # javac resolves dependent sources implicitly. The upstream per-file rules share
 # build/classes, so parallel javac processes can truncate each other's output.
 # Serialize this Java sub-make only; native C/C++ compilation remains bounded
@@ -110,14 +114,65 @@ replace('Natives/LauncherSplitViewController.m',
 
 - (void)splitViewController:(UISplitViewController *)svc willChangeToDisplayMode:''')
 replace('Natives/SurfaceViewController.m','#import "SurfaceViewController.h"','#import "SurfaceViewController.h"\n#import "HarborEngineAdapter.h"')
-replace('Natives/SurfaceViewController.m','[super viewDidAppear:animated];','[super viewDidAppear:animated];\n    HBRInstallGameControls(self);')
-replace('Natives/SurfaceViewController.m','- (void)updateAudioSettings {','''- (void)viewDidDisappear:(BOOL)animated {
-    [super viewDidDisappear:animated];
-    if (!self.view.window) HBRNotifyGameStopped();
+surface=ENGINE/'Natives/SurfaceViewController.m'
+content=surface.read_text()
+content=swap(content,'static GameSurfaceView* pojavWindow;','static __weak GameSurfaceView* pojavWindow;')
+content=swap(content,'@property(nonatomic) NSDictionary* metadata;', '''
+@property(nonatomic) NSDictionary* metadata;
+@property(nonatomic) CADisplayLink *harborInputLink;
+@property(nonatomic) BOOL harborCleanedInput;
+''')
+content=swap(content,'    [displayLink addToRunLoop:NSRunLoop.currentRunLoop forMode:NSRunLoopCommonModes];',
+             '    self.harborInputLink = displayLink;\n    [displayLink addToRunLoop:NSRunLoop.currentRunLoop forMode:NSRunLoopCommonModes];')
+content=swap(content,'    [KeyboardInput initKeycodeTable];','    [KeyboardInput initKeycodeTable];\n    __weak typeof(self) weakSelf = self;')
+content=swap(content,'usingBlock:^(NSNotification *note) {','usingBlock:^(NSNotification *note) {\n        typeof(self) self=weakSelf;\n        if (!self) return;',4)
+content=swap(content,'    mouse.mouseInput.mouseMovedHandler = ^','    __weak typeof(self) weakSelf=self;\n    mouse.mouseInput.mouseMovedHandler = ^')
+content=swap(content,'        if (!self.view.window.windowScene.pointerLockState.locked) {','        typeof(self) self=weakSelf;\n        if (!self.view.window.windowScene.pointerLockState.locked) {')
+content=swap(content,'    [super viewDidAppear:animated];','    [super viewDidAppear:animated];\n    self.harborInputLink.paused = NO;\n    HBRInstallGameControls(self);')
+content=swap(content,'- (void)updateAudioSettings {', (IOS/'Native/HarborSurfaceLifecycle.inc').read_text())
+content=swap(content,'- (void)updateGrabState {','- (void)updateGrabState {\n    HBRUpdateGameGrabState();')
+content=swap(content,'    CGFloat screenScale = self.screenScale;','    if (event == ACTION_MOVE_MOTION && isGrabbing) location = HBRApplyLookDelta(location);\n    CGFloat screenScale = self.screenScale;')
+surface.write_text(content);patches.append({'file':'Natives/SurfaceViewController.m','boundedInputLifecycle':True})
+
+awt=ENGINE/'Natives/JavaGUIViewController.m'
+content=awt.read_text()
+a=content.index('@interface SurfaceView()')
+b=content.index('@interface ScrollableSurfaceView',a)
+content=content[:a]+(IOS/'Native/HarborJavaInstallerSurface.inc').read_text()+content[b:]
+content=swap(content,'@property(nonatomic) ScrollableSurfaceView* surfaceScrollView;',
+    '@property(nonatomic) ScrollableSurfaceView* surfaceScrollView;\n@property(nonatomic) NSThread *harborFrameThread;\n@property(nonatomic,weak) SurfaceView *harborFrameSurface;')
+a=content.index('    // Register the display loop')
+b=content.index('    launchJVM(',a)
+start=content.rindex('dispatch_async(',a,b)
+content=content[:a]+(IOS/'Native/HarborJavaInstallerLifecycle.inc').read_text()+content[start:]
+marker='- (void)loadCustomControls {'
+content=swap(content,marker,'''
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    self.harborFrameSurface.harborVisible = YES;
 }
-- (void)updateAudioSettings {''')
-replace('Natives/SurfaceViewController.m','- (void)updateGrabState {','- (void)updateGrabState {\n    HBRUpdateGameGrabState();')
-replace('Natives/SurfaceViewController.m','    CGFloat screenScale = self.screenScale;','    if (event == ACTION_MOVE_MOTION && isGrabbing) location = HBRApplyLookDelta(location);\n    CGFloat screenScale = self.screenScale;')
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    self.harborFrameSurface.harborVisible = NO;
+}
+
+- (void)viewDidDisappear:(BOOL)animated {
+    [super viewDidDisappear:animated];
+    if (!self.view.window) {
+        [self.harborFrameThread cancel];
+        if (surfaceView == self.harborFrameSurface) surfaceView = nil;
+    }
+}
+
+- (void)dealloc {
+    [self.harborFrameThread cancel];
+    if (surfaceView == self.harborFrameSurface) surfaceView = nil;
+}
+
+- (void)loadCustomControls {
+'''.lstrip())
+awt.write_text(content);patches.append({'file':'Natives/JavaGUIViewController.m','boundedJavaFrameLifecycle':True})
 replace('Natives/installer/ForgeInstallViewController.m', '#import "AFNetworking.h"',
         '#import "AFNetworking.h"\n#import "HarborEngineAdapter.h"')
 replace('Natives/installer/ForgeInstallViewController.m',
@@ -280,9 +335,6 @@ content=content[:a]+'''    NSString *name = altName ?: path.lastPathComponent;
     });
 }
 '''+content[b:]
-def swap(text,old,new,count=1):
-    assert text.count(old)==count,(text.count(old),old[:80])
-    return text.replace(old,new)
 # Queue starts, so the mirror idle timeout never measures time spent waiting.
 content=swap(content,'    [task resume];','    HBRStartPublicTransfer(task);',3)
 for batch in ('libTasks','assetTasks'):

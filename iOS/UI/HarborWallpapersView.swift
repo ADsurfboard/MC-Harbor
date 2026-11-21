@@ -87,7 +87,12 @@ private struct HarborWallpaperThumbnail: View {
                 else { Image(systemName: "photo").frame(maxWidth: .infinity, maxHeight: .infinity).foregroundStyle(.secondary) }
                 if item.video { Image(systemName: "video.fill").font(.caption.bold()).foregroundStyle(.white).padding(6).background(.black.opacity(0.45), in: RoundedRectangle(cornerRadius: 7)).padding(5) }
             }.frame(width: geometry.size.width, height: geometry.size.height).clipped()
-        }.task(id: item.id) { image = await state.thumbnail(item) }
+        }
+        .task(id: item.id) {
+            let result = await state.thumbnail(item)
+            if !Task.isCancelled { image = result }
+        }
+        .onDisappear { image = nil }
     }
 }
 
@@ -97,6 +102,7 @@ private struct HarborWallpaperDetail: View {
     @State private var image: UIImage?
     @State private var failure: String?
     @State private var player: AVQueuePlayer?
+    @State private var videoURL: URL?
     @State private var looper: AVPlayerLooper?
     @State private var playing = false
     @AppStorage(HarborAppearance.exclusiveOptimizationKey) private var exclusive = false
@@ -113,9 +119,8 @@ private struct HarborWallpaperDetail: View {
                 Label(item.video ? "动态壁纸 · 使用后静音循环播放" : "静态壁纸", systemImage: item.video ? "video" : "photo").foregroundStyle(.secondary)
                 if item.video {
                     Button(playing ? "暂停视频预览" : "播放视频预览") {
-                        playing.toggle(); state.setPreviewing(playing)
-                        if playing { player?.play() } else { player?.pause() }
-                    }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).disabled(player == nil || exclusive)
+                        if playing { stopPreview() } else { playPreview() }
+                    }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).disabled(videoURL == nil || exclusive)
                     if exclusive { Text("独家优化已开启，动态壁纸使用静态预览。").font(.footnote).foregroundStyle(.secondary) }
                 }
                 if let failure { Text(failure).foregroundStyle(.red) }
@@ -129,21 +134,50 @@ private struct HarborWallpaperDetail: View {
                 guard let library = state.library else { return }
                 do {
                     if item.video {
-                        image = await state.thumbnail(item)
-                        let url = try await library.media(item); try Task.checkCancellation()
-                        let queue = AVQueuePlayer(); queue.isMuted = true; queue.allowsExternalPlayback = false
-                        looper = AVPlayerLooper(player: queue, templateItem: AVPlayerItem(url: url)); player = queue
+                        let poster = await state.thumbnail(item)
+                        let url = try await library.media(item)
+                        try Task.checkCancellation()
+                        image = poster
+                        videoURL = url
                     }
                     else {
                         let url = try await library.media(item)
                         let data = try await Task.detached(priority: .utility) { try HarborWallpaperMedia.png(HarborWallpaperMedia.image(url, maximum: 2560)) }.value
+                        try Task.checkCancellation()
                         image = HarborWallpaperState.previewImage(data)
                     }
-                } catch { failure = error.localizedDescription }
+                } catch is CancellationError { }
+                catch { failure = error.localizedDescription }
             }
             .onChange(of: phase) { if $0 != .active { stopPreview() } }
             .onChange(of: exclusive) { if $0 { stopPreview() } }
-            .onDisappear { stopPreview(); looper?.disableLooping(); looper = nil; player?.removeAllItems(); player = nil }
+            .onDisappear {
+                stopPreview()
+                image = nil
+                videoURL = nil
+            }
     }
-    private func stopPreview() { player?.pause(); playing = false; state.setPreviewing(false) }
+
+    private func playPreview() {
+        guard let videoURL, phase == .active, !exclusive else { return }
+        state.setPreviewing(true)
+        let queue = AVQueuePlayer()
+        queue.isMuted = true
+        queue.allowsExternalPlayback = false
+        looper = AVPlayerLooper(player: queue, templateItem: AVPlayerItem(url: videoURL))
+        player = queue
+        playing = true
+        queue.play()
+    }
+
+    private func stopPreview() {
+        guard playing else { return }
+        player?.pause()
+        looper?.disableLooping()
+        looper = nil
+        player?.removeAllItems()
+        player = nil
+        playing = false
+        state.setPreviewing(false)
+    }
 }

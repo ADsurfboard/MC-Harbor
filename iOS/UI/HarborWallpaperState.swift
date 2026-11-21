@@ -17,6 +17,8 @@ import Combine
     private(set) var library: WallpaperLibrary?
     private var home: URL?
     private var looper: AVPlayerLooper?
+    private var selectedVideo: URL?
+    private var resumeTime: CMTime = .zero
     private var observers: Set<AnyCancellable> = []
     private var active = true
     private var inGame = false
@@ -51,17 +53,42 @@ import Combine
     func setPolicy(exclusive: Bool) { guard self.exclusive != exclusive else { return }; self.exclusive = exclusive; updatePlayback() }
     func setPreviewing(_ value: Bool) { previewing = value; updatePlayback() }
     private func updatePlayback() {
-        if active && !inGame && !exclusive && !previewing { player?.play() } else { player?.pause() }
+        guard active, !inGame, !exclusive, !previewing, let selectedVideo else {
+            if let player, player.currentTime().seconds.isFinite {
+                resumeTime = player.currentTime()
+            }
+            stopPlayer()
+            return
+        }
+        if player == nil {
+            let queue = AVQueuePlayer()
+            queue.isMuted = true
+            queue.allowsExternalPlayback = false
+            looper = AVPlayerLooper(player: queue, templateItem: AVPlayerItem(url: selectedVideo))
+            player = queue
+            if resumeTime.seconds > 0 { queue.seek(to: resumeTime) }
+        }
+        player?.play()
     }
     private func stopPlayer() {
-        player?.pause(); looper?.disableLooping(); looper = nil; player?.removeAllItems(); player = nil
+        guard let player else { return }
+        player.pause()
+        looper?.disableLooping()
+        looper = nil
+        player.removeAllItems()
+        self.player = nil
     }
     func refresh() async {
         guard let library else { return }
-        do { snapshot = try await library.load(); await displaySelection() } catch { self.error = error.localizedDescription; stopPlayer(); image = nil }
+        do { snapshot = try await library.load(); await displaySelection() } catch { self.error = error.localizedDescription; selectedVideo = nil; stopPlayer(); image = nil }
     }
     private func displaySelection() async {
-        let current = UUID(); generation = current; stopPlayer(); image = nil
+        let current = UUID()
+        generation = current
+        selectedVideo = nil
+        resumeTime = .zero
+        stopPlayer()
+        image = nil
         guard let library, let id = snapshot.selected, let item = snapshot.items.first(where: { $0.id == id }) else { return }
         do {
             let url = try await library.media(item)
@@ -69,9 +96,8 @@ import Combine
                 let data = try await library.preview(item.id)
                 guard generation == current else { return }
                 image = Self.previewImage(data)
-                let queue = AVQueuePlayer(); queue.isMuted = true; queue.allowsExternalPlayback = false
-                let loop = AVPlayerLooper(player: queue, templateItem: AVPlayerItem(url: url))
-                looper = loop; player = queue; updatePlayback()
+                selectedVideo = url
+                updatePlayback()
             } else {
                 let data = try await Task.detached(priority: .utility) { try HarborWallpaperMedia.png(HarborWallpaperMedia.image(url, maximum: 2560)) }.value
                 guard generation == current else { return }
@@ -80,15 +106,15 @@ import Combine
             }
         } catch { if generation == current { self.error = error.localizedDescription; stopPlayer(); image = nil } }
     }
-    static func previewImage(_ data: Data) -> UIImage? {
+    static func previewImage(_ data: Data, pixels: Int = 2560) -> UIImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary),
               let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [kCGImageSourceCreateThumbnailFromImageAlways: true,
-                  kCGImageSourceThumbnailMaxPixelSize: 2560, kCGImageSourceShouldCacheImmediately: true] as CFDictionary) else { return nil }
+                  kCGImageSourceThumbnailMaxPixelSize: pixels, kCGImageSourceShouldCacheImmediately: true] as CFDictionary) else { return nil }
         return UIImage(cgImage: image)
     }
     func thumbnail(_ item: HarborWallpaper) async -> UIImage? {
         if let image = previews.object(forKey: item.id as NSUUID) { return image }
-        guard let library, let data = try? await library.preview(item.id), let image = Self.previewImage(data) else { return nil }
+        guard let library, let data = try? await library.preview(item.id), let image = Self.previewImage(data, pixels: 448), !Task.isCancelled else { return nil }
         previews.setObject(image, forKey: item.id as NSUUID, cost: Int(image.size.width * image.size.height * 4)); return image
     }
     func select(_ id: UUID?) async {

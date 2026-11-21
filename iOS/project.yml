@@ -57,7 +57,10 @@ targets:
   HarborIOSHarness:
     type: application
     platform: iOS
-    sources: [Harness]
+    sources:
+      - Harness
+      - path: ../tests/fixtures/wallpaper.mp4
+        buildPhase: resources
     dependencies:
       - target: HarborIOSUI
       - target: HarborCore

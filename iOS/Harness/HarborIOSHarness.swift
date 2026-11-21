@@ -64,8 +64,17 @@ struct HarnessRoot: UIViewControllerRepresentable {
                 if let data = image.pngData() {
                     try? data.write(to: folder.appendingPathComponent(id + ".png"))
                     try? data.write(to: folder.appendingPathComponent(id + ".preview.png"))
-                    let object: [String: Any] = ["items": [["id": id, "name": "QA Wallpaper", "filename": id + ".png", "video": false, "added": Date().timeIntervalSinceReferenceDate]]]
-                    if let json = try? JSONSerialization.data(withJSONObject: object) { try? json.write(to: index) }
+                    let added = Date().timeIntervalSinceReferenceDate
+                    var items: [[String: Any]] = [["id": id, "name": "QA Wallpaper", "filename": id + ".png", "video": false, "added": added]]
+                    if let movie = Bundle.main.url(forResource: "wallpaper", withExtension: "mp4") {
+                        let videoID = "22345678-1234-4321-8765-123456789ABC"
+                        do {
+                            try FileManager.default.copyItem(at: movie, to: folder.appendingPathComponent(videoID + ".mp4"))
+                            try data.write(to: folder.appendingPathComponent(videoID + ".preview.png"))
+                            items.append(["id": videoID, "name": "QA Video Wallpaper", "filename": videoID + ".mp4", "video": true, "added": added])
+                        } catch { NSLog("[Harbor QA] Could not create video fixture: %@", error.localizedDescription) }
+                    }
+                    if let json = try? JSONSerialization.data(withJSONObject: ["items": items]) { try? json.write(to: index) }
                 }
             }
         }
