@@ -14,12 +14,15 @@ spec.loader.exec_module(publisher)
 
 class SharedReleaseTests(unittest.TestCase):
     def test_existing_mac_files_are_preserved_and_different_windows_files_rejected(self):
-        local = {"MC-Harbor-Windows-1.7.1-x64-portable.zip": (42, "sha256:" + "a" * 64)}
+        local = {"MC-Harbor-1.7.1-Windows-x64-portable.zip": (42, "sha256:" + "a" * 64)}
         mac = {"name": "MC-Harbor-1.7.1-macOS-arm64.zip", "size": 100, "digest": "sha256:" + "b" * 64}
         self.assertEqual(publisher.missing_assets([mac], local, "1.7.1"), list(local))
         with self.assertRaisesRegex(ValueError, "differs"):
             publisher.missing_assets([mac, {"name": next(iter(local)), "size": 42,
                                             "digest": "sha256:" + "c" * 64}], local, "1.7.1")
+        with self.assertRaisesRegex(ValueError, "unexpected Windows"):
+            publisher.missing_assets([mac, {"name": "MC-Harbor-Windows-1.7.1-x64-Setup.msi",
+                                            "size": 42, "digest": "sha256:" + "c" * 64}], local, "1.7.1")
 
     def test_shared_description_keeps_mac_text_and_is_idempotent(self):
         old = "macOS 说明\n\n- 增加windows版**（目前只制作了x64适配）**\n"

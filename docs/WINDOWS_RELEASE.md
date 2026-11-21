@@ -4,11 +4,11 @@
 
 ## 内容与下载
 
-- `MC-Harbor-Windows-1.7.1-x64-Setup.msi`：中文安装器，包含运行库，安装到 Program Files，并创建开始菜单入口。
-- `MC-Harbor-Windows-1.7.1-x64-Setup.zip`：安装版发行压缩包，包含同一份 MSI、中文安装说明、发行说明、项目许可及第三方许可说明。完整解压后运行 MSI；其载荷与单独下载的 MSI 一致。
-- `MC-Harbor-Windows-1.7.1-x64-portable.zip`：包含运行库的便携版，解压后打开 `MC Harbor.exe`，数据保存在该目录的 `MCHarborData`。
-- `MC-Harbor-Windows-1.7.1-source.zip`：从对应提交导出的完整源码、构建脚本、许可证和必要素材，包含固定 HMCL 内核对应源码归档。
-- `SHA256SUMS-windows-1.7.1.txt`：上述附件的 SHA-256 校验清单。
+- `MC-Harbor-1.7.1-Windows-x64-Setup.msi`：中文安装器，包含运行库，安装到 Program Files，并创建开始菜单入口。
+- `MC-Harbor-1.7.1-Windows-x64-Setup.zip`：安装版发行压缩包，包含同一份 MSI、中文安装说明、发行说明、项目许可及第三方许可说明。完整解压后运行 MSI；其载荷与单独下载的 MSI 一致。
+- `MC-Harbor-1.7.1-Windows-x64-portable.zip`：包含运行库的便携版，解压后打开 `MC Harbor.exe`，数据保存在该目录的 `MCHarborData`。
+- `MC-Harbor-1.7.1-Windows-x64-source.zip`：从对应提交导出的完整源码、构建脚本、许可证和必要素材，包含固定 HMCL 内核对应源码归档。
+- `SHA256SUMS-1.7.1-Windows-x64.txt`：上述附件的 SHA-256 校验清单。
 
 安装版数据保存在 `%LOCALAPPDATA%\MCHarbor`。发行附件不包含账号、游戏、存档、个人壁纸、翻译模型或玩家配置。需要在使用时安装或下载的模型与外部服务仍由用户选择。
 
