@@ -3,9 +3,15 @@
   <Package Name="MC Harbor" Manufacturer="MC Harbor" Version="$(ProductVersion)"
            UpgradeCode="{43674F15-1C0E-4B55-9D0D-5C9FEE3CD055}"
            Language="2052" Codepage="936" InstallerVersion="500" Scope="perMachine">
-    <MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="此电脑已安装更新版本的 MC Harbor。" />
+    <MajorUpgrade Schedule="afterInstallInitialize" AllowSameVersionUpgrades="yes"
+                  DowngradeErrorMessage="此电脑已安装更新版本的 MC Harbor。" />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
-    <Launch Condition="Installed OR (VersionNT64 AND WindowsBuild &gt;= 17763)"
+    <!-- Windows Installer can report the compatibility build 9600 on Windows 10. -->
+    <Property Id="HARBOR_WINDOWS_BUILD" Secure="yes">
+      <RegistrySearch Id="HarborWindowsBuildNumber" Root="HKLM" Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+                      Name="CurrentBuildNumber" Type="raw" Bitness="always64" />
+    </Property>
+    <Launch Condition="Installed OR (VersionNT64 AND HARBOR_WINDOWS_BUILD &gt;= 17763)"
             Message="MC Harbor 需要 Windows 10 1809 或以上版本的 64 位 Windows。" />
 
     <Icon Id="HarborIcon.exe" SourceFile="$(PublishDir)\MC Harbor.exe" />
