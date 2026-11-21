@@ -296,13 +296,24 @@ enum JavaBridge {
         try? stdout.fileHandleForWriting.close()
         DispatchQueue.global(qos: .userInitiated).async {
             let output = stdout.fileHandleForReading
-            do {
-                while let data = try output.read(upToCount: 65_536), !data.isEmpty { reader.receive(data) }
-                reader.outputEnded()
-            } catch {
-                reader.outputEnded(error: error)
+            defer { try? output.close() }
+            var bytes = [UInt8](repeating: 0, count: 65_536)
+            while true {
+                // A single read forwards short progress events while the game
+                // is still running. Foundation's sized read can wait for EOF.
+                let count = bytes.withUnsafeMutableBytes {
+                    Darwin.read(output.fileDescriptor, $0.baseAddress, $0.count)
+                }
+                if count > 0 {
+                    reader.receive(Data(bytes.prefix(count)))
+                } else if count == 0 {
+                    reader.outputEnded()
+                    return
+                } else if errno != EINTR {
+                    reader.outputEnded(error: NSError(domain: NSPOSIXErrorDomain, code: Int(errno)))
+                    return
+                }
             }
-            try? output.close()
         }
         do {
             try stdin.fileHandleForWriting.write(contentsOf: data + Data([10]))
