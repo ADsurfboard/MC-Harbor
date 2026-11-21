@@ -53,7 +53,7 @@ MSI 需要 WiX 5.0.2 及 `WixToolset.UI.wixext` 5.0.2。可用 `dotnet tool inst
 
 原 Windows 移植 [PR #1](https://github.com/ADsurfboard/MC-Harbor/pull/1) 已合并到上游 `windows`。个人仓库的 [Windows 1.7.1 预览附件](https://github.com/shiziyueyuan/MC-Harbor/releases/tag/windows-v1.7.1) 保留为原有构建记录；它不是上游 Windows Release，也不会被这次打包流程覆盖。后续打包与发布流程的改动继续向上游 `windows` 提交 PR。
 
-审核合并后，在上游已审核的 `windows` 提交创建并推送与 `SOURCE.json` 完全一致的专用标签（本版为 `windows-v1.7.1`）。标签必须指向 `windows` 的历史；不要标记主分支或另一个平台的提交，也不要移动已发布标签。
+审核合并后，先确认上游同版本正式 Release（`v版本号`）已公开且为 Latest，并保留其 macOS 附件与说明。随后在上游已审核的 `windows` 提交创建并推送与 `SOURCE.json` 完全一致的专用构建标签（本版为 `windows-v1.7.1`）。该标签必须指向 `windows` 的历史；不要标记主分支或另一个平台的提交，也不要移动已发布标签。Windows 构建标签用于追溯源码，不另建独立的公开 Release。
 
 ```powershell
 # 在干净工作区确认上游 windows 与版本；<已审核提交> 替换为实际完整 SHA。
@@ -62,6 +62,6 @@ git tag windows-v1.7.1 <已审核提交>
 git push upstream refs/tags/windows-v1.7.1
 ```
 
-标签推送触发同一个 Windows 构建任务。仅在 `ADsurfboard/MC-Harbor` 的 Windows 标签构建全部成功后，独立的 `release` 任务取得 `contents: write` 权限：下载该次构建附件、校验四份文件 SHA-256，创建 Windows 预览版草稿，上传五份下载附件，并对照 GitHub 返回的附件 SHA-256 和大小后发布。源码 ZIP 的提交必须与标签一致；失败时保留草稿以便重跑排查，不覆盖已公开 Release。Windows 预览版使用 `--latest=false`，保留当前 macOS 正式版的 Latest 状态。
+标签推送触发同一个 Windows 构建任务。仅在 `ADsurfboard/MC-Harbor` 的 Windows 标签构建全部成功后，`release` 任务取得 `contents: write` 权限：下载该次构建附件、校验四份文件 SHA-256 与源码提交，确认同版本正式 Release 仍为 Latest，再将五份 Windows 附件上传到这个共同发布页。发布任务对照 GitHub 返回的 SHA-256 和大小，保留原 macOS 附件及说明，并在同一个描述中追加 Windows 的下载、安装和验证说明。已有同名 Windows 附件只有字节一致才允许重跑；不同内容会中止，不覆盖已公开附件。若同版本正式 Release 尚未发布，任务会停止，待 macOS 发布后从匹配版本的 Windows 标签构建重试。
 
 发行附件通过 GitHub Release 分发，CI 构建记录通过 Actions artifacts 分发。ZIP、MSI 和校验清单不提交到源码 Git 历史；这里的 package 指 Windows 发行打包，不另建 GitHub Packages 仓库。
