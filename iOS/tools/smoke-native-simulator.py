@@ -6,6 +6,7 @@ are modified. Cleanup diagnostics must never mask the original failure.
 """
 import json, os, plistlib, re, shutil, subprocess, time, uuid, zipfile, runpy
 from pathlib import Path
+from simulator_recording import run_recorded_tests
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / 'build/MC-Harbor-simulator.app'
@@ -70,10 +71,15 @@ try:
     world_fixture = runpy.run_path(str(ROOT / 'tools/native-world-fixture.py'))
     world_file = datapack.parent.parent / 'level.dat'
     original_world = world_fixture['create'](); world_file.write_bytes(original_world)
-    run(['xcodebuild', '-project', str(ROOT / 'MCHarborIOS.xcodeproj'), '-scheme', 'HarborNativeRuntimeTests',
+    report['phase'] = 'native-xctest'
+    command = ['xcodebuild', '-project', str(ROOT / 'MCHarborIOS.xcodeproj'), '-scheme', 'HarborNativeRuntimeTests',
          '-destination', 'platform=iOS Simulator,id=' + udid, '-parallel-testing-enabled', 'NO',
          '-maximum-concurrent-test-simulator-destinations', '1', '-derivedDataPath', str(ROOT / 'DerivedData'),
-         '-resultBundlePath', str(OUT / 'native-profile.xcresult'), 'CODE_SIGNING_ALLOWED=NO', 'test'], timeout=900)
+         '-resultBundlePath', str(OUT / 'native-profile.xcresult'), 'CODE_SIGNING_ALLOWED=NO', 'test']
+    completed = run_recorded_tests(command, device=udid, timeout=900,
+                                   clips={'testLocalModpackImportOpensFilesAndCanCancel': 'iPhone-Native-Modpack-Import'},
+                                   directory=ROOT / 'evidence/recordings/native')
+    completed.check_returncode()
     assert ready.is_file() and ready.read_text() == 'HARBOR_ROOT_READY', 'The complete native app did not reach its SwiftUI root'
     assert (home / 'accounts').is_dir(), 'Private account storage was not initialized'
     assert not (data / 'Documents/accounts').exists(), 'Accounts must not be Files-shared'

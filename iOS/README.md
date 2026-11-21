@@ -37,6 +37,8 @@ iOS / iPadOS 26 及以上保留原生 Liquid Glass：实例卡片、启动按钮
 
 CI 先将设备 ARM64 交叉构建放在 Intel 执行器，模拟器与界面检查复用一台 ARM 执行器，以减少 GitHub ARM 容量不足造成的排队取消。每个测试的断言仍保留。对应结果以 [最新 iOS Actions](https://github.com/ADsurfboard/MC-Harbor/actions/workflows/ios-compat.yml?query=branch%3Acodex%2Fios-port) 的具体提交为准；旧失败记录不删除。
 
+云端验收同时录制 iPhone / iPad 上的实例封面流、iPhone 模组夹及完整 App 的 Files 导入操作。视频按测试单独输出为 MP4，可从 Actions 的 `ios-ui-recordings` 和 `ios-native-recordings` 下载。
+
 构建输出包含保留执行权限的 IPA 与模拟器 ZIP，并记录 SHA-256。当前为工程预览：IPA 是临时签名，需要个人开发签名和受支持的 JIT 授权；模拟器 ZIP 需要 Apple 模拟器，不是可直接在 macOS 双击运行的 App。这些产物不等于已经通过 Minecraft 实玩或完整功能验收的正式 iOS 发行版。
 
 原版 Minecraft 与支持镜像的加载器沿用“资源与翻译”里选择的下载顺序。BMCLAPI 提供游戏版本索引、资源及 Fabric、Forge、NeoForge 的镜像。实例资源和导入 Modrinth 整合包时下载的 Modrinth CDN 文件使用 MCIM。超时、无效响应和内容校验失败时会尝试对应的备用来源。下载先落到临时文件，提交成功才计作完成，已有文件会保留到校验通过。Microsoft 和外置账号认证不使用游戏镜像。

@@ -103,6 +103,7 @@ jobs:
     runs-on: macos-15
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+      HARBOR_RECORD_SIMULATOR: "1"
     timeout-minutes: 85
     steps:
       - uses: actions/checkout@v4
@@ -125,6 +126,17 @@ jobs:
       - name: Run actual iPhone and iPad UI tests
         working-directory: iOS
         run: python3 tools/test-simulator-ui.py
+      - name: Verify the iPhone and iPad recordings
+        run: python3 iOS/tools/simulator_recording.py iOS/evidence/recordings/iPhone iOS/evidence/recordings/iPad
+      - name: Retain iPhone and iPad recordings
+        if: ${{ always() && !cancelled() && hashFiles('iOS/evidence/recordings/iPhone/clips.json', 'iOS/evidence/recordings/iPad/clips.json') != '' }}
+        uses: ./.github/actions/upload-artifact-retry
+        with:
+          name: ios-ui-recordings
+          compression-level: 0
+          path: |
+            iOS/evidence/recordings/iPhone
+            iOS/evidence/recordings/iPad
       - name: Retain build diagnostics
         if: always()
         uses: ./.github/actions/upload-artifact-retry
@@ -165,10 +177,21 @@ jobs:
         if: ${{ !cancelled() && steps.native_tools.outcome == 'success' }}
         run: python3 iOS/tools/build-native-engine.py --platform simulator
       - name: Install and launch the complete native app on iPhone simulator
+        id: native_smoke
         if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
         run: python3 iOS/tools/smoke-native-simulator.py
+      - name: Verify the complete native app recording
+        if: ${{ !cancelled() && steps.native_smoke.outcome == 'success' }}
+        run: python3 iOS/tools/simulator_recording.py iOS/evidence/recordings/native
+      - name: Retain the complete native app recording
+        if: ${{ always() && !cancelled() && hashFiles('iOS/evidence/recordings/native/clips.json') != '' }}
+        uses: ./.github/actions/upload-artifact-retry
+        with:
+          name: ios-native-recordings
+          compression-level: 0
+          path: iOS/evidence/recordings/native
       - name: Retain native engine and diagnostics
-        if: always()
+        if: ${{ always() && !cancelled() && (steps.native_build.outcome == 'success' || hashFiles('iOS/evidence/native-*.json', 'iOS/.build/engine-simulator/patch-proof.json') != '') }}
         uses: ./.github/actions/upload-artifact-retry
         with:
           name: ios-native-engine-verification-simulator

@@ -2,6 +2,7 @@
 """Run the native app UI on disposable iPhone and iPad simulators."""
 import subprocess,json,uuid,time,os
 from pathlib import Path
+from simulator_recording import run_recorded_tests
 ROOT=Path(__file__).resolve().parents[1]; EVIDENCE=ROOT/'evidence'; EVIDENCE.mkdir(exist_ok=True)
 def run(args,**kwargs): return subprocess.run(args,check=True,**kwargs)
 all_devices=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','--json']))['devices']
@@ -54,7 +55,11 @@ for family,device_type,runtime in choices:
   # This UUID has just been created, so it cannot contain an earlier run's
   # marker. Check the actual marker after all UI assertions, including clones.
   phase='xctest-cold-launch'
-  completed=subprocess.run(['xcodebuild','-project','MCHarborIOS.xcodeproj','-scheme','HarborIOSHarness','-destination','platform=iOS Simulator,id='+device,'-parallel-testing-enabled','NO','-maximum-concurrent-test-simulator-destinations','1','-derivedDataPath','DerivedData','-resultBundlePath',str(result),'CODE_SIGNING_ALLOWED=NO','test'],cwd=ROOT,timeout=1200)
+  command=['xcodebuild','-project','MCHarborIOS.xcodeproj','-scheme','HarborIOSHarness','-destination','platform=iOS Simulator,id='+device,'-parallel-testing-enabled','NO','-maximum-concurrent-test-simulator-destinations','1','-derivedDataPath','DerivedData','-resultBundlePath',str(result),'CODE_SIGNING_ALLOWED=NO','test']
+  clips={'testCoverFlowSwipesSelectionAndRestoresList':f'{family}-Cover-Flow'}
+  if family=='iPhone':
+   clips['testModFolderForegroundEmptyStateAndPersistence']='iPhone-Mod-Folders'
+  completed=run_recorded_tests(command,device=device,clips=clips,directory=EVIDENCE/'recordings'/family,timeout=1200,cwd=ROOT)
   # Xcode may reinstall into a new data container or run on its own clone.
   # Resolve after XCTest, and inspect only this run's uniquely named devices.
   candidates=[d for d in device_inventory()+device_inventory('testing') if d['udid']==device or device_name in d['name']]
