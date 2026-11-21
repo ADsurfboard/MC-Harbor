@@ -84,6 +84,11 @@ jobs:
           command -v xcodegen || brew install xcodegen
           command -v cmake || brew install cmake
           command -v ldid || brew install ldid
+      - name: Cache verified iOS Java archives
+        uses: actions/cache@v4
+        with:
+          path: iOS/.build/java-runtimes
+          key: ios-java-runtimes-${{ hashFiles('iOS/Native/JavaRuntimes.json') }}
       - name: Build real iPhone ARM64 app and IPA
         run: python3 iOS/tools/build-native-engine.py --platform device
       - name: Retain device package and diagnostics
@@ -172,6 +177,12 @@ jobs:
           command -v xcodegen || brew install xcodegen
           command -v cmake || brew install cmake
           command -v ldid || brew install ldid
+      - name: Cache verified iOS Java archives
+        if: ${{ !cancelled() && steps.native_tools.outcome == 'success' }}
+        uses: actions/cache@v4
+        with:
+          path: iOS/.build/java-runtimes
+          key: ios-java-runtimes-${{ hashFiles('iOS/Native/JavaRuntimes.json') }}
       - name: Build real JVM, graphics and native touch integration
         id: native_build
         if: ${{ !cancelled() && steps.native_tools.outcome == 'success' }}

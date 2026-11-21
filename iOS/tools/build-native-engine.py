@@ -5,6 +5,7 @@ All patches apply to a marked, reproducible build copy. Neither the submodule no
 the macOS source, installed app, player data or credentials are modified.
 """
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 import argparse, subprocess, shutil, json, plistlib, os, hashlib, sys, re, tempfile, zipfile, stat
 
 IOS=Path(__file__).resolve().parents[1]; REPO=IOS.parent
@@ -21,6 +22,43 @@ sdk='iphoneos' if args.platform=='device' else 'iphonesimulator'
 def run(command,cwd=REPO,**kwargs):
     print('+',' '.join(map(str,command)),flush=True)
     return subprocess.run(list(map(str,command)),cwd=cwd,check=True,**kwargs)
+
+def stage_java_runtimes():
+    lock=json.loads((IOS/'Native/JavaRuntimes.json').read_text())
+    cache=IOS/'.build/java-runtimes'
+    cache.mkdir(parents=True,exist_ok=True)
+    dependencies=ENGINE/'depends'
+    dependencies.mkdir()
+
+    def verify(path,expected):
+        if not path.is_file():return False
+        with path.open('rb') as archive:
+            return hashlib.file_digest(archive,'sha256').hexdigest()==expected
+
+    def stage(runtime):
+        major,metadata=runtime
+        filename=f'jre{major}-ios-aarch64.zip'
+        archive=cache/filename
+        expected=metadata['sha256']
+        if not verify(archive,expected):
+            with tempfile.NamedTemporaryFile(dir=cache,prefix=filename+'.',delete=False) as download:
+                partial=Path(download.name)
+            try:
+                run(['curl','--fail','--location','--retry','4','--retry-all-errors','--retry-delay','3',
+                     '--connect-timeout','15','--max-time','180','--max-filesize','104857600',
+                     '--output',partial,lock['baseURL']+filename])
+                if not verify(partial,expected):
+                    raise RuntimeError(f'Java {major} upstream archive did not match the pinned SHA-256')
+                partial.replace(archive)
+            finally:
+                partial.unlink(missing_ok=True)
+        with zipfile.ZipFile(archive) as source, source.open(metadata['archive']) as compressed:
+            with (dependencies/metadata['archive']).open('wb') as target:
+                shutil.copyfileobj(compressed,target)
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        list(pool.map(stage,lock['runtimes'].items()))
+
 assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=SOURCE,text=True).strip()==UPSTREAM
 assert not subprocess.check_output(['git','diff','--name-only'],cwd=SOURCE),'Upstream checkout has local changes'
 if ENGINE.exists():
@@ -594,7 +632,19 @@ s=s.replace('&& cmake \\\n','&& cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \\\n')
 # Retain the upstream runtime's license / notices in every distributable.
 s=s.replace('ASSEMBLY_EXCEPTION,bin,include,jre,legal,LICENSE,man,THIRD_PARTY_README,','bin,include,jre,man,')
 if args.platform=='simulator':s=s.replace('--platform iphoneos','--platform iphonesimulator')
-s=s.replace('curl -OJfSL', 'curl --connect-timeout 15 --max-time 600 --retry 2 -OJfSL')
+begin=s.index('# Function to download and unpack Java runtimes.')
+end=s.index('# Function to codesign binaries.',begin)
+s=s[:begin]+r'''# Reproducible tarballs are downloaded and verified by build-native-engine.py.
+METHOD_JAVA_UNPACK = \
+	cd "$(SOURCEDIR)/depends" || exit 1; \
+	runtime_archive=$$(find . -maxdepth 1 -type f -name 'jre$(1)-*.tar.xz' -print); \
+	test -f "$$runtime_archive" || { echo "Java $(1): missing or ambiguous runtime archive" >&2; exit 1; }; \
+	mkdir -p "java-$(1)-openjdk" || exit 1; \
+	tar -xJf "$$runtime_archive" -C "java-$(1)-openjdk" || exit $$?; \
+	test -s "java-$(1)-openjdk/release" || { echo "Java $(1): incomplete runtime" >&2; exit 1; }; \
+	rm -f "$$runtime_archive"
+
+'''+s[end:]
 make.write_text(s)
 
 # Reuse the project's real icon. The system owns the final rounded mask.
@@ -638,6 +688,7 @@ assert motion_calls >= 45, 'Native motion policy missed expected presentation si
 if args.prepare_only:
     print('Prepared pinned native engine:',ENGINE,flush=True);sys.exit(0)
 
+stage_java_runtimes()
 run(['xcodegen','generate'],cwd=IOS)
 derived=IOS/'build'/('ui-'+args.platform)
 run(['xcodebuild','-project','MCHarborIOS.xcodeproj','-scheme','HarborIOSUI','-configuration','Release','-sdk',sdk,'-destination','generic/platform='+('iOS' if args.platform=='device' else 'iOS Simulator'),'-derivedDataPath',derived,'ARCHS=arm64','ONLY_ACTIVE_ARCH=NO','CODE_SIGNING_ALLOWED=NO','build'],cwd=IOS)
@@ -669,11 +720,29 @@ sdkpath=subprocess.check_output(['xcrun','--sdk',sdk,'--show-sdk-path'],text=Tru
 java_home=os.environ.get('JAVA_HOME_8_ARM64') or os.environ.get('JAVA_HOME')
 if not java_home:java_home=subprocess.check_output(['/usr/libexec/java_home','-v','1.8'],text=True).strip()
 java_bin=Path(java_home)/'bin'
-run(['make','-j2','payload','SDKPATH='+sdkpath,'BOOTJDK='+str(java_bin),'PLATFORM='+('2' if args.platform=='device' else '7'),'RELEASE=0','JOBS=2','RUNNER=0'],cwd=ENGINE)
+run(['make','-j2','payload','SDKPATH='+sdkpath,'BOOTJDK='+str(java_bin),'PLATFORM='+('2' if args.platform=='device' else '7'),'RELEASE=0','JOBS=2','RUNNER=1'],cwd=ENGINE)
 produced=ENGINE/'artifacts/Payload/AngelAuraAmethyst.app';assert produced.is_dir()
 destination=IOS/'build'/('MC-Harbor-'+args.platform+'.app')
 if destination.exists():shutil.rmtree(destination)
 shutil.copytree(produced,destination,symlinks=True)
+# Empty JRE directories can still contain the AWT helper. Verify the executable
+# JVM, class library and release identity before signing or advertising an IPA.
+java_runtime_files={}
+for major in (8,17,21,25):
+    directory=destination/'java_runtimes'/f'java-{major}-openjdk'
+    release=directory/'release'
+    release_text=release.read_text()
+    version_prefix=r'1\.8\.' if major==8 else rf'{major}(?:\.|[+\-"])'
+    assert re.search(r'^JAVA_VERSION="'+version_prefix,release_text,re.M),f'Java {major} release file has the wrong version'
+    java_libraries=['lib/server/libjvm.dylib','lib/libjava.dylib']
+    class_library='lib/rt.jar' if major==8 else 'lib/modules'
+    essential=['release',*java_libraries,class_library]
+    for filename in java_libraries:
+        library=directory/filename
+        architectures=subprocess.check_output(['xcrun','lipo','-archs',library],text=True).split()
+        assert 'arm64' in architectures,f'Java {major} does not contain ARM64 {filename}'
+    assert (directory/class_library).stat().st_size >= 1024*1024,f'Java {major} class library is incomplete'
+    java_runtime_files[str(major)]=[str((directory/name).relative_to(destination)) for name in essential]
 # The upstream packaging Makefile rewrites every Mach-O SDK to iOS 16. That
 # opts the main executable out of the new system design even though this app
 # was actually compiled using the current SDK. Restore accurate build metadata
@@ -717,6 +786,20 @@ with zipfile.ZipFile(package) as archive:
     executable=next(x for x in archive.infolist() if x.filename.endswith('.app/AngelAuraAmethyst'))
     assert stat.S_IMODE(executable.external_attr>>16)&0o111,'Packaged app lost its executable permissions'
     assert archive.testzip() is None,'Packaged app failed ZIP integrity verification'
+    runtime_integrity={}
+    entries={member.filename:member for member in archive.infolist()}
+    app_prefix=executable.filename.rsplit('/',1)[0]+'/'
+    for major, paths in java_runtime_files.items():
+        versions={}
+        for relative in paths:
+            original=destination/relative
+            member=entries.get(app_prefix+relative)
+            assert member and member.file_size==original.stat().st_size,f'Java {major} is incomplete in the packaged app'
+            with original.open('rb') as source, archive.open(member) as archived:
+                sha=hashlib.file_digest(source,'sha256').hexdigest()
+                assert hashlib.file_digest(archived,'sha256').hexdigest()==sha,f'Java {major} changed during packaging'
+            versions[relative.rsplit('/',1)[-1]]={'bytes':member.file_size,'sha256':sha}
+        runtime_integrity[major]=versions
 with package.open('rb') as stream: digest=hashlib.file_digest(stream,'sha256').hexdigest()
 voice_assets={}
 for original in sorted((REPO/'Assets/Voice').glob('*.mp3')):
@@ -741,6 +824,6 @@ with zipfile.ZipFile(package) as archive:
         assert len(members)==1 and hashlib.sha256(archive.read(members[0])).hexdigest()==expected, 'Invalid packaged skin viewer resource: '+name
         skin_viewer[name]=expected
 report={'upstream':UPSTREAM,'platform':args.platform,'app':str(destination),'nativeExecutable':(destination/'AngelAuraAmethyst').is_file(),'frameworks':[x.name for x in (destination/'Frameworks').glob('Harbor*.framework')],'javaRuntimes':[x.name for x in (destination/'java_runtimes').iterdir() if x.is_dir()],'package':package.name,'packageBytes':package.stat().st_size,'packageSHA256':digest,'signing':'ad-hoc; device installation requires personal developer signing','minecraftGameplayVerified':False}
-report.update(nativeBuildMetadata=native_build_metadata, nativeLiquidGlassSDK=True, uiConfiguration='Release', welcomeAudio=voice_assets, skinViewer=skin_viewer)
+report.update(javaRuntimeIntegrity=runtime_integrity, nativeBuildMetadata=native_build_metadata, nativeLiquidGlassSDK=True, uiConfiguration='Release', welcomeAudio=voice_assets, skinViewer=skin_viewer)
 (EVIDENCE/('native-build-'+args.platform+'.json')).write_text(json.dumps(report,indent=2))
 print(json.dumps(report),flush=True)

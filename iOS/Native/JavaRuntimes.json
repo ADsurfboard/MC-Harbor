@@ -1,0 +1,21 @@
+{
+  "baseURL": "https://assets.angelauramc.dev/openjdk/ios-arm64/",
+  "runtimes": {
+    "8": {
+      "archive": "jre8-ios-arm64-20260712-release.tar.xz",
+      "sha256": "d39b627dfd96ef0224da3f36641c127da875c801a06ad4beceef02bd38807c59"
+    },
+    "17": {
+      "archive": "jre17-ios-arm64-20260708-release.tar.xz",
+      "sha256": "75e19f724afb6ffc86635fcbccc43e1e8b7345f0794261c745b16678561fe76f"
+    },
+    "21": {
+      "archive": "jre21-ios-arm64-20260708-release.tar.xz",
+      "sha256": "64043966e5e67e47bd244bb1e27f52367895674699f46693703ebd9a120b73fa"
+    },
+    "25": {
+      "archive": "jre25-ios-arm64-20260710-release.tar.xz",
+      "sha256": "3686cc278ff2d394b13cc449907259596451829bab0187786264c598dd6bd888"
+    }
+  }
+}
