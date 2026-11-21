@@ -46,19 +46,19 @@ class ReleaseChecks(unittest.TestCase):
     def test_complete_release_and_identical_installer(self):
         paths = self.assemble()
         self.assertEqual(len(paths), 6)
-        checksums = self.output / "SHA256SUMS-windows-1.7.1.txt"
+        checksums = self.output / "SHA256SUMS-1.7.1-Windows-x64.txt"
         self.assertEqual(len(checksums.read_text().splitlines()), 4)
         for line in checksums.read_text().splitlines():
             digest, name = line.split("  ")
             self.assertEqual(digest, hashlib.sha256((self.output / name).read_bytes()).hexdigest())
-        with zipfile.ZipFile(self.output / "MC-Harbor-Windows-1.7.1-x64-Setup.zip") as archive:
-            prefix = "MC-Harbor-Windows-1.7.1-x64-Setup/"
-            self.assertEqual(archive.read(prefix + "MC-Harbor-Windows-1.7.1-x64-Setup.msi"),
+        with zipfile.ZipFile(self.output / "MC-Harbor-1.7.1-Windows-x64-Setup.zip") as archive:
+            prefix = "MC-Harbor-1.7.1-Windows-x64-Setup/"
+            self.assertEqual(archive.read(prefix + "MC-Harbor-1.7.1-Windows-x64-Setup.msi"),
                              self.installer.read_bytes())
             self.assertIn(self.revision, archive.read(prefix + "INSTALL.txt").decode("utf-8"))
             self.assertIn(prefix + "LICENSE", archive.namelist())
             self.assertIn(prefix + "THIRD_PARTY_NOTICES.md", archive.namelist())
-        self.assertEqual((self.output / "MC-Harbor-Windows-1.7.1-x64-portable.zip").read_bytes(),
+        self.assertEqual((self.output / "MC-Harbor-1.7.1-Windows-x64-portable.zip").read_bytes(),
                          self.portable.read_bytes())
         self.assertIn(self.revision, (self.output / "RELEASE_NOTES.md").read_text(encoding="utf-8"))
 

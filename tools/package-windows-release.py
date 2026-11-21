@@ -57,19 +57,19 @@ def assemble(portable: Path, installer: Path, source: Path, output: Path,
     if output.exists() and any(output.iterdir()):
         raise ValueError("Use an empty output directory; previous release assets are not overwritten.")
     output.parent.mkdir(parents=True, exist_ok=True)
-    stem = f"MC-Harbor-Windows-{version}"
+    stem = f"MC-Harbor-{version}-Windows-x64"
     notes = (root / "docs/WINDOWS_RELEASE.md").read_text(encoding="utf-8")
     with tempfile.TemporaryDirectory(prefix="release-", dir=output.parent) as temporary:
         stage = Path(temporary)
         payloads = []
-        for origin, name in ((portable, f"{stem}-x64-portable.zip"),
-                             (installer, f"{stem}-x64-Setup.msi"),
+        for origin, name in ((portable, f"{stem}-portable.zip"),
+                             (installer, f"{stem}-Setup.msi"),
                              (source, f"{stem}-source.zip")):
             destination = stage / name
             shutil.copyfile(origin, destination)
             payloads.append(destination)
-        bundle = stage / f"{stem}-x64-Setup.zip"
-        prefix = f"{stem}-x64-Setup/"
+        bundle = stage / f"{stem}-Setup.zip"
+        prefix = f"{stem}-Setup/"
         instruction = (
             f"MC Harbor Windows {version} x64 安装版\n\n"
             "完整解压后，运行同目录的 MSI 安装器；请勿直接在压缩软件中运行。\n"
@@ -82,14 +82,14 @@ def assemble(portable: Path, installer: Path, source: Path, output: Path,
             f"MSI SHA-256：{sha256(installer)}\n"
         )
         with zipfile.ZipFile(bundle, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-            archive.write(installer, prefix + f"{stem}-x64-Setup.msi")
+            archive.write(installer, prefix + f"{stem}-Setup.msi")
             archive.writestr(prefix + "INSTALL.txt", instruction.encode("utf-8"))
             archive.writestr(prefix + "WINDOWS_RELEASE.md", notes.encode("utf-8"))
             for name in ("LICENSE", "THIRD_PARTY_NOTICES.md"):
                 archive.write(root / name, prefix + name)
         # A wrong MSI in the wrapper is a different install experience, even with a valid ZIP.
         with zipfile.ZipFile(bundle) as archive:
-            digest = hashlib.sha256(archive.read(prefix + f"{stem}-x64-Setup.msi")).hexdigest()
+            digest = hashlib.sha256(archive.read(prefix + f"{stem}-Setup.msi")).hexdigest()
             if digest != sha256(installer):
                 raise ValueError("The bundled MSI differs from the standalone installer.")
         _, findings = privacy.scan_zip(bundle, privacy.personal_markers([]), source=False)
@@ -97,7 +97,7 @@ def assemble(portable: Path, installer: Path, source: Path, output: Path,
             privacy.print_findings(findings)
             raise ValueError("The installer ZIP failed the release privacy checks.")
         payloads.append(bundle)
-        checksums = stage / f"SHA256SUMS-windows-{version}.txt"
+        checksums = stage / f"SHA256SUMS-{version}-Windows-x64.txt"
         checksums.write_text("".join(f"{sha256(path)}  {path.name}\n"
                                      for path in sorted(payloads)), encoding="ascii", newline="\n")
         release_notes = stage / "RELEASE_NOTES.md"

@@ -25,13 +25,13 @@ def digest(path: Path) -> str:
 
 
 def expected_names(version: str) -> tuple[str, ...]:
-    stem = f"MC-Harbor-Windows-{version}"
+    stem = f"MC-Harbor-{version}-Windows-x64"
     return (
-        f"{stem}-x64-portable.zip",
-        f"{stem}-x64-Setup.zip",
-        f"{stem}-x64-Setup.msi",
+        f"{stem}-portable.zip",
+        f"{stem}-Setup.zip",
+        f"{stem}-Setup.msi",
         f"{stem}-source.zip",
-        f"SHA256SUMS-windows-{version}.txt",
+        f"SHA256SUMS-{version}-Windows-x64.txt",
     )
 
 
@@ -61,8 +61,11 @@ def verify_local(directory: Path, version: str, revision: str) -> dict[str, tupl
 
 def missing_assets(assets: list[dict], local: dict[str, tuple[int, str]], version: str) -> list[str]:
     by_name = {asset["name"]: asset for asset in assets}
-    stem = f"MC-Harbor-Windows-{version}"
-    extras = {name for name in by_name if (name.startswith(stem) or name == f"SHA256SUMS-windows-{version}.txt") and name not in local}
+    stem = f"MC-Harbor-{version}-Windows-x64"
+    legacy = f"MC-Harbor-Windows-{version}"
+    extras = {name for name in by_name if (name.startswith(stem) or name.startswith(legacy)
+              or name in {f"SHA256SUMS-windows-{version}.txt", f"SHA256SUMS-{version}-Windows-x64.txt"})
+              and name not in local}
     if extras:
         raise ValueError("The shared Release has unexpected Windows attachments.")
     for name, (size, sha) in local.items():
@@ -72,14 +75,14 @@ def missing_assets(assets: list[dict], local: dict[str, tuple[int, str]], versio
 
 
 def windows_section(version: str, revision: str) -> str:
-    stem = f"MC-Harbor-Windows-{version}"
+    stem = f"MC-Harbor-{version}-Windows-x64"
     return f"""### Windows x64（{version}）
 
-- **安装版 ZIP**：`{stem}-x64-Setup.zip`，包含中文 MSI、安装说明及许可文件；也可单独下载 `{stem}-x64-Setup.msi`。
-- **便携版 ZIP**：`{stem}-x64-portable.zip`，完整解压后运行 `MC Harbor.exe`。
-- `{stem}-source.zip` 是对应 Windows 提交的源码；`SHA256SUMS-windows-{version}.txt` 用于核对四份 Windows 下载文件。
+- **安装版 ZIP**：`{stem}-Setup.zip`，包含中文 MSI、安装说明及许可文件；也可单独下载 `{stem}-Setup.msi`。
+- **便携版 ZIP**：`{stem}-portable.zip`，完整解压后运行 `MC Harbor.exe`。
+- `{stem}-source.zip` 是对应 Windows 提交的源码；`SHA256SUMS-{version}-Windows-x64.txt` 用于核对四份 Windows 下载文件。
 
-安装版数据保存在 `%LOCALAPPDATA%\\MCHarbor`，便携版数据保存在程序目录的 `MCHarborData`。安装版 ZIP 中的 MSI 与单独下载的 MSI 一致。本版只包含 x64，程序和 MSI 尚未使用公开可信证书签名。发行附件不包含账号、存档或私人配置；实际安装、升级、卸载、在线账号及不同设备环境仍需实机验证。Windows 源码提交：`{revision}`。"""
+安装版数据保存在 `%LOCALAPPDATA%\\MCHarbor`，便携版数据保存在程序目录的 `MCHarborData`。安装版 ZIP 中的 MSI 与单独下载的 MSI 一致。此处为 x64 附件说明；程序和 MSI 尚未使用公开可信证书签名。发行附件不包含账号、存档或私人配置；实际安装、升级、卸载、在线账号及不同设备环境仍需实机验证。Windows 源码提交：`{revision}`。"""
 
 
 def shared_description(body: str, version: str, revision: str) -> str:
