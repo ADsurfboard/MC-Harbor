@@ -3,6 +3,15 @@ import XCTest
 @MainActor final class HarborIOSUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false; XCUIDevice.shared.orientation = .portrait }
     override func tearDownWithError() throws { XCUIDevice.shared.orientation = .portrait }
+    func testDeveloperCreditsShowAuthorAndPortLead() {
+        let app = XCUIApplication()
+        app.launch()
+        openSettingsEntry("settings.credits", app: app)
+        XCTAssertTrue(app.staticTexts["ADsurfboard"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Windows、Android 与 Linux 移植负责人"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.staticTexts.matching(identifier: "时咨月.").count, 1)
+        capture("developers-and-contributors")
+    }
     func testWorldEditorSavesRealNBTAndRestoresAfterRelaunch() throws {
         let app = XCUIApplication(); app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"; app.launchEnvironment["HARBOR_WORLD_FIXTURE"] = "1"; app.launch()
         func openWorld() {

@@ -5,11 +5,11 @@ import ImageIO
 /// loader artwork in memory. Original assets remain unchanged in the repository.
 @MainActor enum HarborArtwork {
     private static let cache = NSCache<NSString, UIImage>()
-    static func image(_ name: String, pixels: Int = 192) -> UIImage? {
-        let key = "\(name)-\(pixels)" as NSString
+    static func image(_ name: String, pixels: Int = 192, fileExtension: String = "png") -> UIImage? {
+        let key = "\(name).\(fileExtension)-\(pixels)" as NSString
         if let cached = cache.object(forKey: key) { return cached }
         let bundle = Bundle(for: HarborRootFactory.self)
-        guard let url = bundle.url(forResource: name, withExtension: "png"),
+        guard let url = bundle.url(forResource: name, withExtension: fileExtension),
               let source = CGImageSourceCreateWithURL(url as CFURL, nil),
               let bitmap = CGImageSourceCreateThumbnailAtIndex(source, 0, [
                 kCGImageSourceCreateThumbnailFromImageAlways: true,

@@ -285,11 +285,17 @@ Intel 版已在 Rosetta 下校验并启动官方陶瓦、退出房间，并验�
 
 ## 开发者与平台分工
 
-MC Harbor 由 [ADsurfboard](https://github.com/ADsurfboard) 发起、设计并持续维护。**macOS、iOS 及除 Windows 外的版本继续由 ADsurfboard 独立开发。**
+### ADsurfboard
+
+<img src="Assets/Contributors/adsurfboard.jpg" width="72" height="72" alt="ADsurfboard 头像">
+
+[ADsurfboard](https://github.com/ADsurfboard) 发起、设计并维护 MC Harbor，独立负责 macOS、iOS 和 iPadOS 的开发。
+
+### 时咨月.
 
 <img src="Assets/Contributors/shiziyueyuan.png" width="72" height="72" alt="时咨月. 头像">
 
-**[时咨月.](https://github.com/shiziyueyuan)** 为项目正式授权的 **Windows 版本开发者与移植负责人**，在本仓库的 [`windows`](https://github.com/ADsurfboard/MC-Harbor/tree/windows) 分支开展后续移植、适配、测试与维护。此授权仅说明 Windows 官方开发分工，Windows 版本尚未作为正式成品发布。
+[时咨月.](https://github.com/shiziyueyuan) 为项目授权的 Windows、Android 与 Linux 移植负责人，负责开发、兼容性适配、测试与维护。Windows 相关工作在 [windows 分支](https://github.com/ADsurfboard/MC-Harbor/tree/windows) 开展。
 
 [开发分工与权限](GOVERNANCE.md) · [Windows 开发入口](docs/WINDOWS_PORT.md)
 
@@ -309,12 +315,6 @@ MC Harbor 由 [ADsurfboard](https://github.com/ADsurfboard) 发起、设计并�
 <img src="Assets/Contributors/flowerbank.png" width="72" height="72" alt="花圆银行 头像">
 
 导入进度展示建议：提出整合包导入时展示当前处理阶段与下载进度，替代仅显示加载转圈，让玩家了解任务状态并判断是否停滞。
-
-### 时咨月.
-
-<img src="Assets/Contributors/shiziyueyuan.png" width="72" height="72" alt="时咨月. 头像">
-
-负责后续 Windows 移植方向的官方开发工作。平台职责与实际完成的代码贡献分别记录，macOS、iOS 等版本的作者署名仍为 ADsurfboard。
 
 ### 作者的模组夹设计
 

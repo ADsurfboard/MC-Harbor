@@ -263,6 +263,7 @@ struct HarborPhoneRoot: View {
                     Section("关于") {
                         LabeledContent("作者", value: "ADsurfboard")
                         NavigationLink { HarborPeopleView() } label: { Label("开发者与贡献名单", systemImage: "person.2").frame(minHeight: 44) }
+                            .accessibilityIdentifier("settings.credits")
                         Text(services.runtimeDescription).font(.footnote).foregroundStyle(.secondary)
                         Link("GitHub 项目", destination: URL(string: "https://github.com/ADsurfboard/MC-Harbor")!)
                         Link("提交问题或建议", destination: URL(string: "https://github.com/ADsurfboard/MC-Harbor/issues")!)

@@ -6,6 +6,7 @@ private struct PhoneCredit: Decodable, Identifiable {
     let avatar: String
     let contributions: [String]
     let role: String?
+    let description: String?
     let category: String?
     let url: URL?
 }
@@ -19,37 +20,37 @@ struct HarborPeopleView: View {
     }
     var body: some View {
         List {
-            Section("项目作者") {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("ADsurfboard").font(.headline)
-                    Text("项目发起人、主要作者与维护负责人。macOS、iOS 及其他非 Windows 版本继续由作者独立开发与维护。")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                    Link("作者 GitHub", destination: URL(string: "https://github.com/ADsurfboard")!).frame(minHeight: 44)
-                }.padding(.vertical, 8)
-            }
-            Section("平台开发者") {
-                ForEach(entries.filter { $0.category == "developer" }) { entry in
-                    person(entry, includeContributions: false)
+            Section("开发人员") {
+                ForEach(entries.filter { $0.category == "author" || $0.category == "developer" }) { entry in
+                    person(entry)
                 }
             }
             Section("贡献名单") {
-                ForEach(entries) { entry in person(entry, includeContributions: true) }
+                ForEach(entries.filter { $0.category == nil }) { entry in
+                    person(entry)
+                }
             }
         }.harborPageBackground().harborMotionPolicy()
             .navigationTitle("开发者与贡献").navigationBarTitleDisplayMode(.inline)
     }
-    private func person(_ entry: PhoneCredit, includeContributions: Bool) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            if let image = HarborArtwork.image((entry.avatar as NSString).deletingPathExtension, pixels: 160) {
-                Image(uiImage: image).resizable().scaledToFill().frame(width: 52, height: 52).clipShape(Circle()).accessibilityHidden(true)
-            }
+    private func person(_ entry: PhoneCredit) -> some View {
+        let filename = entry.avatar as NSString
+        return HStack(alignment: .top, spacing: 12) {
+            Group {
+                if let image = HarborArtwork.image(filename.deletingPathExtension, pixels: 160, fileExtension: filename.pathExtension) {
+                    Image(uiImage: image).resizable().scaledToFill()
+                } else {
+                    Image(systemName: "person.crop.circle.fill").resizable().scaledToFit().foregroundStyle(.secondary)
+                }
+            }.frame(width: 52, height: 52).clipShape(Circle()).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 8) {
                 Text(entry.name).font(.headline)
                 if let role = entry.role { Text(role).font(.subheadline).foregroundStyle(.secondary) }
-                if includeContributions {
-                    ForEach(entry.contributions, id: \.self) { Text($0).font(.subheadline).fixedSize(horizontal: false, vertical: true) }
+                if let description = entry.description {
+                    Text(description).font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
-                if let url = entry.url { Link("GitHub 主页", destination: url).frame(minHeight: 44).contentShape(Rectangle()) }
+                ForEach(entry.contributions, id: \.self) { Text($0).font(.subheadline).fixedSize(horizontal: false, vertical: true) }
+                if let url = entry.url { Link(entry.category == "author" ? "作者 GitHub" : "GitHub 主页", destination: url).frame(minHeight: 44).contentShape(Rectangle()) }
             }
         }.padding(.vertical, 10)
     }
