@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import Combine
+import Darwin
 import Security
 import UniformTypeIdentifiers
 
@@ -281,16 +282,30 @@ enum JavaBridge {
             process.executableURL = URL(fileURLWithPath: "/usr/bin/nohup")
             process.arguments = [java] + (process.arguments ?? [])
         }
-        let data=try JSONSerialization.data(withJSONObject:input)
-        let stdin=Pipe(),stdout=Pipe(),stderr=Pipe();process.standardInput=stdin;process.standardOutput=stdout;process.standardError=stderr
-        let reader=BridgeReader(event:event,completion:completion)
+        let data = try JSONSerialization.data(withJSONObject: input)
+        let stdin = Pipe(), stdout = Pipe()
+        process.standardInput = stdin
+        process.standardOutput = stdout
+        // The Java protocol uses stdout exclusively. Drain discarded stderr in
+        // the kernel instead of retaining a pipe and a blocking reader per task.
+        process.standardError = FileHandle.nullDevice
+        _ = fcntl(stdin.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1)
+        let reader = BridgeReader(event: event, completion: completion)
+        process.terminationHandler = { process in reader.processEnded(process.terminationStatus) }
         try process.run()
-        DispatchQueue.global(qos:.userInitiated).async { while true {let data=stdout.fileHandleForReading.availableData;if data.isEmpty{break};reader.receive(data)};process.waitUntilExit();reader.finish(process.terminationStatus) }
-        DispatchQueue.global(qos:.utility).async {
-            while !stderr.fileHandleForReading.availableData.isEmpty {}
+        try? stdout.fileHandleForWriting.close()
+        DispatchQueue.global(qos: .userInitiated).async {
+            let output = stdout.fileHandleForReading
+            do {
+                while let data = try output.read(upToCount: 65_536), !data.isEmpty { reader.receive(data) }
+                reader.outputEnded()
+            } catch {
+                reader.outputEnded(error: error)
+            }
+            try? output.close()
         }
         do {
-            try stdin.fileHandleForWriting.write(contentsOf:data+Data([10]))
+            try stdin.fileHandleForWriting.write(contentsOf: data + Data([10]))
             try stdin.fileHandleForWriting.close()
         } catch {
             try? stdin.fileHandleForWriting.close()
@@ -301,9 +316,63 @@ enum JavaBridge {
     }
 }
 final class BridgeReader: @unchecked Sendable {
-    private var buffer=Data();private var result:[String:Any]?;private var failure:String?;private let lock=NSLock()
-    private let event:([String:Any])->Void;private let completion:(Result<[String:Any],Error>)->Void
-    init(event:@escaping([String:Any])->Void,completion:@escaping(Result<[String:Any],Error>)->Void){self.event=event;self.completion=completion}
-    func receive(_ data:Data){lock.lock();defer{lock.unlock()};buffer.append(data);while let index=buffer.firstIndex(of:10){let line=buffer[..<index];buffer.removeSubrange(...index);guard let object=(try? JSONSerialization.jsonObject(with:line)) as? [String:Any] else{continue};if object["event"] as? String=="result"{result=object["data"] as? [String:Any] ?? [:]}else if object["event"] as? String=="error"{failure=object["message"] as? String}else{event(object)}}}
-    func finish(_ code:Int32){lock.lock();let value=result;let error=failure;lock.unlock();if code==0,let value{completion(.success(value))}else{completion(.failure(NSError(domain:"MC Harbor",code:Int(code),userInfo:[NSLocalizedDescriptionKey:error ?? "后台任务未完成。请查看下载记录。"])))}}
+    private var buffer = Data()
+    private var result: [String: Any]?
+    private var failure: String?
+    private var outputClosed = false
+    private var terminationStatus: Int32?
+    private var finished = false
+    private let lock = NSLock()
+    private let event: ([String: Any]) -> Void
+    private let completion: (Result<[String: Any], Error>) -> Void
+
+    init(event: @escaping ([String: Any]) -> Void, completion: @escaping (Result<[String: Any], Error>) -> Void) {
+        self.event = event
+        self.completion = completion
+    }
+
+    func receive(_ data: Data) {
+        lock.lock()
+        buffer.append(data)
+        var events: [[String: Any]] = []
+        while let index = buffer.firstIndex(of: 10) {
+            let line = buffer[..<index]
+            buffer.removeSubrange(...index)
+            guard let object = (try? JSONSerialization.jsonObject(with: line)) as? [String: Any] else { continue }
+            switch object["event"] as? String {
+            case "result": result = object["data"] as? [String: Any] ?? [:]
+            case "error": failure = object["message"] as? String
+            default: events.append(object)
+            }
+        }
+        lock.unlock()
+        for object in events { event(object) }
+    }
+
+    func outputEnded(error: Error? = nil) {
+        lock.lock()
+        outputClosed = true
+        if let error, failure == nil { failure = error.localizedDescription }
+        let outcome = takeOutcome()
+        lock.unlock()
+        if let outcome { completion(outcome) }
+    }
+
+    func processEnded(_ code: Int32) {
+        lock.lock()
+        terminationStatus = code
+        let outcome = takeOutcome()
+        lock.unlock()
+        if let outcome { completion(outcome) }
+    }
+
+    private func takeOutcome() -> Result<[String: Any], Error>? {
+        guard outputClosed, let code = terminationStatus, !finished else { return nil }
+        finished = true
+        buffer.removeAll(keepingCapacity: false)
+        if code == 0, let result, failure == nil { return .success(result) }
+        return .failure(NSError(domain: "MC Harbor", code: Int(code), userInfo: [
+            NSLocalizedDescriptionKey: failure ?? "后台任务未完成。请查看下载记录。"
+        ]))
+    }
 }

@@ -4,9 +4,30 @@ enum AddonSource:String,Codable,CaseIterable,Identifiable {case modrinth,cursefo
 private final class QueryProcess:@unchecked Sendable {
     let lock=NSLock();var process:Process?;var continuation:CheckedContinuation<[String:Any],Error>?;var finished=false;var cancelled=false
     func register(_ continuation:CheckedContinuation<[String:Any],Error>){lock.lock();self.continuation=continuation;let cancel=cancelled;lock.unlock();if cancel{resolve(.failure(CancellationError()))}}
-    func set(_ process:Process){lock.lock();self.process=process;let cancel=cancelled;lock.unlock();if cancel{process.terminate()}}
-    func resolve(_ result:Result<[String:Any],Error>){lock.lock();guard !finished,let continuation else{lock.unlock();return};finished=true;lock.unlock();continuation.resume(with:result)}
-    func cancel(){lock.lock();cancelled=true;let process=process;lock.unlock();process?.terminate();resolve(.failure(CancellationError()))}
+    func set(_ process: Process) {
+        lock.lock()
+        let cancel = cancelled
+        if !finished { self.process = process }
+        lock.unlock()
+        if cancel && process.isRunning { process.terminate() }
+    }
+    func resolve(_ result: Result<[String: Any], Error>) {
+        lock.lock()
+        guard !finished, let continuation else { lock.unlock(); return }
+        finished = true
+        self.continuation = nil
+        process = nil
+        lock.unlock()
+        continuation.resume(with: result)
+    }
+    func cancel() {
+        lock.lock()
+        cancelled = true
+        let process = process
+        lock.unlock()
+        if let process, process.isRunning { process.terminate() }
+        resolve(.failure(CancellationError()))
+    }
 }
 enum BackendQuery {
     static func run(_ input:[String:Any],event:@escaping([String:Any])->Void={_ in})async throws->[String:Any]{
