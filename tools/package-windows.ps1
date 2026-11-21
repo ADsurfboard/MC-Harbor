@@ -199,6 +199,9 @@ else {
         [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($database)
         [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($installer)
     }
+    if ($Architecture -eq 'x64' -or [Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq [Runtime.InteropServices.Architecture]::Arm64) {
+        & (Join-Path $PSScriptRoot 'check-windows-installer.ps1') -InstallerPath $artifact -Architecture $Architecture
+    }
 }
 Move-Item -LiteralPath $artifact -Destination $output -Force
 Get-Item -LiteralPath $output

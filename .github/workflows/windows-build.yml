@@ -4,11 +4,16 @@ on:
   pull_request:
     branches: [windows]
   push:
-    branches: [windows, windows-x64-1.7.1, windows-arm64]
+    branches: [windows, windows-x64-1.7.1, windows-arm64, windows-1.7.1.1]
+    tags: ['windows-v*']
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: windows-package-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: false
 
 jobs:
   windows:
@@ -22,8 +27,24 @@ jobs:
             runner: windows-11-arm
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 40
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate Windows release version and tag
+        id: version
+        shell: pwsh
+        run: |
+          $version = (Get-Content SOURCE.json -Raw | ConvertFrom-Json).windows.version
+          if ($version -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') { throw 'Invalid Windows version.' }
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            if ($env:GITHUB_REF_NAME -ne "windows-v$version") { throw 'The tag differs from SOURCE.json.' }
+            git merge-base --is-ancestor HEAD origin/windows
+            if ($LASTEXITCODE -ne 0) { throw 'Release tags must point to reviewed windows history.' }
+          }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.404
@@ -38,8 +59,17 @@ jobs:
       - name: Check source privacy
         run: |
           python tools/test-source-privacy.py
+          if ($LASTEXITCODE -ne 0) { throw 'Source privacy regression checks failed.' }
+          python tools/test-windows-release.py
+          if ($LASTEXITCODE -ne 0) { throw 'Release packaging regression checks failed.' }
+          python tools/test-publish-windows-assets.py
+          if ($LASTEXITCODE -ne 0) { throw 'Shared Release publishing checks failed.' }
           python tools/check-source-privacy.py
+          if ($LASTEXITCODE -ne 0) { throw 'Source privacy check failed.' }
           python tools/test-windows-payload.py
+          if ($LASTEXITCODE -ne 0) { throw 'Windows payload checks failed.' }
+      - name: Export corresponding committed source before generating build files
+        run: python tools/package-windows-source.py --output-directory build/windows-source
       - name: Prepare WiX
         shell: pwsh
         run: |
@@ -70,6 +100,11 @@ jobs:
           tools/package-windows.ps1 -PublishDirectory $folder -Architecture $architecture -Format Installer
           python tools/check-windows-backend.py --directory $folder --architecture $architecture
           python tools/check-source-privacy.py --zip "build/MC-Harbor-Windows-$architecture-portable.zip"
+          if ($LASTEXITCODE -ne 0) { throw 'Windows payload privacy check failed.' }
+          if ($architecture -eq 'x64') {
+            python tools/package-windows-release.py
+            if ($LASTEXITCODE -ne 0) { throw 'Release assembly failed.' }
+          }
       - uses: ./.github/actions/upload-artifact-retry
         with:
           name: windows-${{ matrix.architecture }}-ci-unsigned
@@ -77,3 +112,26 @@ jobs:
           path: |
             build/MC-Harbor-Windows-${{ matrix.architecture }}-portable.zip
             build/MC-Harbor-Windows-${{ matrix.architecture }}-Setup.msi
+            build/windows-source/*
+            build/windows-release/*
+
+  release:
+    needs: windows
+    if: github.repository == 'ADsurfboard/MC-Harbor' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/windows-v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ github.ref_name }}
+      RELEASE_VERSION: ${{ needs.windows.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-x64-ci-unsigned
+          path: release-assets
+      - name: Verify and attach Windows assets to the shared Latest release
+        run: python3 tools/publish-windows-assets.py --directory release-assets
