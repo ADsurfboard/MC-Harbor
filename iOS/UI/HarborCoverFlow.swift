@@ -67,13 +67,16 @@ private final class HarborCoverFlowLayout: UICollectionViewLayout {
             AudioServicesCreateSystemSoundID(url as CFURL, &soundID)
         }
     }
+    static var hapticsEnabled: Bool {
+        UserDefaults.standard.object(forKey: HarborLibraryOptions.haptics) as? Bool ?? true
+    }
     func prepare() { selection.prepare() }
     func tick() {
         let now = CFAbsoluteTimeGetCurrent()
         guard now - lastTick >= 0.065 else { return }
         lastTick = now
         let preferences = UserDefaults.standard
-        if preferences.object(forKey: HarborLibraryOptions.haptics) as? Bool ?? true {
+        if Self.hapticsEnabled {
             selection.selectionChanged(); selection.prepare()
         }
         // A quiet original mechanical tick. System sound playback preserves
@@ -243,7 +246,10 @@ private struct NativeCoverFlow: UIViewRepresentable {
                 layout.liftedSlot = path.item
                 layout.destinationSlot = path.item
                 layout.invalidateLayout()
-                grabFeedback.impactOccurred(intensity: 0.72)
+                if HarborCrownFeedback.hapticsEnabled {
+                    grabFeedback.impactOccurred(intensity: 0.72)
+                    grabFeedback.prepare()
+                }
                 feedback.prepare()
                 if parent.spatialEffects {
                     UIView.animate(withDuration: 0.18, delay: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
@@ -260,8 +266,12 @@ private struct NativeCoverFlow: UIViewRepresentable {
                 transaction.previous = point
                 transaction.previousTime = now
                 let displacement = point.x - transaction.anchor.x
-                transaction.snapshot.center = CGPoint(x: transaction.origin.x + displacement,
-                    y: transaction.origin.y + (point.y - transaction.anchor.y) * 0.18)
+                // A small velocity-dependent lag gives the lifted card weight
+                // without delaying the position at which it exchanges places.
+                let trailingDistance = parent.spatialEffects ? min(22, max(-22, transaction.velocity * 0.022)) : 0
+                let verticalOffset = parent.spatialEffects ? (point.y - transaction.anchor.y) * 0.18 : 0
+                transaction.snapshot.center = CGPoint(x: transaction.origin.x + displacement - trailingDistance,
+                    y: transaction.origin.y + verticalOffset)
                 reorder = transaction
                 previewReorder(index(for: displacement, drag: transaction, layout: layout), in: view, layout: layout)
             case .ended, .cancelled, .failed:
@@ -307,7 +317,7 @@ private struct NativeCoverFlow: UIViewRepresentable {
                 guard let self, let view, self.reorder?.snapshot === transaction.snapshot else { return }
                 self.cleanReorder(in: view)
                 if committed {
-                    self.grabFeedback.impactOccurred(intensity: 0.52)
+                    if HarborCrownFeedback.hapticsEnabled { self.grabFeedback.impactOccurred(intensity: 0.52) }
                     if transaction.sourceIndex != index {
                         self.centerAfterReorder = true
                         self.parent.move(transaction.instance.id, index)
