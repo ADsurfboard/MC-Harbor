@@ -45,6 +45,8 @@ jobs:
         run: python3 tools/check-apple-bundle.py
       - name: Test packaged Apple Java backend
         run: python3 tools/check-apple-backend.py
+      - name: Verify independent game session and reconnect
+        run: python3 tools/check-game-lifecycle.py
       - name: Prepare disposable test keychain
         shell: bash
         run: |

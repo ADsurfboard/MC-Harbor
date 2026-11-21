@@ -11,13 +11,13 @@ from reportlab.platypus import Paragraph
 from reportlab.lib.styles import ParagraphStyle
 
 ROOT=Path(__file__).resolve().parent.parent
-OUT=Path(os.environ.get('HARBOR_DOC_OUTPUT',str(ROOT/'outputs/MC-Harbor-Introduction-1.7.1.pdf')));OUT.parent.mkdir(parents=True,exist_ok=True)
+OUT=Path(os.environ.get('HARBOR_DOC_OUTPUT',str(ROOT/'outputs/MC-Harbor-Introduction-1.7.2.pdf')));OUT.parent.mkdir(parents=True,exist_ok=True)
 pdfmetrics.registerFont(TTFont('CJK','/System/Library/Fonts/Supplemental/Arial Unicode.ttf'))
 W,H=595.276,841.89
 INK=HexColor('#10271E');GREEN=HexColor('#29825B');MUTED=HexColor('#5C6E65');PALE=HexColor('#EDF4EE');LINE=HexColor('#D9E5DD')
 DOC=canvas.Canvas(str(OUT),pagesize=(W,H),pageCompression=1)
-DOC.setTitle('MC Harbor | 启动器介绍');DOC.setAuthor('ADsurfboard');DOC.setSubject('1.7.1 双架构版：原生 macOS Minecraft 启动器、功能与汉化')
-README=['# MC Harbor','1.7.1 · Apple Silicon / Intel 双版本','[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/tag/v1.7.1) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.7.1/MC-Harbor-Introduction-1.7.1.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)','以下正文与随包 PDF 同版。']
+DOC.setTitle('MC Harbor | 启动器介绍');DOC.setAuthor('ADsurfboard');DOC.setSubject('1.7.2 双架构版：原生 macOS Minecraft 启动器、功能与汉化')
+README=['# MC Harbor','1.7.2 · Apple Silicon / Intel 双版本','[下载最新版](https://github.com/ADsurfboard/MC-Harbor/releases/tag/v1.7.2) · [产品介绍 PDF](https://github.com/ADsurfboard/MC-Harbor/releases/download/v1.7.2/MC-Harbor-Introduction-1.7.2.pdf) · [作者 GitHub](https://github.com/ADsurfboard) · [作者 B站](https://space.bilibili.com/1628767816) · [问题与功能建议](https://github.com/ADsurfboard/MC-Harbor/issues/new/choose)','以下正文与随包 PDF 同版。']
 STYLE=ParagraphStyle('body',fontName='CJK',fontSize=10.4,leading=17.4,textColor=INK,wordWrap='CJK',spaceAfter=0)
 
 def txt(text,x,y,size=11,color=INK,font='CJK'):
@@ -39,7 +39,7 @@ def page(number,tag,title,description):
     y=para(description,46,H-132,W-92,11,MUTED)
     rule(y-21);return y-52
 def finish(number):
-    rule(52);txt('MC Harbor  ·  1.7.1  ·  2026.11.15',46,33,8,MUTED)
+    rule(52);txt('MC Harbor  ·  1.7.2  ·  2026.11.21',46,33,8,MUTED)
     txt(f'{number:02d} / 14',W-86,33,8,MUTED);DOC.showPage()
 def section(title,text,y):
     README.append('### '+title)
@@ -67,8 +67,8 @@ para('为 macOS 重新设计的 Minecraft 启动器。\n保留 HMCL 的游戏能
 DOC.setStrokeColor(HexColor('#375448'));DOC.line(48,269,W-48,269)
 for x,big,small in [(48,'SwiftUI','原生界面'),(218,'HMCL','稳定内核'),(388,'Frosted','原生磨砂')]:
     txt(big,x,231,17,HexColor('#F4F8F4'));txt(small,x,207,10,HexColor('#A9C7B4'))
-para('1.7.1 · Apple Silicon / Intel 双版本\nApple Silicon：macOS 26 起；Intel：macOS 12 起',48,132,W-96,10,HexColor('#ADC4B5'),17)
-txt('ADsurfboard / Apple Silicon + Intel / 2026.11.15',48,51,9,HexColor('#A9C7B4'));txt('01 / 14',W-91,51,9,HexColor('#A9C7B4'));DOC.showPage()
+para('1.7.2 · Apple Silicon / Intel 双版本\nApple Silicon：macOS 26 起；Intel：macOS 12 起',48,132,W-96,10,HexColor('#ADC4B5'),17)
+txt('ADsurfboard / Apple Silicon + Intel / 2026.11.21',48,51,9,HexColor('#A9C7B4'));txt('01 / 14',W-91,51,9,HexColor('#A9C7B4'));DOC.showPage()
 
 # 02 - Features
 y=page(2,'DAILY USE','日常操作，一处完成。','以实例为中心。默认加载器图标高清重绘，保留实例资源原图标、可视化资源管理与明确的下载目标。')
@@ -195,21 +195,22 @@ def person(contributor,y):
     DOC.saveState();clip=DOC.beginPath();clip.circle(72,y-26,26);DOC.clipPath(clip,stroke=0,fill=0)
     DOC.drawImage(ImageReader(str(ROOT/'Assets/Contributors'/contributor['avatar'])),46,y-52,52,52,mask='auto');DOC.restoreState()
     txt(contributor['name'],112,y-8,14)
-    bottom=para('\n'.join(contributor['contributions']),112,y-24,W-158,10.2)
+    details = [contributor[key] for key in ('role', 'description') if contributor.get(key)] + contributor['contributions']
+    README.extend(details)
+    if contributor.get('url'):README.append('[GitHub 主页]('+contributor['url']+')')
+    bottom=para('\n'.join(details),112,y-24,W-158,10.2)
     return min(y-52,bottom)-26
 for contributor in people:
-    if contributor.get('category')!='developer':y=person(contributor,y)
+    if contributor.get('category') is None:y=person(contributor,y)
 y=section('作者的模组夹设计','模组夹、命名与轻染色材质、自动图标预览及展开交互由 ADsurfboard 提出；不混入社区问题反馈的署名。',y)
 y=section('验证范围与服务边界','发布前分别构建两种架构并运行回归；原生系统、窗口行为、事务和网络可用性需要分别验证。第三方镜像、翻译、认证与联机节点均可能变化；阿里翻译需自备有效密钥。自动测试不能代表所有模组组合、所有 macOS 小版本或所有地区网络已穷尽验证。',y)
 para('来源：MCIM / mcimirror.top；B站 / github.com/bilibili/Index-Translate；阿里 / help.aliyun.com/zh/model-studio/qwen-mt-api；MyMemory / mymemory.translated.net/doc/spec.php；Google 公共接口为非官方备选，无稳定性保证。',46,y,W-92,9,MUTED)
 finish(13)
 # 14 - Platform responsibilities
-y=page(14,'DEVELOPMENT','清晰分工，持续维护。','Windows 授权开发职责与现有实现贡献分别记录；平台维护分工不改变项目 GPL 许可。')
-y=section('作者与维护负责人 · ADsurfboard','项目发起、产品方向、主要开发与发布维护。Apple Silicon macOS、Intel macOS、iOS / iPadOS 及其他非 Windows 官方版本继续由 ADsurfboard 独立开发与维护。',y)
-README.insert(len(README)-1,'<img src="https://github.com/ADsurfboard.png?size=128" width="64" height="64" alt="ADsurfboard" style="border-radius:50%">')
+y=page(14,'DEVELOPMENT','清晰分工，持续维护。','Windows、Android 与 Linux 的移植职责与现有实现贡献分别记录；平台维护分工不改变项目 GPL 许可。')
 for contributor in people:
-    if contributor.get('category')=='developer':y=person(contributor,y)
-y=section('开发分支与当前阶段','Windows 移植在同一仓库 windows 分支开展，工作由时咨月. 负责；iOS / iPadOS 在 codex/ios-port 分支独立推进。此版本交付的是两种 macOS 安装包，iOS 工程和原生运行验证仍在继续，不以界面演示或构建成功替代 Minecraft 实玩结论。',y)
+    if contributor.get('category') in ('author','developer'):y=person(contributor,y)
+y=section('开发分支与当前阶段','时咨月. 负责 Windows、Android 与 Linux 移植。ADsurfboard 继续维护 macOS 与 iOS / iPadOS。此版本同时发布 Apple 芯片、Intel 和 iOS 工程包。iOS 已通过云端构建和模拟器测试，设备安装需要开发者签名与受支持的 JIT 授权。',y)
 y=section('反馈与维护','问题和功能建议统一通过 GitHub Issues 提交。请注明芯片、系统、软件与游戏版本、加载器、复现步骤，并清除日志中的令牌和私人信息。确认的贡献会继续保留明确署名。',y)
 source('平台分工与维护范围','https://github.com/ADsurfboard/MC-Harbor/blob/main/GOVERNANCE.md',y)
 README.append('[iOS / iPadOS 开发分支](https://github.com/ADsurfboard/MC-Harbor/tree/codex/ios-port) · [Windows 开发分支](https://github.com/ADsurfboard/MC-Harbor/tree/windows)')

@@ -20,6 +20,18 @@ public struct WallpaperSettings: Codable, Equatable {
     public var blur: Double = 0
     public var backdropBlur: Double = 28
 }
+enum HarborPostLaunch: String, Codable, CaseIterable, Identifiable {
+    case keep, hide, quit
+    var id: Self { self }
+    var title: String {
+        switch self {
+        case .keep: return "保持可见"
+        case .hide: return "隐藏启动器"
+        case .quit: return "退出启动器"
+        }
+    }
+}
+
 struct NativePreferences: Codable {
     var themeHex = "#29825B"
     var glassClarity: Double = 0.82
@@ -36,6 +48,7 @@ struct NativePreferences: Codable {
     var gameRoot = FileManager.default.fileExists(atPath:"/Applications/.minecraft") ? "/Applications/.minecraft":NativePaths.root.appendingPathComponent("game").path
     var selectedGame = ""
     var favorites: Set<String> = []
+    var postLaunch: HarborPostLaunch = .keep
     var memory = 3072
     var javaPath = NativePaths.resources.appendingPathComponent("Runtime/bin/java").path
     var downloadSource = "auto"

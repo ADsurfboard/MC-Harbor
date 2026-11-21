@@ -49,37 +49,257 @@ struct LibraryWallpaper:Codable,Identifiable,Equatable,Sendable {
     }
 }
 
-enum WallpaperThumbnails {
-    static func image(_ item:LibraryWallpaper)async->HarborDecodedBitmap? {
-        let url=URL(fileURLWithPath:item.path)
-        if item.kind == .video {let generator=AVAssetImageGenerator(asset:AVURLAsset(url:url));generator.appliesPreferredTrackTransform=true;generator.maximumSize=CGSize(width:640,height:400);let image:CGImage?;if #available(macOS 13.0, *){image=try? await generator.image(at:.zero).image}else{image=try? generator.copyCGImage(at:.zero,actualTime:nil)};guard let image else{return nil};return HarborDecodedBitmap(image:image)}
-        return HarborImageCache.decodeThumbnail(item.path,pixels:640)
+/// Limit simultaneous video generators when a lot of cards appear at once.
+private actor WallpaperDecoder {
+    static let shared = WallpaperDecoder()
+    private var active = 0
+
+    func bitmap(_ item: LibraryWallpaper, pixels: Int) async -> HarborDecodedBitmap? {
+        while active >= 2 {
+            do { try await HarborDelay.sleep(seconds: 0.04) }
+            catch { return nil }
+        }
+        guard !Task.isCancelled else { return nil }
+        active += 1
+        defer { active -= 1 }
+        let url = URL(fileURLWithPath: item.path)
+        if item.kind == .video {
+            let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+            generator.appliesPreferredTrackTransform = true
+            generator.maximumSize = CGSize(width: pixels, height: pixels)
+            let image: CGImage?
+            if #available(macOS 13.0, *) {
+                image = try? await generator.image(at: .zero).image
+            } else {
+                image = try? generator.copyCGImage(at: .zero, actualTime: nil)
+            }
+            guard !Task.isCancelled, let image else { return nil }
+            return HarborDecodedBitmap(image: image)
+        }
+        return HarborImageCache.decodeThumbnail(item.path, pixels: pixels)
     }
 }
-private struct WallpaperThumbnail:View {
-    let item:LibraryWallpaper
-    @State private var image:NSImage?
-    var body:some View{ZStack{Color.primary.opacity(0.06);if let image{Image(nsImage:image).resizable().scaledToFill()}else{Image(systemName:"photo").foregroundStyle(.secondary)}}.frame(height:112).clipped().overlay(alignment:.bottomTrailing){if item.kind == .video{Image(systemName:"video.fill").font(.system(size:11,weight:.semibold)).foregroundStyle(.white).padding(7).background(.black.opacity(0.5),in:RoundedRectangle(cornerRadius:8)).padding(7)}}.clipShape(RoundedRectangle(cornerRadius:14)).task(id:item.id){let bitmap=await Task.detached(priority:.utility){await WallpaperThumbnails.image(item)}.value;if !Task.isCancelled{image=bitmap.map{NSImage(cgImage:$0.image,size:.zero)}}}}
 
+enum WallpaperThumbnails {
+    static func image(_ item: LibraryWallpaper, pixels: Int = 640) async -> HarborDecodedBitmap? {
+        await WallpaperDecoder.shared.bitmap(item, pixels: pixels)
+    }
+
+    @MainActor static func presentation(_ item: LibraryWallpaper, pixels: Int) async -> NSImage? {
+        if let cached = HarborImageCache.cachedThumbnail(item.path, pixels: pixels) { return cached }
+        guard let bitmap = await image(item, pixels: pixels), !Task.isCancelled else { return nil }
+        return HarborImageCache.cacheThumbnail(bitmap, path: item.path, pixels: pixels)
+    }
 }
 
-struct WallpaperLibraryPanel:View {
-    @ObservedObject var model:LauncherModel
-    @Environment(\.scenePhase) private var phase
-    @StateObject private var library:WallpaperLibrary
-    @State private var selected:String?
-    @State private var name=""
-    @State private var preview:NSImage?
-    @State private var player:AVPlayer?
-    @State private var removing=false
-    init(model:LauncherModel){self.model=model;_library=StateObject(wrappedValue:WallpaperLibrary(current:model.preferences.wallpaper))}
-    private var current:LibraryWallpaper?{library.items.first{$0.id==selected}}
-    var body:some View{VStack(spacing:18){
-        HStack{Text("壁纸库").font(.system(size:27,weight:.semibold));Spacer();if library.busy{HarborActivityIndicator().controlSize(.small)};Button("导入图片或视频…"){library.choose()}.buttonStyle(HarborButtonStyle()).disabled(library.busy);Button{model.modal=nil}label:{HarborSymbol(systemName:"xmark")}.buttonStyle(HarborButtonStyle())}
-        HStack(alignment:.top,spacing:20){ScrollView{LazyVGrid(columns:[GridItem(.adaptive(minimum:155),spacing:12)],spacing:14){ForEach(library.items){item in Button{select(item)}label:{VStack(alignment:.leading,spacing:8){WallpaperThumbnail(item:item);HStack{Text(item.name).lineLimit(1);Spacer(minLength:2);if model.preferences.wallpaper.filePath==item.path{Image(systemName:"checkmark.circle.fill").foregroundStyle(model.controlTint)}}.font(.system(size:12)).padding(.horizontal,4)}.padding(7).background(selected==item.id ? model.themeColor.opacity(0.18):Color.primary.opacity(0.025),in:RoundedRectangle(cornerRadius:19)).contentShape(RoundedRectangle(cornerRadius:19))}.buttonStyle(HarborPressButtonStyle(pressedScale:0.98,pressedOffset:0))}}}.frame(maxWidth:.infinity,maxHeight:.infinity)
-            VStack(alignment:.leading,spacing:16){if let item=current{ZStack{Color.primary.opacity(0.04);if let player{WallpaperVideoPreview(player:player)}else if let preview{Image(nsImage:preview).resizable().scaledToFit()}else{HarborSymbol(systemName:"photo")}}.frame(height:220).clipShape(RoundedRectangle(cornerRadius:18));HStack{TextField("壁纸名称",text:$name).textFieldStyle(.roundedBorder).onSubmit{library.rename(item,to:name)};Button("保存"){library.rename(item,to:name)}.buttonStyle(HarborButtonStyle()).disabled(name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty)};Text(item.kind == .video ? "动态壁纸 · 无声播放":"静态壁纸").font(.system(size:12)).harborSecondaryText();HStack{Button("使用壁纸"){model.preferences.wallpaper.kind=item.kind;model.preferences.wallpaper.filePath=item.path;model.toast("壁纸已切换")}.buttonStyle(HarborButtonStyle(prominent:true));Button("移除"){removing=true}.buttonStyle(HarborButtonStyle())}}else{HarborEmptyView("选择壁纸",systemImage:"photo.on.rectangle",description:Text("导入后可命名、预览和切换。"))};Spacer()}.frame(width:320)
+private struct WallpaperThumbnail: View {
+    let item: LibraryWallpaper
+    @State private var image: NSImage?
+
+    var body: some View {
+        // The grid proposes the width. The artwork cannot negotiate a wider
+        // cell when its aspect ratio exceeds the allocated tile.
+        GeometryReader { geometry in
+            ZStack {
+                Color.primary.opacity(0.06)
+                if let image {
+                    Image(nsImage: image).resizable().scaledToFill()
+                } else {
+                    Image(systemName: "photo").foregroundStyle(.secondary)
+                }
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            .clipped()
+            .overlay(alignment: .bottomTrailing) {
+                if item.kind == .video {
+                    Image(systemName: "video.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(7)
+                        .background(.black.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+                        .padding(7)
+                }
+            }
         }
-        if let error=library.error{Text(error).font(.system(size:12)).harborSecondaryText().textSelection(.enabled).lineLimit(3)}
-    }.padding(25).onDisappear{player?.pause();player=nil}.harborOnChange(of:phase){_,value in if value == .active{player?.play()}else{player?.pause()}}.harborOnChange(of:library.items.count){_,_ in if current==nil,let first=library.items.first{select(first)}}.onAppear{if let item=library.items.first(where:{$0.path==model.preferences.wallpaper.filePath}) ?? library.items.first{select(item)}}.alert("从壁纸库移除？",isPresented:$removing){Button("取消",role:.cancel){};Button("移除",role:.destructive){if let item=current{if model.preferences.wallpaper.filePath==item.path{model.preferences.wallpaper.kind = .harbor;model.preferences.wallpaper.filePath=nil};player?.pause();player=nil;library.remove(item);selected=nil;preview=nil}}}message:{Text("导入的副本将被移除，原始文件保留。")}}
-    private func select(_ item:LibraryWallpaper){selected=item.id;name=item.name;player?.pause();player=nil;preview=nil;if item.kind == .video{let p=AVPlayer(url:URL(fileURLWithPath:item.path));p.isMuted=true;player=p;p.play()}else{Task{let bitmap=await Task.detached(priority:.utility){await WallpaperThumbnails.image(item)}.value;if selected==item.id{preview=bitmap.map{NSImage(cgImage:$0.image,size:.zero)}}}}}
+        .frame(height: 102)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .task(id: item.path) {
+            let result = await WallpaperThumbnails.presentation(item, pixels: 384)
+            if !Task.isCancelled { image = result }
+        }
+        .onDisappear { image = nil }
+    }
+}
+
+struct WallpaperLibraryPanel: View {
+    @ObservedObject var model: LauncherModel
+    @Environment(\.scenePhase) private var phase
+    @StateObject private var library: WallpaperLibrary
+    @State private var selected: String?
+    @State private var name = ""
+    @State private var preview: NSImage?
+    @State private var player: AVPlayer?
+    @State private var removing = false
+
+    init(model: LauncherModel) {
+        self.model = model
+        _library = StateObject(wrappedValue: WallpaperLibrary(current: model.preferences.wallpaper))
+    }
+
+    private var current: LibraryWallpaper? { library.items.first { $0.id == selected } }
+
+    var body: some View {
+        VStack(spacing: 18) {
+            HStack(spacing: 10) {
+                Text("壁纸库").font(.system(size: 27, weight: .semibold))
+                Spacer()
+                if library.busy { HarborActivityIndicator().controlSize(.small) }
+                Button("导入图片或视频…") { library.choose() }
+                    .buttonStyle(HarborButtonStyle()).disabled(library.busy)
+                Button { model.modal = nil } label: { HarborSymbol(systemName: "xmark") }
+                    .buttonStyle(HarborButtonStyle())
+                    .accessibilityLabel("关闭壁纸库")
+            }
+            GeometryReader { geometry in
+                HStack(alignment: .top, spacing: 20) {
+                    catalog
+                    Divider().opacity(0.30)
+                    detail.frame(width: min(320, max(230, geometry.size.width * 0.34)))
+                }
+            }
+            if let error = library.error {
+                Text(error).font(.system(size: 12)).harborSecondaryText().textSelection(.enabled).lineLimit(3)
+            }
+        }
+        .padding(25)
+        .onAppear { select(library.items.first { $0.path == model.preferences.wallpaper.filePath } ?? library.items.first) }
+        .onDisappear { stopPreview() }
+        .task(id: selected) {
+            guard let current, current.kind == .image else { return }
+            let result = await WallpaperThumbnails.presentation(current, pixels: 1120)
+            if !Task.isCancelled && selected == current.id { preview = result }
+        }
+        .harborOnChange(of: phase) { _, value in
+            if value == .active { player?.play() } else { player?.pause() }
+        }
+        .harborOnChange(of: library.items.count) { _, _ in
+            if current == nil { select(library.items.first) }
+        }
+        .alert("从壁纸库移除？", isPresented: $removing) {
+            Button("取消", role: .cancel) {}
+            Button("移除", role: .destructive) { removeSelection() }
+        } message: { Text("导入的副本将被移除，原始文件保留。") }
+    }
+
+    private var catalog: some View {
+        ScrollView {
+            if library.items.isEmpty {
+                HarborEmptyView("壁纸库为空", systemImage: "photo.on.rectangle")
+            } else {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 144), spacing: 12)], spacing: 12) {
+                    ForEach(library.items) { item in card(item) }
+                }
+                .padding(.horizontal, 2)
+                .padding(.vertical, 2)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
+    }
+
+    private func card(_ item: LibraryWallpaper) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 16)
+        let applied = model.preferences.wallpaper.filePath == item.path
+        return Button { select(item) } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                WallpaperThumbnail(item: item)
+                HStack(spacing: 5) {
+                    Text(item.name).lineLimit(1).truncationMode(.tail).layoutPriority(1)
+                    Spacer(minLength: 0)
+                    if applied { Image(systemName: "checkmark.circle.fill").foregroundStyle(model.controlTint) }
+                }
+                .font(.system(size: 12))
+                .padding(.horizontal, 3)
+            }
+            .padding(7)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(selected == item.id ? model.themeColor.opacity(0.18) : Color.primary.opacity(0.035), in: shape)
+            .clipShape(shape)
+            .contentShape(shape)
+        }
+        .buttonStyle(HarborPressButtonStyle(pressedScale: 0.98, pressedOffset: 0))
+        .help(item.name)
+    }
+
+    private var detail: some View {
+        ScrollView {
+            if let item = current {
+                VStack(alignment: .leading, spacing: 16) {
+                    GeometryReader { geometry in
+                        ZStack {
+                            Color.primary.opacity(0.04)
+                            if let player { WallpaperVideoPreview(player: player) }
+                            else if let preview { Image(nsImage: preview).resizable().scaledToFit() }
+                            else { HarborSymbol(systemName: "photo") }
+                        }
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                    }
+                    .aspectRatio(16.0 / 10.0, contentMode: .fit)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    HStack {
+                        TextField("壁纸名称", text: $name).textFieldStyle(.roundedBorder)
+                            .onSubmit { library.rename(item, to: name) }
+                        Button("保存") { library.rename(item, to: name) }
+                            .buttonStyle(HarborButtonStyle())
+                            .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                    Text(item.kind == .video ? "动态壁纸 · 无声播放" : "静态壁纸")
+                        .font(.system(size: 12)).harborSecondaryText()
+                    HStack {
+                        Button("使用壁纸") {
+                            model.preferences.wallpaper.kind = item.kind
+                            model.preferences.wallpaper.filePath = item.path
+                            model.toast("壁纸已切换")
+                        }
+                        .buttonStyle(HarborButtonStyle(prominent: true))
+                        Button("移除") { removing = true }.buttonStyle(HarborButtonStyle())
+                    }
+                }
+            } else {
+                HarborEmptyView("选择壁纸", systemImage: "photo.on.rectangle",
+                                description: Text("导入后可命名、预览和切换。"))
+            }
+        }.harborHideScrollIndicators()
+    }
+
+    private func select(_ item: LibraryWallpaper?) {
+        if selected == item?.id && (item?.kind != .video || player != nil) { return }
+        stopPreview()
+        selected = item?.id
+        name = item?.name ?? ""
+        guard let item, item.kind == .video else { return }
+        let player = AVPlayer(url: URL(fileURLWithPath: item.path))
+        player.isMuted = true
+        player.preventsDisplaySleepDuringVideoPlayback = false
+        self.player = player
+        if phase == .active { player.play() }
+    }
+
+    private func stopPreview() {
+        player?.pause()
+        player?.replaceCurrentItem(with: nil)
+        player = nil
+        preview = nil
+    }
+
+    private func removeSelection() {
+        guard let item = current else { return }
+        library.remove(item)
+        guard !library.items.contains(where: { $0.id == item.id }) else { return }
+        if model.preferences.wallpaper.filePath == item.path {
+            model.preferences.wallpaper.kind = .harbor
+            model.preferences.wallpaper.filePath = nil
+        }
+        select(library.items.first)
+    }
 }
