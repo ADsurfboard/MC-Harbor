@@ -162,7 +162,15 @@ private struct NativeCoverFlow: UIViewRepresentable {
             layout.instanceCount = coordinator.items.count
             coordinator.suppress = true; view.reloadData(); view.layoutIfNeeded()
             let position = coordinator.items.firstIndex { $0.id == focused } ?? 0
-            coordinator.center(layout.geometry.middle(position), in: view, animated: false)
+            if coordinator.centerAfterReorder, layout.geometry.slots > 0 {
+                let previous = min(coordinator.virtualIndex, layout.geometry.slots - 1)
+                let destination = layout.geometry.closestSlot(for: position, around: previous)
+                coordinator.centerAfterReorder = false
+                coordinator.center(previous, in: view, animated: false)
+                coordinator.center(destination, in: view, animated: spatialEffects)
+            } else {
+                coordinator.center(layout.geometry.middle(position), in: view, animated: false)
+            }
             coordinator.suppress = false
         } else if !coordinator.dragging, !view.isDecelerating,
                   let position = coordinator.items.firstIndex(where: { $0.id == focused }), position != coordinator.current {
@@ -183,6 +191,7 @@ private struct NativeCoverFlow: UIViewRepresentable {
         var virtualIndex = 0
         var dragging = false
         var suppress = false
+        var centerAfterReorder = false
         let feedback = HarborCrownFeedback()
         private let grabFeedback = UIImpactFeedbackGenerator(style: .soft)
         private struct Reorder {
@@ -296,11 +305,14 @@ private struct NativeCoverFlow: UIViewRepresentable {
             let relativeVelocity = abs(distance) > 8 ? min(3, max(-3, velocity / distance)) : 0
             let finish = { [weak self, weak view] in
                 guard let self, let view, self.reorder?.snapshot === transaction.snapshot else { return }
-                if committed {
-                    self.parent.move(transaction.instance.id, index)
-                    self.grabFeedback.impactOccurred(intensity: 0.52)
-                }
                 self.cleanReorder(in: view)
+                if committed {
+                    self.grabFeedback.impactOccurred(intensity: 0.52)
+                    if transaction.sourceIndex != index {
+                        self.centerAfterReorder = true
+                        self.parent.move(transaction.instance.id, index)
+                    }
+                }
             }
             guard parent.spatialEffects else { finish(); return }
             let spring = UISpringTimingParameters(dampingRatio: 0.80, initialVelocity: CGVector(dx: relativeVelocity, dy: 0))

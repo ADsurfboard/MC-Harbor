@@ -76,10 +76,7 @@ try:
          '-destination', 'platform=iOS Simulator,id=' + udid, '-parallel-testing-enabled', 'NO',
          '-maximum-concurrent-test-simulator-destinations', '1', '-derivedDataPath', str(ROOT / 'DerivedData'),
          '-resultBundlePath', str(OUT / 'native-profile.xcresult'), 'CODE_SIGNING_ALLOWED=NO', 'test']
-    completed = run_recorded_tests(command, device=udid, timeout=900,
-                                   clips={'testLocalModpackImportOpensFilesAndCanCancel': 'iPhone-Native-Modpack-Import'},
-                                   directory=ROOT / 'evidence/recordings/native')
-    completed.check_returncode()
+    subprocess.run(command, check=True, timeout=900)
     assert ready.is_file() and ready.read_text() == 'HARBOR_ROOT_READY', 'The complete native app did not reach its SwiftUI root'
     assert (home / 'accounts').is_dir(), 'Private account storage was not initialized'
     assert not (data / 'Documents/accounts').exists(), 'Accounts must not be Files-shared'
@@ -103,7 +100,21 @@ try:
     with zipfile.ZipFile(backups[-1]) as archive:
         assert archive.read('level.dat') == original_world
     report['realWorldEditingAndBackup'] = True
-    report.update(passed=True, realProfileCancelSaveAndRelaunch=True)
+    report.update(realProfileCancelSaveAndRelaunch=True)
+    if os.environ.get('HARBOR_RECORD_SIMULATOR') == '1':
+        # XCTest can buffer both case boundaries together. Replay only Files
+        # after the full suite, starting the camera before XCTest opens the app.
+        case = 'testLocalModpackImportOpensFilesAndCanCancel'
+        capture = command.copy()
+        capture[capture.index('-resultBundlePath') + 1] = str(ROOT / 'DerivedData' / 'HarborFilesRecording.xcresult')
+        capture[-1] = 'test-without-building'
+        capture.append('-only-testing:HarborNativeIOSUITests/HarborNativeIOSUITests/' + case)
+        record = run_recorded_tests(capture, device=udid, timeout=180,
+                                    clips={case: 'iPhone-Native-Modpack-Import'},
+                                    directory=ROOT / 'evidence/recordings/native', pre_record=True)
+        record.check_returncode()
+        report['filesRecordingReplayPassed'] = True
+    report['passed'] = True
 except Exception as error:
     report['error'] = str(error)
     if isinstance(error, subprocess.CalledProcessError):

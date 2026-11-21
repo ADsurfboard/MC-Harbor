@@ -14,7 +14,7 @@ CLIP_LIMIT_SECONDS = 90
 CLIP_LIMIT_BYTES = 60 * 1024 * 1024
 
 
-def run_recorded_tests(command, *, device, clips, directory, timeout, cwd=None):
+def run_recorded_tests(command, *, device, clips, directory, timeout, cwd=None, pre_record=False):
     if os.environ.get('HARBOR_RECORD_SIMULATOR') != '1':
         return subprocess.run(command, cwd=cwd, timeout=timeout)
 
@@ -46,20 +46,8 @@ def run_recorded_tests(command, *, device, clips, directory, timeout, cwd=None):
             clip['error'] = f'Invalid recorded size: {size}'
         clip = None
 
-    def show_line(line):
+    def start_recording(test):
         nonlocal active, clip
-        sys.stdout.buffer.write(line)
-        sys.stdout.buffer.flush()
-        match = TEST_EVENT.search(line.decode('utf-8', errors='replace'))
-        if not match or match[1] not in clips:
-            return
-        test, event = match.groups()
-        if event != 'started':
-            outcomes.setdefault(test, {})['status'] = event
-            if clip and clip['test'] == test:
-                stop_recording()
-            return
-        stop_recording()
         file_name = clips[test] + '.mp4'
         clip = {'file': file_name, 'test': test, 'started': time.monotonic()}
         outcomes[test] = clip
@@ -74,10 +62,29 @@ def run_recorded_tests(command, *, device, clips, directory, timeout, cwd=None):
                 clip['error'] = str(error)
                 clip = None
 
+    def show_line(line):
+        sys.stdout.buffer.write(line)
+        sys.stdout.buffer.flush()
+        match = TEST_EVENT.search(line.decode('utf-8', errors='replace'))
+        if not match or match[1] not in clips:
+            return
+        test, event = match.groups()
+        if event != 'started':
+            outcomes.setdefault(test, {})['status'] = event
+            if clip and clip['test'] == test:
+                stop_recording()
+        elif test not in outcomes:
+            stop_recording()
+            start_recording(test)
+
+    if pre_record and len(clips) != 1:
+        raise ValueError('Early video capture requires exactly one test case')
     process = subprocess.Popen(command, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                start_new_session=True)
     buffer = b''
     try:
+        if pre_record:
+            start_recording(next(iter(clips)))
         with selectors.DefaultSelector() as selector:
             selector.register(process.stdout, selectors.EVENT_READ)
             while True:
