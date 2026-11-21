@@ -150,6 +150,7 @@ else {
         [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($database)
         [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($installer)
     }
+    & (Join-Path $PSScriptRoot 'check-windows-installer.ps1') -InstallerPath $artifact
 }
 Move-Item -LiteralPath $artifact -Destination $output -Force
 Get-Item -LiteralPath $output
