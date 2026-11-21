@@ -220,23 +220,13 @@ import XCTest
     }
     func testCoverFlowSwipesSelectionAndRestoresList() throws {
         let app = XCUIApplication()
-        app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"; app.launch()
-        defer {
-            // Keep unrelated UI tests independent even when an assertion fails.
-            XCUIDevice.shared.orientation = .portrait
-            if app.buttons["安装或导入"].isHittable {
-                app.buttons["安装或导入"].tap()
-                if app.buttons["使用列表选择实例"].exists { app.buttons["使用列表选择实例"].tap() }
-                else { app.tap() }
-            }
-        }
-        let menu = app.buttons["安装或导入"]
-        XCTAssertTrue(menu.waitForExistence(timeout: 15)); menu.tap()
-        if app.buttons["使用列表选择实例"].exists {
-            app.buttons["使用列表选择实例"].tap()
-            menu.tap()
-        }
-        app.buttons["使用封面流选择实例"].tap()
+        app.launchEnvironment["HARBOR_SMOKE_TEST"] = "1"
+        // Choose the actual preference in the process argument domain so an
+        // unrelated system menu cannot block the gestures or leave later tests
+        // in Cover Flow. The instance order still uses the regular data store.
+        app.launchArguments = ["-harbor.library.coverflow", "YES"]
+        app.launch()
+        defer { XCUIDevice.shared.orientation = .portrait }
         let flow = app.collectionViews["library.coverflow"]
         XCTAssertTrue(flow.waitForExistence(timeout: 10))
         let previous = app.buttons["上一个实例"], next = app.buttons["下一个实例"]
@@ -293,8 +283,9 @@ import XCTest
         XCTAssertTrue(flow.waitForExistence(timeout: 10))
         XCTAssertEqual(app.staticTexts["library.coverflow.position"].label, "2 / 2")
         XCUIDevice.shared.orientation = .portrait
-        XCTAssertTrue(menu.waitForExistence(timeout: 10))
-        menu.tap(); app.buttons["使用列表选择实例"].tap()
+        app.terminate()
+        app.launchArguments = []
+        app.launch()
         XCTAssertTrue(app.buttons["instance.launch.fabric-example"].waitForExistence(timeout: 10))
         XCTAssertFalse(flow.exists)
         XCTAssertFalse(next.exists)

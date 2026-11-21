@@ -12,8 +12,12 @@ public struct CoverFlowGeometry: Sendable {
     public var contentWidth: Double { width + Double(max(0, slots - 1)) * pitch }
     public init(width: Double, height: Double, count: Int) {
         self.width = max(1, width); self.height = max(1, height); self.count = max(0, min(10_000, count))
-        cardHeight = max(1, height - 28)
-        cardWidth = max(1, min(width * 0.52, height * 0.91, 330))
+        let visibleFan = count > 1 && width >= 1200
+        // Keep the entire seven-card fan visible as a roomy landscape iPad
+        // supplies more height. A card's width cannot be driven by height alone.
+        let maximumWidth = visibleFan ? width * 0.17 : width * 0.52
+        cardWidth = max(1, min(maximumWidth, height * 0.91, 330))
+        cardHeight = max(1, min(height - 28, visibleFan ? cardWidth * 1.35 : height))
         // Leave visible air between the focused cover and its tilted neighbors.
         // Phone edges intentionally reveal a partial cover on either side.
         pitch = cardWidth * 0.90

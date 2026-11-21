@@ -595,7 +595,7 @@ struct HarborLibraryPresentationSettings: View {
                 }.pickerStyle(.segmented).accessibilityIdentifier("settings.library.mode")
                 HarborSettingsToggle("切换触觉反馈", isOn: $haptics).frame(minHeight: 44)
                 HarborSettingsToggle("机械切换音效", isOn: $sound).frame(minHeight: 44)
-                Text("封面流可左右滑动并吸附到当前实例。长按卡片可左右拖动排序。横屏点选中卡片打开实例操作。触觉与音效只在切换实例时触发；音效遵循设备静音。独家优化保留滑动操作，保留静态空间排布，关闭连续三维形变。")
+                Text("左右滑动浏览实例，长按卡片可拖动排序。横屏点按居中的卡片打开实例操作。触感跟随切换和排序，音效遵循设备静音。独家优化开启后，仍可滑动和排序，卡片使用静态空间排布。")
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }

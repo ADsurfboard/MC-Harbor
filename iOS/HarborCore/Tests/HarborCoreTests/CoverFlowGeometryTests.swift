@@ -95,16 +95,21 @@ final class CoverFlowGeometryTests: XCTestCase {
         XCTAssertEqual(CoverFlowGeometry(width: 390, height: 268, count: 1).slots, 1)
     }
     func testEveryLogicalPositionHasThreeSymmetricNeighbors() throws {
-        for count in 2...8 {
-            let layout = CoverFlowGeometry(width: 1376, height: 268, count: count)
-            for logical in 0..<count {
-                let selected = layout.middle(logical)
-                let range = try XCTUnwrap(layout.visible(around: layout.offset(selected)))
-                XCTAssertEqual(range.lowerBound, selected - 3)
-                XCTAssertEqual(range.upperBound, selected + 3)
-                for step in 1...3 {
-                    XCTAssertEqual(layout.logical(selected + step), (logical + step) % count)
-                    XCTAssertEqual(layout.logical(selected - step), (logical - step + count * 2) % count)
+        for height in [268.0, 960.0] {
+            for count in 2...8 {
+                let layout = CoverFlowGeometry(width: 1376, height: height, count: count)
+                for logical in 0..<count {
+                    let selected = layout.middle(logical)
+                    let offset = layout.offset(selected)
+                    let range = try XCTUnwrap(layout.visible(around: offset))
+                    XCTAssertEqual(range.lowerBound, selected - 3)
+                    XCTAssertEqual(range.upperBound, selected + 3)
+                    for step in 1...3 {
+                        XCTAssertEqual(layout.logical(selected + step), (logical + step) % count)
+                        XCTAssertEqual(layout.logical(selected - step), (logical - step + count * 2) % count)
+                    }
+                    let outer = layout.pose(slot: range.lowerBound, offset: offset, continuous: true)
+                    XCTAssertGreaterThanOrEqual(outer.centerX - offset, 24, "The outer card needs room inside the full-width viewport")
                 }
             }
         }
