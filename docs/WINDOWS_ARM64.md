@@ -32,6 +32,8 @@ tools/package-windows.ps1 -PublishDirectory build/MC-Harbor-Windows-arm64 -Archi
 
 生成 `build/MC-Harbor-Windows-arm64-portable.zip` 与 `build/MC-Harbor-Windows-arm64-Setup.msi`。ARM64 MSI 使用 ARM64 安装模板并检查 Windows 版本；便携版也在启动前检查最低系统版本。未签名测试构建不会标注为已获得受信任证书签名。
 
+MSI 从 64 位注册表读取实际的 Windows 内部版本号。打包时会确认这个值能从安装界面传给提权后的安装流程。
+
 `tools/setup-windows-arm64.ps1` 从 BellSoft Full JDK 的 ARM64 jmods 交叉链接精简运行时；开发机运行的 jlink 与目标模块均使用 Java 21。`tools/setup-windows-game-compat.ps1` 准备固定 x64 JRE，并保留其许可证。JavaFX 的 x64 JAR 仅供游戏兼容后台及编译使用。
 
 固定 Full JDK 附带一个未被其他原生二进制引用的 x64 `vcruntime140_1.dll`。准备脚本仅在其 SHA-256 与记录一致、且未发现其他 EXE/DLL 引用时，从生成的 ARM64 运行时排除该文件。其余 ARM64 VC 运行库与许可证完整保留；最终文件架构检查不为该目录放宽限制。

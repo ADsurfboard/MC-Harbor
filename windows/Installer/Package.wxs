@@ -5,7 +5,7 @@
            Language="2052" Codepage="936" InstallerVersion="500" Scope="perMachine">
     <MajorUpgrade Schedule="afterInstallInitialize" AllowSameVersionUpgrades="yes" DowngradeErrorMessage="此电脑已安装更新版本的 MC Harbor。" />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
-    <Property Id="HARBOR_WINDOWS_BUILD">
+    <Property Id="HARBOR_WINDOWS_BUILD" Secure="yes">
       <RegistrySearch Id="WindowsBuildNumber" Root="HKLM" Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion"
                       Name="CurrentBuildNumber" Type="raw" Bitness="always64" />
     </Property>

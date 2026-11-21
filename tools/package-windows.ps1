@@ -178,6 +178,20 @@ else {
         if ($packagedFiles -ne $payloadFiles.Count) {
             throw "The installer contains $packagedFiles files. Expected $($payloadFiles.Count) payload files."
         }
+        $propertyQuery = 'SELECT {0}Value{0} FROM {0}Property{0} WHERE {0}Property{0} = ''SecureCustomProperties''' -f [char]96
+        $propertyView = $database.OpenView($propertyQuery)
+        $propertyRecord = $null
+        try {
+            $propertyView.Execute()
+            $propertyRecord = $propertyView.Fetch()
+            if ($null -eq $propertyRecord -or ($propertyRecord.StringData(1) -split ';') -notcontains 'HARBOR_WINDOWS_BUILD') {
+                throw 'The Windows build check must be passed to the elevated installer.'
+            }
+        } finally {
+            if ($null -ne $propertyRecord) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($propertyRecord) }
+            $propertyView.Close()
+            [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($propertyView)
+        }
     } finally {
         $view.Close()
         [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($view)
