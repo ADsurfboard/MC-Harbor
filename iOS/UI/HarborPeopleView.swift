@@ -50,7 +50,12 @@ struct HarborPeopleView: View {
                     Text(description).font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
                 ForEach(entry.contributions, id: \.self) { Text($0).font(.subheadline).fixedSize(horizontal: false, vertical: true) }
-                if let url = entry.url { Link(entry.category == "author" ? "作者 GitHub" : "GitHub 主页", destination: url).frame(minHeight: 44).contentShape(Rectangle()) }
+                if let url = entry.url {
+                    Link("GitHub 主页", destination: url)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                        .accessibilityHint("打开 \(entry.name) 的 GitHub 个人主页")
+                }
             }
         }.padding(.vertical, 10)
     }
