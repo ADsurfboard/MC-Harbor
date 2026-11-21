@@ -101,8 +101,63 @@ precondition(HarborGameReceipts.controls(for: [wrong], in: directory).isEmpty)
                 if not receipt.exists(): break
                 time.sleep(.1)
 
+# Keep the real protocol bridge in this test. The fixture keeps its output
+# open after a short launch event until the client acknowledges the event.
+with tempfile.TemporaryDirectory(prefix='harbor-bridge-stream-') as folder:
+    scratch = Path(folder)
+    resources = scratch/'Runtime/bin'
+    resources.mkdir(parents=True)
+    fixture = resources/'java'
+    fixture.write_text(r'''#!/bin/sh
+/bin/cat >/dev/null
+printf '%s\n' '{"event":"launched","pid":42}'
+for ignored in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    if test -f "$HARBOR_BRIDGE_STREAM_QA/acknowledged"; then
+        printf '%s\n' '{"event":"result","data":{"acknowledged":true}}'
+        exit 0
+    fi
+    /bin/sleep 0.2
+done
+exit 2
+''')
+    fixture.chmod(0o700)
+    entry = scratch/'main.swift'
+    bridge=(root/'Sources/AppModel.swift').read_text().split('enum JavaBridge {',1)[1]
+    entry.write_text(r'''
+import Foundation
+import Darwin
+enum NativePaths {
+    static let root = URL(fileURLWithPath: ProcessInfo.processInfo.environment["HARBOR_BRIDGE_STREAM_QA"]!, isDirectory: true)
+    static let resources = root
+}
+let done = DispatchSemaphore(value: 0)
+let process = try JavaBridge.start(input: ["command": "launch"], event: { event in
+    guard event["event"] as? String == "launched" else { return }
+    try? Data().write(to: NativePaths.root.appendingPathComponent("acknowledged"), options: .atomic)
+}, completion: { result in
+    guard case .success(let value) = result, value["acknowledged"] as? Bool == true else { exit(1) }
+    done.signal()
+})
+let deadline = DispatchTime.now() + 8
+// Process's termination callback may use the main queue on older Foundation.
+var completed = false
+while DispatchTime.now() < deadline {
+    if done.wait(timeout: .now()) == .success {
+        completed = true
+        break
+    }
+    RunLoop.main.run(until: Date().addingTimeInterval(0.025))
+}
+guard completed, FileManager.default.fileExists(atPath: NativePaths.root.appendingPathComponent("acknowledged").path),
+      !process.isRunning, process.terminationStatus == 0 else { exit(1) }
+'''.replace('let done =', 'enum JavaBridge {'+bridge+'\nlet done =',1))
+    binary=scratch/'bridge-stream-check'
+    subprocess.run(['swiftc',entry,'-o',binary],check=True)
+    subprocess.run([binary],env=dict(os.environ,HARBOR_BRIDGE_STREAM_QA=folder),check=True,timeout=16)
+    print('A short launch event reached the client before the helper exited.')
+
 report = root/'evidence/game-lifecycle-report.json'
 report.parent.mkdir(exist_ok=True)
-report.write_text(json.dumps({'runsAfterLauncherExit': True, 'rejectsConcurrentOwner':True, 'boundedLogBuffer': True,
+report.write_text(json.dumps({'runsAfterLauncherExit': True, 'rejectsConcurrentOwner':True, 'boundedLogBuffer': True, 'liveLaunchEvent': True,
     'reconnectsMatchingPIDAndDirectory':True, 'stopsWithMarkerAndClearsReceipt':True},indent=2))
 print('Game session persists, reconnects, rejects a duplicate owner and stops correctly.')
