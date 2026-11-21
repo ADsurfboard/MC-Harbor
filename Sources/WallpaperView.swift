@@ -309,6 +309,7 @@ struct LoopingVideoView: NSViewRepresentable {
 
     static func dismantleNSView(_ nsView: VideoSurfaceView, coordinator: Coordinator) {
         coordinator.stop()
+        nsView.playerLayer.player = nil
     }
 
     final class Coordinator {
@@ -320,6 +321,7 @@ struct LoopingVideoView: NSViewRepresentable {
 
         func configure(url: URL, surface: VideoSurfaceView) {
             stop()
+            surface.playerLayer.player = nil
             currentURL = url
             securityScoped = url.startAccessingSecurityScopedResource()
             let item = AVPlayerItem(url: url)
@@ -347,9 +349,10 @@ struct LoopingVideoView: NSViewRepresentable {
         func stop() {
             playing = nil
             player?.pause()
+            looper?.disableLooping()
+            looper = nil
             player?.removeAllItems()
             player = nil
-            looper = nil
             if securityScoped, let currentURL {
                 currentURL.stopAccessingSecurityScopedResource()
             }

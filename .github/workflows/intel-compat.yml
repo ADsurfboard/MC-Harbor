@@ -41,6 +41,8 @@ jobs:
         run: python3 tools/check-intel-swift.py
       - name: Test packaged Intel Java backend
         run: python3 tools/check-intel-backend.py
+      - name: Verify independent game session and reconnect
+        run: python3 tools/check-game-lifecycle.py
       - name: Prepare disposable test keychain
         shell: bash
         run: |

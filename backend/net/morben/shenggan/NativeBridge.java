@@ -1,5 +1,8 @@
 package net.morben.shenggan;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
 import com.google.gson.*;
 import org.jackhuang.hmcl.auth.*;
 import org.jackhuang.hmcl.auth.microsoft.*;
@@ -167,10 +170,48 @@ public final class NativeBridge {
         if(request.has("account")){JsonObject stored=request.getAsJsonObject("account");Account account=restore(text("accountType","offline"),stored.getAsJsonObject("hmclMetadata"),stored.getAsJsonObject("privateData"));authentication=account.logIn();emit(Map.of("event","accountUpdated","data",serialize(account,text("accountType","offline"))));}
         else{String name=text("username","");if(!name.matches("[A-Za-z0-9_]{3,16}"))throw new IOException("离线用户名无效");UUID uuid;try{uuid=UUID.fromString(text("uuid",""));}catch(IllegalArgumentException e){uuid=UUID.nameUUIDFromBytes(("OfflinePlayer:"+name).getBytes(StandardCharsets.UTF_8));}authentication=new AuthInfo(name,uuid,"0",AuthInfo.USER_TYPE_LEGACY,"{}");}
         JavaRuntime java=gameJava(version);LaunchOptions options=new LaunchOptions.Builder().setGameDir(repository.getRunDirectory(id)).setJava(java).setVersionName(id).setVersionType("MC Harbor").setProfileName(id).setMaxMemory(Math.max(1024,Math.min(6144,integer("memory",3072)))).setWidth(Math.max(640,Math.min(7680,integer("width",1280)))).setHeight(Math.max(480,Math.min(4320,integer("height",800)))).setFullscreen(request.has("fullscreen")&&request.get("fullscreen").getAsBoolean()).setJavaArguments(StringUtils.tokenize(text("jvmArguments",""))).setDaemon(true).setAllowAutoAgent(true).setQuickPlayOption(text("serverAddress","").isBlank()?null:new org.jackhuang.hmcl.game.QuickPlayOption.MultiPlayer(validServer(text("serverAddress","")))).create();
-        Files.createDirectories(data.resolve("logs"));PrintWriter gameLog=new PrintWriter(Files.newBufferedWriter(data.resolve("logs").resolve("game-"+System.currentTimeMillis()+".log"),StandardCharsets.UTF_8));
-        ProcessListener listener=new ProcessListener(){@Override public synchronized void onLog(String line,boolean error){gameLog.println(line);gameLog.flush();}@Override public void onExit(int code,ExitType type){gameLog.close();}};
-        Path stop=NativeGameControl.stopPath(data,text("stopFile",""));
-        stage("启动游戏");ManagedProcess process=new DefaultLauncher(repository,version,authentication,options,listener,true).launch();emit(Map.of("event","launched","pid",process.getProcess().pid()));NativePlayHistory history=null;try{if(request.has("historySessionID"))history=new NativePlayHistory(data,text("historySessionID",""),repository.getRunDirectory(id),process.getProcess().pid());}catch(Exception error){System.err.println("Playtime receipt unavailable");}int exit;try{exit=NativeGameControl.waitFor(process.getProcess(),stop);}finally{if(history!=null)history.close();}return Map.of("id",id,"exitCode",exit);
+        Path runDirectory = repository.getRunDirectory(id);
+        Files.createDirectories(runDirectory);
+        try (NativeGameControl control = new NativeGameControl(data, runDirectory, text("stopFile", ""))) {
+            control.checkPendingStop();
+            Files.createDirectories(data.resolve("logs"));
+            PrintWriter gameLog = new PrintWriter(Files.newBufferedWriter(
+                    Files.createTempFile(data.resolve("logs"), "game-", ".log"), StandardCharsets.UTF_8));
+            var logClosed = new CountDownLatch(1);
+            ProcessListener listener = new ProcessListener() {
+                @Override public synchronized void onLog(String line, boolean error) {
+                    gameLog.println(line);
+                    gameLog.flush();
+                }
+                @Override public void onExit(int code, ExitType type) {
+                    gameLog.close();
+                    logClosed.countDown();
+                }
+            };
+            ManagedProcess process;
+            try {
+                stage("启动游戏");
+                process = new DefaultLauncher(repository, version, authentication, options, listener, true).launch();
+            } catch (Exception error) {
+                gameLog.close();
+                throw error;
+            }
+            control.record(id, process.getProcess());
+            emit(Map.of("event", "launched", "pid", process.getProcess().pid()));
+            NativePlayHistory history = null;
+            if (request.has("historySessionID")) {
+                try { history = new NativePlayHistory(data, text("historySessionID", ""), runDirectory, process.getProcess().pid()); }
+                catch (Exception error) { System.err.println("Playtime receipt unavailable"); }
+            }
+            try {
+                int exit = control.waitFor(process.getProcess());
+                // The pumps finish writing before the bridge exits, even after the app window closes.
+                logClosed.await(2, TimeUnit.SECONDS);
+                return Map.of("id", id, "exitCode", exit);
+            } finally {
+                if (history != null) history.close();
+            }
+        }
     }
     private static Map<String,Object> importPack()throws Exception{
         String name=validName(text("name",""));if(Files.exists(repository.getVersionRoot(name)))throw new IOException("实例目录已存在，未覆盖");Path file=Path.of(text("file",""));
