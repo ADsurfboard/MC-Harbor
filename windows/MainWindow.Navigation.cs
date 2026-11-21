@@ -46,7 +46,7 @@ public sealed partial class MainWindow
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 LibraryGameCount = new TextBlock
                 {
-                    FontFamily = new FontFamily("Cascadia Mono"), FontSize = 10, Opacity = 0.7,
+                    FontSize = 10, Opacity = 0.7,
                     VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed
                 };
                 Grid.SetColumn(LibraryGameCount, 2);

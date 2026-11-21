@@ -105,7 +105,7 @@ def main() -> None:
     revision = os.environ["GITHUB_SHA"]
     repository = os.environ["GH_REPO"]
     token = os.environ["GH_TOKEN"]
-    if repository != REPOSITORY or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
+    if repository != REPOSITORY or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?", version):
         raise SystemExit("Unexpected repository or Windows version.")
     if tag != f"windows-v{version}" or not re.fullmatch(r"[0-9a-f]{40}", revision):
         raise SystemExit("Windows tag or commit differs from the version.")

@@ -29,8 +29,8 @@ def sha256(path: Path) -> str:
 
 def assemble(portable: Path, installer: Path, source: Path, output: Path,
              version: str, revision: str, root: Path = ROOT) -> list[Path]:
-    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
-        raise ValueError("Expected a three-part Windows version.")
+    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?", version):
+        raise ValueError("Expected a three- or four-part Windows version.")
     if not re.fullmatch(r"[0-9a-f]{40}", revision):
         raise ValueError("Expected a complete source commit SHA.")
     for archive_path, source_archive in ((portable, False), (source, True)):

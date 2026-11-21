@@ -15,6 +15,11 @@ internal static class Program
     {
         try
         {
+            if (WindowsPlatform.ClientArchitecture == "arm64" && !OperatingSystem.IsWindowsVersionAtLeast(10, 0, 26100))
+            {
+                ShowLaunchError(IntPtr.Zero, "ARM64 版本需要 Windows 11 24H2 或更新版本。", "MC Harbor ARM64", 0x10);
+                return;
+            }
             WinRT.ComWrappersSupport.InitializeComWrappers();
             var identity = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(AppPaths.DataDirectory.ToUpperInvariant())));
             var current = AppInstance.FindOrRegisterForKey("MC-Harbor-" + identity);

@@ -8,6 +8,10 @@
             <ResourceDictionary.MergedDictionaries>
                 <controls:XamlControlsResources />
             </ResourceDictionary.MergedDictionaries>
+            <FontFamily x:Key="ContentControlThemeFontFamily">ms-appx:///Assets/Fonts/#Source Han Serif CN</FontFamily>
+            <Style TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
+            </Style>
             <Color x:Key="SystemAccentColor">#29825B</Color>
         </ResourceDictionary>
     </Application.Resources>

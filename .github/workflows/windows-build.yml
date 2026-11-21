@@ -1,10 +1,10 @@
-name: Windows x64 build check
+name: Windows build check
 
 on:
   pull_request:
     branches: [windows]
   push:
-    branches: [windows, windows-x64-1.7.1]
+    branches: [windows, windows-x64-1.7.1, windows-arm64, windows-1.7.1.1]
     tags: ['windows-v*']
   workflow_dispatch:
 
@@ -16,8 +16,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  windows-x64:
-    runs-on: windows-2022
+  windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: x64
+            runner: windows-2022
+          - architecture: arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 40
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -30,7 +38,7 @@ jobs:
         shell: pwsh
         run: |
           $version = (Get-Content SOURCE.json -Raw | ConvertFrom-Json).windows.version
-          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid Windows version.' }
+          if ($version -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') { throw 'Invalid Windows version.' }
           if ($env:GITHUB_REF_TYPE -eq 'tag') {
             if ($env:GITHUB_REF_NAME -ne "windows-v$version") { throw 'The tag differs from SOURCE.json.' }
             git merge-base --is-ancestor HEAD origin/windows
@@ -44,6 +52,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+          architecture: x64
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -57,6 +66,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Shared Release publishing checks failed.' }
           python tools/check-source-privacy.py
           if ($LASTEXITCODE -ne 0) { throw 'Source privacy check failed.' }
+          python tools/test-windows-payload.py
+          if ($LASTEXITCODE -ne 0) { throw 'Windows payload checks failed.' }
       - name: Export corresponding committed source before generating build files
         run: python tools/package-windows-source.py --output-directory build/windows-source
       - name: Prepare WiX
@@ -71,23 +82,41 @@ jobs:
           $tool | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
       - name: Check local translation transport privacy
         run: dotnet run --project tests/windows-local-transport/LocalTransportChecks.csproj -c Release
+      - name: Check platform routing and native execution
+        run: dotnet run --project tests/windows-platform-checks/PlatformChecks.csproj -c Release -r win-${{ matrix.architecture }} --self-contained false -- --expect-architecture ${{ matrix.architecture }}
+      - name: Check emulated OPUS runtime on ARM64
+        if: matrix.architecture == 'arm64'
+        shell: pwsh
+        run: |
+          tools/setup-windows-translation.ps1
+          & 'build/translation-python/tools/python.exe' -I tools/check-windows-translation-runtime.py
+          if ($LASTEXITCODE -ne 0) { throw 'The x64 OPUS compatibility runtime failed on ARM64.' }
       - name: Build unsigned test payload without optional licensed interface sounds
         shell: pwsh
         run: |
-          tools/build-windows.ps1 -Mode Publish
-          tools/package-windows.ps1 -PublishDirectory build/MC-Harbor-Windows -Format Installer
-          if ($LASTEXITCODE -ne 0) { throw 'Windows payload packaging failed.' }
-          python tools/package-windows-release.py
-          if ($LASTEXITCODE -ne 0) { throw 'Release assembly failed.' }
+          $architecture = '${{ matrix.architecture }}'
+          tools/build-windows.ps1 -Mode Publish -Architecture $architecture
+          $folder = if ($architecture -eq 'arm64') { 'build/MC-Harbor-Windows-arm64' } else { 'build/MC-Harbor-Windows' }
+          tools/package-windows.ps1 -PublishDirectory $folder -Architecture $architecture -Format Installer
+          python tools/check-windows-backend.py --directory $folder --architecture $architecture
+          python tools/check-source-privacy.py --zip "build/MC-Harbor-Windows-$architecture-portable.zip"
+          if ($LASTEXITCODE -ne 0) { throw 'Windows payload privacy check failed.' }
+          if ($architecture -eq 'x64') {
+            python tools/package-windows-release.py
+            if ($LASTEXITCODE -ne 0) { throw 'Release assembly failed.' }
+          }
       - uses: ./.github/actions/upload-artifact-retry
         with:
-          name: windows-x64-ci-unsigned
+          name: windows-${{ matrix.architecture }}-ci-unsigned
           compression-level: 0
           path: |
+            build/MC-Harbor-Windows-${{ matrix.architecture }}-portable.zip
+            build/MC-Harbor-Windows-${{ matrix.architecture }}-Setup.msi
+            build/windows-source/*
             build/windows-release/*
 
   release:
-    needs: windows-x64
+    needs: windows
     if: github.repository == 'ADsurfboard/MC-Harbor' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/windows-v')
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -97,7 +126,7 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}
       RELEASE_TAG: ${{ github.ref_name }}
-      RELEASE_VERSION: ${{ needs.windows-x64.outputs.version }}
+      RELEASE_VERSION: ${{ needs.windows.outputs.version }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4

@@ -1,4 +1,4 @@
-param([Parameter(Mandatory)][string]$InstallerPath)
+param([Parameter(Mandatory)][string]$InstallerPath, [ValidateSet('x64','arm64')][string]$Architecture = 'x64')
 
 $ErrorActionPreference = 'Stop'
 $package = (Resolve-Path -LiteralPath $InstallerPath).Path
@@ -44,17 +44,18 @@ try {
     $session.Property('HARBOR_WINDOWS_BUILD') = ''
     if ($session.DoAction('AppSearch') -ne 1) { throw 'The system build registry lookup failed.' }
 
+    $minimumBuild = if ($Architecture -eq 'arm64') { 26100 } else { 17763 }
     $actualBuild = [int](Get-ItemPropertyValue -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -Name CurrentBuildNumber)
     if ($session.Property('HARBOR_WINDOWS_BUILD') -ne [string]$actualBuild -or
-        $session.EvaluateCondition($systemCondition[0]) -ne [int]($actualBuild -ge 17763)) {
+        $session.EvaluateCondition($systemCondition[0]) -ne [int]($actualBuild -ge $minimumBuild)) {
         throw 'The MSI decision does not match the real Windows build with a legacy WindowsBuild value.'
     }
 
     $cases = @(
-        @{ Name = 'Below Windows 10 1809'; Build = '17762'; Bitness = '603'; Installed = ''; Expected = 0 }
-        @{ Name = 'Windows 10 1809';       Build = '17763'; Bitness = '603'; Installed = ''; Expected = 1 }
-        @{ Name = 'Windows 10 22H2';       Build = '19045'; Bitness = '603'; Installed = ''; Expected = 1 }
-        @{ Name = 'Windows 11';           Build = '26100'; Bitness = '603'; Installed = ''; Expected = 1 }
+        @{ Name = 'Below minimum build'; Build = [string]($minimumBuild - 1); Bitness = '603'; Installed = ''; Expected = 0 }
+        @{ Name = 'Minimum build';       Build = [string]$minimumBuild; Bitness = '603'; Installed = ''; Expected = 1 }
+        @{ Name = 'Windows 10 22H2';    Build = '19045'; Bitness = '603'; Installed = ''; Expected = [int]($minimumBuild -le 19045) }
+        @{ Name = 'Windows 11 24H2';   Build = '26100'; Bitness = '603'; Installed = ''; Expected = 1 }
         @{ Name = 'Missing build';        Build = '';      Bitness = '603'; Installed = ''; Expected = 0 }
         @{ Name = 'No 64-bit Windows';    Build = '19045'; Bitness = '';    Installed = ''; Expected = 0 }
         @{ Name = 'Existing installation';Build = '';      Bitness = '603'; Installed = '1';Expected = 1 }

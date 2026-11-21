@@ -9,16 +9,22 @@
     <EnableMsixTooling>false</EnableMsixTooling>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\App.ico</ApplicationIcon>
-    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
+    <PlatformTarget Condition="'$(RuntimeIdentifier)' == 'win-arm64'">ARM64</PlatformTarget>
+    <PlatformTarget Condition="'$(RuntimeIdentifier)' == 'win-x64'">x64</PlatformTarget>
+    <HarborRuntimeDirectory Condition="'$(HarborRuntimeDirectory)' == '' and '$(RuntimeIdentifier)' == 'win-arm64'">$(MSBuildProjectDirectory)\..\build\runtime-arm64</HarborRuntimeDirectory>
+    <HarborRuntimeDirectory Condition="'$(HarborRuntimeDirectory)' == ''">$(MSBuildProjectDirectory)\..\build\Runtime</HarborRuntimeDirectory>
+    <HarborRuntimeManifest Condition="'$(HarborRuntimeManifest)' == ''">$(MSBuildProjectDirectory)\..\build\$(RuntimeIdentifier)\runtime.json</HarborRuntimeManifest>
+    <HarborGameRuntimeDirectory Condition="'$(HarborGameRuntimeDirectory)' == ''">$(MSBuildProjectDirectory)\..\build\arm64-deps\jre-21.0.13.1</HarborGameRuntimeDirectory>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <DefaultItemExcludes>$(DefaultItemExcludes);obj\**;bin\**</DefaultItemExcludes>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <RootNamespace>MCHarbor.Windows</RootNamespace>
     <AssemblyName>MC Harbor</AssemblyName>
     <ApplicationTitle>MC Harbor</ApplicationTitle>
-    <Version>1.7.1</Version>
+    <Version>1.7.1.1</Version>
     <Deterministic>true</Deterministic>
     <PathMap>$(MSBuildProjectDirectory)=/_/windows</PathMap>
     <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
@@ -37,23 +43,36 @@
     <Content Include="..\Assets\Services.json" Link="Assets\Services.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\Assets\Voice\*.mp3" Link="Assets\Voice\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\Assets\Fonts\FluentSystemIcons-Regular.ttf" Link="Assets\Fonts\FluentSystemIcons-Regular.ttf" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\Assets\Fonts\SourceHanSerifCN-*.otf" Link="Assets\Fonts\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="..\build\Interface.soundbank" Link="Assets\Audio\Interface.soundbank" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\build\Interface.soundbank')" />
     <Content Include="..\Assets\Loaders\*.png" Link="Assets\Loaders\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\vendor\HMCLCore.jar" Link="Backend\HMCLCore.jar" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\vendor\HMCLCore.jar')" />
     <Content Include="..\build\Backend.jar" Link="Backend\Backend.jar" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\build\Backend.jar')" />
+    <Content Include="$(HarborRuntimeManifest)" Link="Backend\runtime.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(HarborRuntimeManifest)')" />
+  </ItemGroup>
+  <ItemGroup>
     <Content Include="..\vendor\javafx-windows-x64\javafx-base-21.0.8-win.jar" Link="Backend\javafx\javafx-base.jar" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\vendor\javafx-windows-x64\javafx-base-21.0.8-win.jar')" />
     <Content Include="..\vendor\javafx-windows-x64\javafx-graphics-21.0.8-win.jar" Link="Backend\javafx\javafx-graphics.jar" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\vendor\javafx-windows-x64\javafx-graphics-21.0.8-win.jar')" />
     <Content Include="..\vendor\javafx-windows-x64\javafx-controls-21.0.8-win.jar" Link="Backend\javafx\javafx-controls.jar" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\vendor\javafx-windows-x64\javafx-controls-21.0.8-win.jar')" />
     <Content Include="$(HMCL_FX_DIR)\javafx-base-21.0.8-win.jar" Link="Backend\javafx\javafx-base.jar" CopyToOutputDirectory="PreserveNewest" Condition="'$(HMCL_FX_DIR)' != '' and Exists('$(HMCL_FX_DIR)\javafx-base-21.0.8-win.jar')" />
     <Content Include="$(HMCL_FX_DIR)\javafx-graphics-21.0.8-win.jar" Link="Backend\javafx\javafx-graphics.jar" CopyToOutputDirectory="PreserveNewest" Condition="'$(HMCL_FX_DIR)' != '' and Exists('$(HMCL_FX_DIR)\javafx-graphics-21.0.8-win.jar')" />
     <Content Include="$(HMCL_FX_DIR)\javafx-controls-21.0.8-win.jar" Link="Backend\javafx\javafx-controls.jar" CopyToOutputDirectory="PreserveNewest" Condition="'$(HMCL_FX_DIR)' != '' and Exists('$(HMCL_FX_DIR)\javafx-controls-21.0.8-win.jar')" />
-    <Content Include="..\build\Runtime\**\*" Link="Runtime\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\build\Runtime')" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="$(HarborRuntimeDirectory)\**\*" Link="Runtime\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(HarborRuntimeDirectory)')" />
+    <Content Include="$(HarborGameRuntimeDirectory)\**\*" Link="Compatibility\JavaX64\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Condition="'$(RuntimeIdentifier)' == 'win-arm64' and Exists('$(HarborGameRuntimeDirectory)')" />
     <None Include="..\build\translation-python\tools\**\*"
           Exclude="..\build\translation-python\tools\**\__pycache__\**;..\build\translation-python\tools\**\*.pyc;..\build\translation-python\tools\**\*.pyo"
           Link="Translation\Python\%(RecursiveDir)%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest" />
     <None Update="Translation\worker.py;Translation\requirements.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+
+  <Target Name="ValidateWindowsArchitecture" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(RuntimeIdentifier)' != 'win-x64' and '$(RuntimeIdentifier)' != 'win-arm64'" Text="Supported Windows runtime identifiers are win-x64 and win-arm64." />
+    <Error Condition="'$(RuntimeIdentifier)' == 'win-arm64' and (!Exists('$(HarborRuntimeManifest)') or !Exists('$(HarborRuntimeDirectory)\bin\glass.dll'))" Text="Run tools/build-windows.ps1 -Architecture arm64 to prepare the native ARM64 JavaFX runtime." />
+    <Error Condition="'$(RuntimeIdentifier)' == 'win-arm64' and !Exists('$(HarborGameRuntimeDirectory)\bin\java.exe')" Text="Prepare the pinned x64 game compatibility runtime with tools/setup-windows-game-compat.ps1." />
+  </Target>
 
   <!-- The unpackaged WinUI targets put these files in bin, but omit them from dotnet publish. -->
   <Target Name="IncludeWinUIResourcesInPublish"

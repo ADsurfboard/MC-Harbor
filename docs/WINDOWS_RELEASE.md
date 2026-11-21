@@ -1,5 +1,7 @@
 # Windows 1.7.1 x64 发行说明
 
+本页记录已发布的 x64 1.7.1 附件。后续 ARM64 开发与测试构建见 [WINDOWS_ARM64.md](WINDOWS_ARM64.md)，不改变本页原 x64 发行附件的校验值或验证结论。
+
 项目作者为 ADsurfboard，Windows 移植负责人为时咨月.（shiziyueyuan）。本版以普通版 1.7.1 源码为公共基线，提交到上游 `windows` 分支审核；Windows 专用标签使用 `windows-*`。
 
 ## 内容与下载
